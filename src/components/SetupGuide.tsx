@@ -55,28 +55,48 @@ export const SetupGuide: React.FC = () => {
       </div>
 
       {/* Fix Missing File Box */}
-      <div className="bg-red-950/40 border-2 border-red-500/60 rounded-xl p-4 sm:p-5 shadow-xl space-y-3">
+      <div className="bg-emerald-950/40 border-2 border-emerald-500/60 rounded-xl p-4 sm:p-5 shadow-xl space-y-3">
         <div className="flex items-center justify-between">
-          <span className="text-sm font-bold text-red-400 flex items-center gap-2">
-            <ShieldAlert className="w-4 h-4 text-red-400" />
-            <span>🚨 Error Fix: "python: can't open file 'FeaturesticLeaks.py'"</span>
+          <span className="text-sm font-bold text-emerald-400 flex items-center gap-2">
+            <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+            <span>⚡ Direct Fix for GitHub Cloned Folder:</span>
           </span>
         </div>
 
-        <p className="text-xs text-red-200/90 leading-relaxed">
-          Yeh error isliye aa raha hai kyunki aapke GitHub Repo me <code className="text-emerald-400 font-bold">FeaturesticLeaks.py</code> file upload nahi hai ya name change hai. Isko fix karne ke liye Termux me yeh 1-Line command paste karein:
+        <p className="text-xs text-emerald-200/90 leading-relaxed">
+          Aapke GitHub repo me <code className="text-amber-300 font-bold">FeaturesticLeaks.py</code> file <code className="text-amber-300 font-bold">public/</code> folder ke andar hai. Aap niche me se koi bhi **1 command** Termux me copy-paste kar ke run karein:
         </p>
 
-        <div className="flex items-center justify-between bg-black p-3 rounded border border-red-800">
-          <code className="text-xs text-emerald-400 font-mono overflow-x-auto whitespace-pre">
-            curl -sSL https://ais-pre-4xyeqa646rna4n7nppfial-470491496334.asia-southeast1.run.app/FeaturesticLeaks.py -o FeaturesticLeaks.py && python FeaturesticLeaks.py
-          </code>
-          <button
-            onClick={() => handleCopy('curl -sSL https://ais-pre-4xyeqa646rna4n7nppfial-470491496334.asia-southeast1.run.app/FeaturesticLeaks.py -o FeaturesticLeaks.py && python FeaturesticLeaks.py', 77)}
-            className="ml-2 px-3 py-1 rounded bg-red-600 hover:bg-red-500 text-white font-bold text-xs shrink-0"
-          >
-            {copiedIndex === 77 ? 'Copied!' : 'Copy Fix Command'}
-          </button>
+        {/* Command 1: Run directly from public */}
+        <div className="space-y-1">
+          <span className="text-xs font-semibold text-slate-300">Option 1: Direct Run From Public Folder</span>
+          <div className="flex items-center justify-between bg-black p-3 rounded border border-emerald-800">
+            <code className="text-xs text-emerald-400 font-mono overflow-x-auto whitespace-pre">
+              python public/FeaturesticLeaks.py
+            </code>
+            <button
+              onClick={() => handleCopy('python public/FeaturesticLeaks.py', 77)}
+              className="ml-2 px-3 py-1 rounded bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shrink-0"
+            >
+              {copiedIndex === 77 ? 'Copied!' : 'Copy Command'}
+            </button>
+          </div>
+        </div>
+
+        {/* Command 2: Copy to Root and Run */}
+        <div className="space-y-1">
+          <span className="text-xs font-semibold text-slate-300">Option 2: Copy to Root Folder & Run</span>
+          <div className="flex items-center justify-between bg-black p-3 rounded border border-emerald-800">
+            <code className="text-xs text-emerald-400 font-mono overflow-x-auto whitespace-pre">
+              cp public/FeaturesticLeaks.py . && python FeaturesticLeaks.py
+            </code>
+            <button
+              onClick={() => handleCopy('cp public/FeaturesticLeaks.py . && python FeaturesticLeaks.py', 78)}
+              className="ml-2 px-3 py-1 rounded bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shrink-0"
+            >
+              {copiedIndex === 78 ? 'Copied!' : 'Copy Command'}
+            </button>
+          </div>
         </div>
       </div>
       <div className="bg-amber-950/40 border-2 border-amber-500/60 rounded-xl p-4 sm:p-5 shadow-xl space-y-3">
