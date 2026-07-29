@@ -22,6 +22,25 @@ from functools import lru_cache
 from pathlib import PurePath, Path
 from typing import List, Dict, Tuple, Optional, Any
 import time
+import subprocess
+
+# Auto-install missing dependencies if run directly with python
+def _ensure_package(pkg_name, import_name=None):
+    if import_name is None:
+        import_name = pkg_name
+    try:
+        __import__(import_name)
+    except ImportError:
+        print(f"[+] Installing missing dependency: {pkg_name}...")
+        subprocess.check_call([sys.executable, "-m", "pip", "install", pkg_name])
+
+_ensure_package("rich")
+_ensure_package("requests")
+_ensure_package("pytz")
+_ensure_package("gmalg")
+_ensure_package("pycryptodome", "Crypto")
+_ensure_package("zstandard")
+
 from rich.console import Console
 from rich.panel import Panel
 from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TaskProgressColumn, TimeElapsedColumn, TimeRemainingColumn

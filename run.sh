@@ -32,10 +32,10 @@ if [ ${#MISSING_PKGS[@]} -ne 0 ]; then
 fi
 
 # Python library installation check
-echo -e "\e[1;36m[+] Verifying Python requirements (rich, requests, pycryptodome, zstandard)...\e[0m"
-python3 -c "import rich, requests, Crypto, zstandard" 2>/dev/null || {
+echo -e "\e[1;36m[+] Verifying Python requirements (rich, requests, pycryptodome, zstandard, pytz, gmalg)...\e[0m"
+python3 -c "import rich, requests, Crypto, zstandard, pytz, gmalg" 2>/dev/null || {
     echo -e "\e[1;33m[+] Installing missing Python modules...\e[0m"
-    pip install rich requests pycryptodome zstandard
+    pip install rich requests pycryptodome zstandard pytz gmalg
 }
 
 # Ensure workspaces exist
@@ -43,12 +43,21 @@ mkdir -p PAK UNPACK REPACK RESULT "PAK TOOL/PAK" "PAK TOOL/EDIT" "PAK TOOL/UNPAC
 
 # Create global shortcut 'paktool' in Termux bin if possible
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-if [ -d "$PREFIX/bin" ] && [ ! -f "$PREFIX/bin/paktool" ]; then
-    echo -e "\e[1;36m[+] Creating Termux quick command 'paktool'...\e[0m"
-    echo "#!/usr/bin/env bash" > "$PREFIX/bin/paktool"
-    echo "cd \"$SCRIPT_DIR\" && ./run.sh" >> "$PREFIX/bin/paktool"
-    chmod +x "$PREFIX/bin/paktool"
-    echo -e "\e[1;32m[✔] Quick command created! You can now launch this tool by typing 'paktool' anywhere in Termux.\e[0m"
+BIN_DIR=""
+
+if [ -n "$PREFIX" ] && [ -d "$PREFIX/bin" ]; then
+    BIN_DIR="$PREFIX/bin"
+elif [ -d "/data/data/com.termux/files/usr/bin" ]; then
+    BIN_DIR="/data/data/com.termux/files/usr/bin"
+elif [ -d "$HOME/.local/bin" ]; then
+    BIN_DIR="$HOME/.local/bin"
+fi
+
+if [ -n "$BIN_DIR" ]; then
+    echo "#!/usr/bin/env bash" > "$BIN_DIR/paktool"
+    echo "cd \"$SCRIPT_DIR\" && python3 FeaturesticLeaks.py \"\$@\"" >> "$BIN_DIR/paktool"
+    chmod +x "$BIN_DIR/paktool"
+    echo -e "\e[1;32m[✔] Quick command created/updated in $BIN_DIR/paktool!\e[0m"
 fi
 
 if [ -f "FeaturesticLeaks.py" ]; then
