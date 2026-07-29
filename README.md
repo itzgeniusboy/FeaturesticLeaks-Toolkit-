@@ -9,11 +9,23 @@
 
 Termux me tool setup aur chalane ke liye niche diye gaye commands ko ek ek karke run karein:
 
-### ⚡ Option 1: One-Line Express Installer (Sabse Aasan)
-Termux open karein aur is poori line ko copy karke paste kar dein:
+### ⚡ Option 1: Auto-Launcher Script (`run.sh`) (Recommended)
+Termux open karein aur `run.sh` execute karein:
 
 ```bash
-pkg update -y && pkg upgrade -y && pkg install -y python php git clang libffi openssl zlib make tar wget && pip install rich requests pycryptodome zstandard && python FeaturesticLeaks.py
+chmod +x run.sh && ./run.sh
+```
+
+Or run via bash:
+```bash
+bash run.sh
+```
+
+---
+
+### ⚡ Option 2: Express One-Line Installer
+```bash
+pkg update -y && pkg install -y python php git clang libffi openssl zlib make tar wget && pip install rich requests pycryptodome zstandard && python FeaturesticLeaks.py
 ```
 
 ---

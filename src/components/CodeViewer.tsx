@@ -23,11 +23,11 @@ export const CodeViewer: React.FC = () => {
       description: 'PHP REST API handling key verification, hardware ID (HWID) binding, key expiry calculations, and database validation.',
     },
     setup: {
-      name: 'setup.sh',
+      name: 'run.sh',
       language: 'bash',
       code: SETUP_SCRIPT,
-      type: 'Termux Installation Script',
-      description: 'Automated Termux dependency installer (pkg install python php git, pip install rich requests pycryptodome zstandard).',
+      type: 'Termux Auto-Launcher & Installer Script',
+      description: 'Automated launcher script that installs dependencies (pip install rich requests pycryptodome zstandard) and executes FeaturesticLeaks.py.',
     },
   };
 
@@ -106,7 +106,7 @@ export const CodeViewer: React.FC = () => {
               }`}
             >
               <Cpu className="w-4 h-4" />
-              <span>setup.sh</span>
+              <span>run.sh</span>
             </button>
           </div>
         </div>
