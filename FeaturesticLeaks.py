@@ -1472,9 +1472,36 @@ def ensure_directories(base_dir: Path):
 
 def print_banner():
     os.system('cls' if os.name == 'nt' else 'clear')
-    banner_text = "[bold cyan]FEATURESTIC LEAKS[/bold cyan]\n[bold green]PAK TOOL v2.0 - Termux Edition[/bold green]\n[bold yellow]📢 Channel: https://t.me/FeaturesticLeaks[/bold yellow]"
-    console.print(Panel(banner_text, expand=False, border_style="bold magenta"))
-    console.print()
+    now = datetime.now()
+    date_str = now.strftime("%d/%b/%y %a")
+    
+    ascii_title = (
+        "[bold cyan]███████╗███████╗██████╗ ████████╗██╗   ██╗██████╗ ██╗███████╗████████╗██╗ ██████╗[/bold cyan]\n"
+        "[bold cyan]██╔════╝██╔════╝██╔══██╗╚══██╔══╝██║   ██║██╔══██╗██║██╔════╝╚══██╔══╝██║██╔════╝[/bold cyan]\n"
+        "[bold bright_cyan]█████╗  █████╗  ██████╔╝   ██║   ██║   ██║██████╔╝██║███████╗   ██║   ██║██║     [/bold bright_cyan]\n"
+        "[bold yellow]██╔══╝  ██╔══╝  ██╔══██╗   ██║   ██║   ██║██╔══██╗██║╚════██║   ██║   ██║██║     [/bold yellow]\n"
+        "[bold red]██║     ███████╗██║  ██║   ██║   ╚██████╔╝██║  ██║██║███████║   ██║   ██║╚██████╗[/bold red]\n"
+        "[bold bright_red]╚═╝     ╚══════╝╚═╝  ╚═╝   ╚═╝    ╚═════╝ ╚═╝  ╚═╝╚═╝╚══════╝   ╚═╝   ╚═╝ ╚═════╝[/bold bright_red]\n\n"
+        "[bold bright_yellow]⚡ PAK TOOL v2.0 - TERMUX ULTIMATE REVERSE ENGINEERING SUITE ⚡[/bold bright_yellow]\n"
+        "[bold bright_green]📢 Official Telegram: https://t.me/FeaturesticLeaks[/bold bright_green]"
+    )
+    
+    banner_panel = Panel(
+        Align.center(ascii_title),
+        border_style="bold bright_blue",
+        box=ROUNDED,
+        padding=(0, 2)
+    )
+    console.print(banner_panel)
+    
+    prompt_header = (
+        f"[bold bright_red]┌──[[/bold bright_red][bold bright_blue]FeaturesticLeaks[/bold bright_blue]"
+        f"[bold bright_red]@[/bold bright_red][bold cyan]termux[/bold cyan]"
+        f"[bold bright_red]─[[/bold bright_red][bold yellow]~[/bold yellow][bold bright_red]]──────────────────────────[/bold bright_red]"
+        f" [black on green] 📅 {date_str} [/black on green]\n"
+        f"[bold bright_red]└──[/bold bright_red][bold yellow]❯❯❯[/bold yellow]"
+    )
+    console.print(prompt_header)
 
 def safe_input(prompt: str='') -> str:
     try:
@@ -1540,26 +1567,61 @@ def delete_folder(data_path: Path) -> None:
         console.print('[bold #FF0055]❌ Invalid input[/bold #FF0055]')
 
 def display_file_selector(title, folder_path, file_pattern="*.pak"):
-    files = list(folder_path.glob(file_pattern))
+    folder_path = Path(folder_path)
+    files = list(folder_path.glob(file_pattern)) if folder_path.exists() else []
+    
     if not files:
-        console.print(f"[bold red][ERROR] No {file_pattern} files in {folder_path}[/]")
-        return None, None
-    selection_table = Table(title=f"[bold cyan]{title}[/]", expand=True, box=ROUNDED, border_style="yellow")
-    selection_table.add_column("[bold yellow]#[/]", justify="center", style="bold yellow", width=4)
-    selection_table.add_column("[bold green]File Name[/]", justify="left", style="bold bright_green")
-    selection_table.add_column("[bold magenta]Size[/]", justify="right", style="bold bright_magenta")
+        console.print(f"[bold yellow]⚠ No {file_pattern} files found in default workspace ({folder_path})[/bold yellow]")
+        console.print("[bold cyan]👉 Enter custom file path or SDCard folder path (or press Enter to cancel):[/bold cyan]")
+        console.print("[bold dim]Examples:\n  • /sdcard/Download\n  • /sdcard/Download/my_game.pak[/bold dim]")
+        custom_input = safe_input("📂 Enter path: ").strip().strip('"\'')
+        if not custom_input:
+            return None, None
+        custom_p = Path(custom_input)
+        if custom_p.is_file():
+            return custom_p, [custom_p]
+        elif custom_p.is_dir():
+            files = list(custom_p.glob(file_pattern))
+            if not files:
+                console.print(f"[bold red][ERROR] No {file_pattern} files found in custom directory: {custom_p}[/bold red]")
+                return None, None
+            folder_path = custom_p
+        else:
+            console.print(f"[bold red][ERROR] Path does not exist: {custom_p}[/bold red]")
+            return None, None
+
+    selection_table = Table(title=f"[bold bright_yellow]📁 {title}[/bold bright_yellow]", expand=True, box=ROUNDED, border_style="bright_blue")
+    selection_table.add_column("[bold yellow]Option[/bold yellow]", justify="center", width=10)
+    selection_table.add_column("[bold green]File Name / Target[/bold green]", justify="left", style="bold bright_green")
+    selection_table.add_column("[bold magenta]Size[/bold magenta]", justify="right", style="bold bright_magenta")
+    
     for i, f in enumerate(files, 1):
         size_mb = f.stat().st_size / (1024 * 1024)
-        selection_table.add_row(str(i), f.name, f"{size_mb:.2f} MB")
+        selection_table.add_row(f"[black on green]  {i}  [/black on green]", f.name, f"[bold yellow]{size_mb:.2f} MB[/bold yellow]")
+    
+    selection_table.add_row("[black on yellow]  C  [/black on yellow]", "[bold bright_yellow]Custom Path (e.g. /sdcard/Download/file.pak)[/bold bright_yellow]", "-")
     console.print(selection_table)
+    
     try:
-        idx = int(console.input(f"\n[bold yellow]Select file number (1-{len(files)}): [/]")) - 1
+        user_choice = console.input(f"\n[bold bright_red]└──[/bold bright_red][bold yellow]❯❯❯ Select file (1-{len(files)}) or 'C': [/bold yellow]").strip().upper()
+        if user_choice == 'C':
+            custom_input = safe_input("📂 Enter custom file path: ").strip().strip('"\'')
+            if not custom_input:
+                return None, None
+            custom_p = Path(custom_input)
+            if custom_p.is_file():
+                return custom_p, [custom_p]
+            else:
+                console.print(f"[bold red][ERROR] Invalid file path or file does not exist: {custom_p}[/bold red]")
+                return None, None
+        
+        idx = int(user_choice) - 1
         if idx < 0 or idx >= len(files):
-            console.print("[bold red][ERROR] Invalid selection[/]")
+            console.print("[bold red][ERROR] Invalid selection[/bold red]")
             return None, None
         return files[idx], files
     except ValueError:
-        console.print("[bold red][ERROR] Please enter a valid number[/]")
+        console.print("[bold red][ERROR] Please enter a valid number or 'C'[/bold red]")
         return None, None
 
 def main_menu():
@@ -1570,16 +1632,24 @@ def main_menu():
     ensure_directories(data_path)
     while True:
         print_banner()
-        menu_table = Table(title="[bold yellow]FEATURESTIC LEAKS - MAIN MENU[/bold yellow]", show_header=True, header_style="bold cyan", box=ROUNDED, border_style="magenta", expand=True)
-        menu_table.add_column("Option", style="bold green", justify="center", width=8)
-        menu_table.add_column("Description", style="bold white", justify="left")
+        menu_table = Table(
+            title="[bold bright_yellow]⚡ FEATURESTIC LEAKS - MAIN CONTROL MENU ⚡[/bold bright_yellow]",
+            show_header=True,
+            header_style="bold cyan",
+            box=ROUNDED,
+            border_style="bright_blue",
+            expand=True
+        )
+        menu_table.add_column("Option", style="bold yellow", justify="center", width=10)
+        menu_table.add_column("Description / Action", style="bold white", justify="left")
+        menu_table.add_column("Type", style="bold green", justify="center", width=14)
         
-        menu_table.add_row("1", "UNPACK ALL TYPES PAKS")
-        menu_table.add_row("2", "REPACK ALL TYPES PAKS")
-        menu_table.add_row("3", "REPACK ANY SIZE (EXISTING FILES)")
-        menu_table.add_row("4", "REPACK TO PATH (NEW FILES)")
-        menu_table.add_row("5", "DELETE FOLDER WORKSPACE")
-        menu_table.add_row("0", "EXIT")
+        menu_table.add_row("[black on cyan]  1  [/black on cyan]", "📦 UNPACK ALL TYPES PAKS", "[bold green]EXTRACT[/bold green]")
+        menu_table.add_row("[black on yellow]  2  [/black on yellow]", "🛠️ REPACK ALL TYPES PAKS", "[bold yellow]REBUILD[/bold yellow]")
+        menu_table.add_row("[black on blue]  3  [/black on blue]", "🔄 REPACK ANY SIZE (EXISTING FILES)", "[bold blue]INJECT[/bold blue]")
+        menu_table.add_row("[black on magenta]  4  [/black on magenta]", "🎯 REPACK TO PATH (NEW FILES)", "[bold magenta]PATH EDIT[/bold magenta]")
+        menu_table.add_row("[black on red]  5  [/black on red]", "🗑️ DELETE FOLDER WORKSPACE", "[bold red]CLEANUP[/bold red]")
+        menu_table.add_row("[white on grey37]  0  [/white on grey37]", "❌ EXIT TOOL", "[bold dim]DISCONNECT[/bold dim]")
         
         console.print(menu_table)
         console.print()
@@ -1587,10 +1657,7 @@ def main_menu():
         
         if choice == '1':
             pak_dir = data_path / "PAK"
-            if not pak_dir.exists():
-                console.print(f"[bold red]ERROR: PAK folder not found at {pak_dir}[/]")
-                safe_input('\nPress Enter to continue...')
-                continue
+            pak_dir.mkdir(parents=True, exist_ok=True)
             pak_file, _ = display_file_selector("📁 Available .pak files to UNPACK:", pak_dir)
             if not pak_file:
                 safe_input('\nPress Enter to continue...')
@@ -1613,10 +1680,7 @@ def main_menu():
             
         elif choice == '2':
             pak_dir = data_path / "PAK"
-            if not pak_dir.exists():
-                console.print(f"[bold red]ERROR: PAK folder not found at {pak_dir}[/]")
-                safe_input('\nPress Enter to continue...')
-                continue
+            pak_dir.mkdir(parents=True, exist_ok=True)
             pak_file, _ = display_file_selector("📁 Available .pak files to REPACK:", pak_dir)
             if not pak_file:
                 safe_input('\nPress Enter to continue...')
@@ -1651,11 +1715,9 @@ def main_menu():
             pak_dir = pak_tool_dir / "PAK"
             edit_dir = pak_tool_dir / "EDIT"
             result_dir = pak_tool_dir / "RESULT"
-            
-            if not pak_dir.exists():
-                console.print(f"[bold red]ERROR: PAK folder not found at {pak_dir}[/]")
-                safe_input('\nPress Enter to continue...')
-                continue
+            pak_dir.mkdir(parents=True, exist_ok=True)
+            edit_dir.mkdir(parents=True, exist_ok=True)
+            result_dir.mkdir(parents=True, exist_ok=True)
             
             pak_file, _ = display_file_selector("📁 Available .pak files to REPACK (EXISTING FILES):", pak_dir)
             if not pak_file:
@@ -1692,11 +1754,9 @@ def main_menu():
             pak_dir = pak_tool_dir / "PAK"
             edit_dir = pak_tool_dir / "EDIT"
             result_dir = pak_tool_dir / "RESULT"
-            
-            if not pak_dir.exists():
-                console.print(f"[bold red]ERROR: PAK folder not found at {pak_dir}[/]")
-                safe_input('\nPress Enter to continue...')
-                continue
+            pak_dir.mkdir(parents=True, exist_ok=True)
+            edit_dir.mkdir(parents=True, exist_ok=True)
+            result_dir.mkdir(parents=True, exist_ok=True)
             
             pak_file, _ = display_file_selector("📁 Available .pak files to REPACK TO PATH:", pak_dir)
             if not pak_file:
