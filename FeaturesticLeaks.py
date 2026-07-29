@@ -931,9 +931,9 @@ def repack_pak_file_full(pak_file, edited_root, output_path, target_path=None, f
     """
     import copy as _cp
 
-    console.print(f'[bold cyan]📦 Full PAK Rebuild mode (Option 3 & 4 logic)[/bold cyan]')
+    console.print(f'[bold cyan][BUILD] Full PAK Rebuild mode[/bold cyan]')
     if target_path:
-        console.print(f'[bold cyan]🎯 Target path: {target_path}[/bold cyan]')
+        console.print(f'[bold cyan][TARGET] Target path: {target_path}[/bold cyan]')
     
     # Get all files from edit folder or file
     edit_files = []
@@ -946,10 +946,10 @@ def repack_pak_file_full(pak_file, edited_root, output_path, target_path=None, f
                 edit_files.append(p)
     
     if not edit_files:
-        console.print('[bold red]❌ No files found to inject/add![/bold red]')
+        console.print('[bold red][X] No files found to inject/add![/bold red]')
         return 0
     
-    console.print(f'[bold cyan]📁 Found {len(edit_files)} file(s) to process[/bold cyan]')
+    console.print(f'[bold cyan][+] Found {len(edit_files)} file(s) to process[/bold cyan]')
 
     version = pak_file._pak_info.version
     keystream = PakCrypto.zuc_keystream()
@@ -1045,10 +1045,10 @@ def repack_pak_file_full(pak_file, edited_root, output_path, target_path=None, f
                 edited[new_fp] = (p, template_entry)
 
     if not edited:
-        console.print('[bold red]❌ No files to repack![/bold red]')
+        console.print('[bold red][X] No files to repack![/bold red]')
         return 0
 
-    console.print(f'  [bold bright_cyan]📁 Files to repack: {len(edited)}[/bold bright_cyan]')
+    console.print(f'  [bold cyan][+] Files to repack: {len(edited)}[/bold cyan]')
 
     new_files = []
     for e in pak_file._files:
@@ -1441,7 +1441,7 @@ def repack_pak_file_with_block_display(pak_file, edited_root: Path, output_path:
                         break
     
     if not edited:
-        console.print('[bold #FF0055]❌ No files to repack![/bold #FF0055]')
+        console.print('[bold red][X] No files to repack![/bold red]')
         return
     
     total_files = len(edited)
@@ -1477,17 +1477,17 @@ def detect_repack_mode(pak_path: Path) -> str:
     return 'OBBZSDIC'
 
 def repack_mini_obb(pak, repack_dir, output_pak):
-    console.print('[bold #00FFFF]🧩 Repack Mode: MINI_OBB[/bold #00FFFF]')
+    console.print('[bold cyan][MODE] Repack Mode: MINI_OBB[/bold cyan]')
     pak._is_zstd_with_dict = False
     pak._zstd_dict = None
     repack_pak_file_with_block_display(pak_file=pak, edited_root=repack_dir, output_path=output_pak)
 
 def repack_obbzsdic(pak, repack_dir, output_pak):
-    console.print('[bold #00FFFF]🧩 Repack Mode: OBBZSDIC[/bold #00FFFF]')
+    console.print('[bold cyan][MODE] Repack Mode: OBBZSDIC[/bold cyan]')
     repack_pak_file_with_block_display(pak_file=pak, edited_root=repack_dir, output_path=output_pak)
 
 def repack_gamepatch(pak, repack_dir, output_pak):
-    console.print('[bold #00FFFF]🧩 Repack Mode: GAMEPATCH[/bold #00FFFF]')
+    console.print('[bold cyan][MODE] Repack Mode: GAMEPATCH[/bold cyan]')
     pak._is_zstd_with_dict = False
     pak._zstd_dict = None
     repack_pak_file_with_block_display(pak_file=pak, edited_root=repack_dir, output_path=output_pak)
@@ -1506,34 +1506,21 @@ def ensure_directories(base_dir: Path):
 def print_banner():
     os.system('cls' if os.name == 'nt' else 'clear')
     now = datetime.now()
-    date_str = now.strftime("%d/%b/%y %a")
+    date_str = now.strftime("%d/%b/%Y")
     
-    fox_banner = (
-        "[bold bright_yellow]          /\\___/\\          [/bold bright_yellow]\n"
-        "[bold bright_yellow]         /  [bold bright_white]o[/bold bright_white]   [bold bright_white]o[/bold bright_white]  \\         [/bold bright_yellow]\n"
-        "[bold bright_yellow]        (    [bold red]▲[/bold red]    )        [/bold bright_yellow]\n"
-        "[bold bright_yellow]         \\  [bold white]===[/bold white]  /         [/bold bright_yellow]\n"
-        "[bold bright_yellow]          \\_____/          [/bold bright_yellow]\n"
-        "[bold bright_cyan]⚡ FEATURESTIC LEAKS PAK TOOL v2.0 ⚡[/bold bright_cyan]\n"
-        "[bold bright_green]📢 Official Telegram: https://t.me/FeaturesticLeaks[/bold bright_green]"
+    banner_text = (
+        "[bold cyan]⚡ FEATURESTIC LEAKS ⚡[/bold cyan]\n"
+        "[dim]Termux Game Reverse Engineering Suite v2.0[/dim]\n"
+        "[dim white]Telegram: https://t.me/FeaturesticLeaks[/dim white]"
     )
     
     banner_panel = Panel(
-        Align.center(fox_banner),
-        border_style="bold bright_blue",
+        Align.center(banner_text),
+        border_style="cyan",
         box=ROUNDED,
-        padding=(0, 1)
+        padding=(0, 2)
     )
     console.print(banner_panel)
-    
-    prompt_header = (
-        f"[bold bright_red]┌──[[/bold bright_red][bold bright_blue]FeaturesticLeaks[/bold bright_blue]"
-        f"[bold bright_red]@[/bold bright_red][bold cyan]termux[/bold cyan]"
-        f"[bold bright_red]─[[/bold bright_red][bold yellow]~[/bold yellow][bold bright_red]]──────────────────────────[/bold bright_red]"
-        f" [black on bright_green] 📅 {date_str} [/black on bright_green]\n"
-        f"[bold bright_red]└──[/bold bright_red][bold yellow]❯❯❯[/bold yellow]"
-    )
-    console.print(prompt_header)
 
 def safe_input(prompt: str='') -> str:
     try:
@@ -1568,12 +1555,18 @@ def delete_folder(data_path: Path) -> None:
         if item.is_dir() and item.name not in ['PAK', 'UNPACK', 'REPACK', 'RESULT', 'PAK TOOL']:
             folders.append(item)
     if not folders:
-        console.print('[bold #FFAA00]⚠ No folders found to delete![/bold #FFAA00]')
+        console.print('[yellow][!] No folders found to delete.[/yellow]')
         return
-    folder_table = Table(title="[bold #FF00FF]📁 AVAILABLE FOLDERS[/bold #FF00FF]", border_style="#00FFFF", box=DOUBLE_EDGE)
-    folder_table.add_column("#", justify="center", style="bold #FFFF00", width=4)
-    folder_table.add_column("Folder Name", justify="left", style="bold #00FF88")
-    folder_table.add_column("Size", justify="right", style="bold #00CCFF")
+    folder_table = Table(
+        title="[bold cyan]AVAILABLE WORKSPACE FOLDERS[/bold cyan]",
+        border_style="dim cyan",
+        box=ROUNDED,
+        show_header=True,
+        header_style="bold cyan"
+    )
+    folder_table.add_column("Index", justify="center", style="bold yellow", width=8)
+    folder_table.add_column("Folder Name", justify="left", style="bold white")
+    folder_table.add_column("Size", justify="right", style="dim white")
     for i, folder in enumerate(folders, 1):
         folder_size = 0
         for root, dirs, files in os.walk(folder):
@@ -1584,77 +1577,121 @@ def delete_folder(data_path: Path) -> None:
         folder_table.add_row(str(i), folder.name, human_size(folder_size))
     console.print(folder_table)
     try:
-        choice = int(console.input(f"\n[bold #FFFF00]Select folder number (1-{len(folders)}): [/bold #FFFF00]"))
+        choice_str = safe_input(f"\n-> Select folder number (1-{len(folders)}): ").strip()
+        choice = int(choice_str)
         if 1 <= choice <= len(folders):
             selected_folder = folders[choice - 1]
-            confirm = safe_input(f"[bold #FFFF00]Delete {selected_folder.name}? (yes/no): [/bold #FFFF00]").strip().lower()
+            confirm = safe_input(f"-> Delete {selected_folder.name}? (yes/no): ").strip().lower()
             if confirm == 'yes':
                 shutil.rmtree(selected_folder)
-                console.print(f'[bold #00FF88]✅ Deleted: {selected_folder.name}[/bold #00FF88]')
+                console.print(f'[bold green][OK] Deleted: {selected_folder.name}[/bold green]')
             else:
-                console.print('[bold #FFAA00]⚠ Cancelled[/bold #FFAA00]')
+                console.print('[yellow][!] Cancelled[/yellow]')
         else:
-            console.print('[bold #FF0055]❌ Invalid selection[/bold #FF0055]')
+            console.print('[bold red][X] Invalid selection[/bold red]')
     except ValueError:
-        console.print('[bold #FF0055]❌ Invalid input[/bold #FF0055]')
+        console.print('[bold red][X] Invalid input[/bold red]')
+
+def pick_file_from_folder(action_title: str, default_folder: Path, extensions: List[str] = [".pak", ".obb"]) -> Tuple[Optional[Path], List[Path]]:
+    """
+    Smart Folder Path File Picker:
+    - Prompts user for a folder path (or direct file path).
+    - Scans folder for .pak / .obb files.
+    - If 1 file found: Auto-selects automatically.
+    - If multiple files found: Shows numbered clean table for quick selection (e.g. '2').
+    - If no files found: Clear error message and re-prompts.
+    """
+    current_path_str = str(default_folder)
+    
+    while True:
+        console.print(f"\n[bold cyan][?] Select Source Folder for {action_title}[/bold cyan]")
+        console.print(f"[dim]Default directory: {current_path_str}[/dim]")
+        user_input = safe_input("-> Enter folder path [Press Enter for default, 'C' to cancel]: ").strip().strip('"\'')
+        
+        if user_input.upper() == 'C':
+            return None, []
+        
+        target_path = Path(user_input) if user_input else Path(current_path_str)
+        
+        if not target_path.exists():
+            console.print(f"[bold red][X] Path does not exist: {target_path}[/bold red]")
+            continue
+        
+        # If user passed a direct file path
+        if target_path.is_file():
+            if any(target_path.name.lower().endswith(ext) for ext in extensions):
+                size_mb = target_path.stat().st_size / (1024 * 1024)
+                console.print(f"[bold green][OK] File selected: {target_path.name} ({size_mb:.2f} MB)[/bold green]")
+                return target_path, [target_path]
+            else:
+                console.print(f"[bold red][X] File is not a valid package ({', '.join(extensions)}): {target_path.name}[/bold red]")
+                continue
+        
+        # Scan folder
+        found_files = []
+        for p in target_path.iterdir():
+            if p.is_file() and any(p.name.lower().endswith(ext) for ext in extensions):
+                found_files.append(p)
+        
+        found_files.sort(key=lambda x: x.name.lower())
+        
+        if not found_files:
+            console.print(f"[bold red][X] No valid files ({', '.join(extensions)}) found in folder: {target_path}[/bold red]")
+            console.print("[dim]Please enter a folder path containing your .pak or .obb files.[/dim]")
+            current_path_str = str(target_path)
+            continue
+        
+        # Auto-select if 1 file found
+        if len(found_files) == 1:
+            selected = found_files[0]
+            size_mb = selected.stat().st_size / (1024 * 1024)
+            console.print(f"\n[bold green][OK] Auto-selected single file: {selected.name} ({size_mb:.2f} MB)[/bold green]")
+            return selected, found_files
+        
+        # Multiple files found -> Display clean table
+        file_table = Table(
+            title=f"[bold cyan]Available Files in {target_path.name}[/bold cyan]",
+            show_header=True,
+            header_style="bold cyan",
+            box=ROUNDED,
+            border_style="dim cyan",
+            expand=True
+        )
+        file_table.add_column("Index", style="bold yellow", justify="center", width=8)
+        file_table.add_column("Filename", style="bold white", justify="left")
+        file_table.add_column("Size", style="dim white", justify="right", width=12)
+        
+        for i, f in enumerate(found_files, 1):
+            size_mb = f.stat().st_size / (1024 * 1024)
+            file_table.add_row(str(i), f.name, f"{size_mb:.2f} MB")
+        
+        file_table.add_row("C", "Change folder or cancel", "-")
+        
+        console.print()
+        console.print(file_table)
+        
+        choice = safe_input(f"-> Select file number (1-{len(found_files)}) or 'C': ").strip().upper()
+        
+        if choice == 'C':
+            current_path_str = str(target_path)
+            continue
+        
+        try:
+            idx = int(choice) - 1
+            if 0 <= idx < len(found_files):
+                selected = found_files[idx]
+                size_mb = selected.stat().st_size / (1024 * 1024)
+                console.print(f"[bold green][OK] Selected: {selected.name} ({size_mb:.2f} MB)[/bold green]")
+                return selected, found_files
+            else:
+                console.print(f"[bold red][X] Selection out of range (1-{len(found_files)})[/bold red]")
+        except ValueError:
+            console.print("[bold red][X] Invalid input. Enter a number or 'C'[/bold red]")
 
 def display_file_selector(title, folder_path, file_pattern="*.pak"):
-    folder_path = Path(folder_path)
-    files = list(folder_path.glob(file_pattern)) if folder_path.exists() else []
-    
-    if not files:
-        console.print(f"[bold yellow]⚠ No {file_pattern} files found in default workspace ({folder_path})[/bold yellow]")
-        console.print("[bold cyan]👉 Enter custom file path or SDCard folder path (or press Enter to cancel):[/bold cyan]")
-        console.print("[bold dim]Examples:\n  • /sdcard/Download\n  • /sdcard/Download/my_game.pak[/bold dim]")
-        custom_input = safe_input("📂 Enter path: ").strip().strip('"\'')
-        if not custom_input:
-            return None, None
-        custom_p = Path(custom_input)
-        if custom_p.is_file():
-            return custom_p, [custom_p]
-        elif custom_p.is_dir():
-            files = list(custom_p.glob(file_pattern))
-            if not files:
-                console.print(f"[bold red][ERROR] No {file_pattern} files found in custom directory: {custom_p}[/bold red]")
-                return None, None
-            folder_path = custom_p
-        else:
-            console.print(f"[bold red][ERROR] Path does not exist: {custom_p}[/bold red]")
-            return None, None
-
-    selection_table = Table(title=f"[bold bright_yellow]📁 {title}[/bold bright_yellow]", expand=True, box=ROUNDED, border_style="bright_blue")
-    selection_table.add_column("[bold yellow]Option[/bold yellow]", justify="center", width=10)
-    selection_table.add_column("[bold green]File Name / Target[/bold green]", justify="left", style="bold bright_green")
-    selection_table.add_column("[bold magenta]Size[/bold magenta]", justify="right", style="bold bright_magenta")
-    
-    for i, f in enumerate(files, 1):
-        size_mb = f.stat().st_size / (1024 * 1024)
-        selection_table.add_row(f"[black on green]  {i}  [/black on green]", f.name, f"[bold yellow]{size_mb:.2f} MB[/bold yellow]")
-    
-    selection_table.add_row("[black on yellow]  C  [/black on yellow]", "[bold bright_yellow]Custom Path (e.g. /sdcard/Download/file.pak)[/bold bright_yellow]", "-")
-    console.print(selection_table)
-    
-    try:
-        user_choice = console.input(f"\n[bold bright_red]└──[/bold bright_red][bold yellow]❯❯❯ Select file (1-{len(files)}) or 'C': [/bold yellow]").strip().upper()
-        if user_choice == 'C':
-            custom_input = safe_input("📂 Enter custom file path: ").strip().strip('"\'')
-            if not custom_input:
-                return None, None
-            custom_p = Path(custom_input)
-            if custom_p.is_file():
-                return custom_p, [custom_p]
-            else:
-                console.print(f"[bold red][ERROR] Invalid file path or file does not exist: {custom_p}[/bold red]")
-                return None, None
-        
-        idx = int(user_choice) - 1
-        if idx < 0 or idx >= len(files):
-            console.print("[bold red][ERROR] Invalid selection[/bold red]")
-            return None, None
-        return files[idx], files
-    except ValueError:
-        console.print("[bold red][ERROR] Please enter a valid number or 'C'[/bold red]")
-        return None, None
+    """Backward compatibility alias for pick_file_from_folder"""
+    exts = [file_pattern.replace('*', '')] if file_pattern else [".pak", ".obb"]
+    return pick_file_from_folder(title, Path(folder_path), extensions=exts)
 
 def main_menu():
     play_welcome_audio()
@@ -1663,40 +1700,40 @@ def main_menu():
     else:
         data_path = Path(__file__).parent
     ensure_directories(data_path)
+    
     while True:
         print_banner()
         menu_table = Table(
-            title="[bold bright_yellow]⚡ FEATURESTIC LEAKS - MAIN CONTROL MENU ⚡[/bold bright_yellow]",
             show_header=True,
-            header_style="bold bright_cyan",
+            header_style="bold cyan",
             box=ROUNDED,
-            border_style="bright_blue",
+            border_style="dim cyan",
             expand=True
         )
-        menu_table.add_column("Option", style="bold", justify="center", width=10)
-        menu_table.add_column("Description / Action", style="bold bright_white", justify="left")
-        menu_table.add_column("Type", style="bold", justify="center", width=12)
+        menu_table.add_column("Option", justify="center", width=8)
+        menu_table.add_column("Action", justify="left", width=18)
+        menu_table.add_column("Description", style="dim white", justify="left")
         
-        menu_table.add_row("[bold black on bright_cyan]  1  [/bold black on bright_cyan]", "📦 UNPACK ALL TYPES PAKS", "[bold bright_cyan]EXTRACT[/bold bright_cyan]")
-        menu_table.add_row("[bold black on bright_green]  2  [/bold black on bright_green]", "🛠️ REPACK ALL TYPES PAKS", "[bold bright_green]REBUILD[/bold bright_green]")
-        menu_table.add_row("[bold black on bright_yellow]  3  [/bold black on bright_yellow]", "🔄 REPACK ANY SIZE (EXISTING FILES)", "[bold bright_yellow]INJECT[/bold bright_yellow]")
-        menu_table.add_row("[bold black on bright_magenta]  4  [/bold black on bright_magenta]", "🎯 REPACK TO PATH (NEW FILES)", "[bold bright_magenta]PATH EDIT[/bold bright_magenta]")
-        menu_table.add_row("[bold black on bright_red]  5  [/bold black on bright_red]", "🗑️ DELETE FOLDER WORKSPACE", "[bold bright_red]CLEANUP[/bold bright_red]")
-        menu_table.add_row("[bold white on grey37]  0  [/bold white on grey37]", "❌ EXIT TOOL", "[bold dim]DISCONNECT[/bold dim]")
+        menu_table.add_row("[bold cyan]1[/bold cyan]", "[bold cyan]Unpack[/bold cyan]", "Extract PAK / OBB package contents")
+        menu_table.add_row("[bold green]2[/bold green]", "[bold green]Repack[/bold green]", "Rebuild workspace to PAK / OBB")
+        menu_table.add_row("[bold yellow]3[/bold yellow]", "[bold yellow]Replace Files[/bold yellow]", "Inject edited files into existing structure")
+        menu_table.add_row("[bold magenta]4[/bold magenta]", "[bold magenta]Inject Path[/bold magenta]", "Inject files into custom PAK target path")
+        menu_table.add_row("[bold red]5[/bold red]", "[bold red]Cleanup[/bold red]", "Delete workspace folders")
+        menu_table.add_row("[dim]0[/dim]", "[dim]Exit[/dim]", "Close application")
         
         console.print(menu_table)
         console.print()
-        choice = safe_input('👉 ENTER YOUR CHOICE (0-5): ').strip()
+        choice = safe_input('-> Select option (0-5): ').strip()
         
         if choice == '1':
             pak_dir = data_path / "PAK"
             pak_dir.mkdir(parents=True, exist_ok=True)
-            pak_file, _ = display_file_selector("📁 Available .pak files to UNPACK:", pak_dir)
+            pak_file, _ = pick_file_from_folder("Unpack", pak_dir)
             if not pak_file:
                 safe_input('\nPress Enter to continue...')
                 continue
             try:
-                console.print(f'[bold #00FFFF]🚀 Unpacking {pak_file.name}...[/bold #00FFFF]')
+                console.print(f'[bold cyan][+] Unpacking {pak_file.name}...[/bold cyan]')
                 pak = TencentPakFile(pak_file)
                 unpack_path = data_path / "UNPACK" / pak_file.stem
                 repack_path = data_path / "REPACK" / pak_file.stem
@@ -1706,26 +1743,26 @@ def main_menu():
                 for dir_path, _ in pak._index.items():
                     current_repack_path = repack_path / pak._mount_point / dir_path
                     current_repack_path.mkdir(parents=True, exist_ok=True)
-                console.print(f'[bold #00FF88]✅ SUCCESS: Extracted to {unpack_path}[/bold #00FF88]')
+                console.print(f'[bold green][OK] Successfully extracted to: {unpack_path}[/bold green]')
             except Exception as e:
-                console.print(f'[bold #FF0055]❌ Error: {escape(str(e))}[/bold #FF0055]')
+                console.print(f'[bold red][X] Error: {escape(str(e))}[/bold red]')
             safe_input('\nPress Enter to continue...')
             
         elif choice == '2':
             pak_dir = data_path / "PAK"
             pak_dir.mkdir(parents=True, exist_ok=True)
-            pak_file, _ = display_file_selector("📁 Available .pak files to REPACK:", pak_dir)
+            pak_file, _ = pick_file_from_folder("Repack", pak_dir)
             if not pak_file:
                 safe_input('\nPress Enter to continue...')
                 continue
             repack_dir = data_path / "REPACK" / pak_file.stem
             if not repack_dir.exists():
-                console.print(f'[bold #FF0055]❌ ERROR: {repack_dir} not found.[/bold #FF0055]')
-                console.print('[#FFAA00]⚠ Please unpack first using option 1.[/#FFAA00]')
+                console.print(f'[bold red][X] Error: {repack_dir} not found.[/bold red]')
+                console.print('[yellow][!] Please unpack first using Option 1.[/yellow]')
                 safe_input('\nPress Enter to continue...')
                 continue
             try:
-                console.print(f'[bold #00FFFF]🚀 Repacking {pak_file.name}...[/bold #00FFFF]')
+                console.print(f'[bold cyan][+] Repacking {pak_file.name}...[/bold cyan]')
                 pak = TencentPakFile(pak_file)
                 result_dir = data_path / "RESULT"
                 output_pak = result_dir / pak_file.name
@@ -1736,9 +1773,9 @@ def main_menu():
                     repack_gamepatch(pak, repack_dir, output_pak)
                 else:
                     repack_obbzsdic(pak, repack_dir, output_pak)
-                console.print('[bold #00FF88]✅ REPACK COMPLETED SUCCESSFULLY![/bold #00FF88]')
+                console.print('[bold green][OK] Repack completed successfully![/bold green]')
             except Exception as e:
-                console.print(f'[bold #FF0055]❌ Repack failed:[/bold #FF0055] {e}')
+                console.print(f'[bold red][X] Repack failed: {e}[/bold red]')
                 import traceback
                 traceback.print_exc()
             safe_input('\nPress Enter to continue...')
@@ -1752,47 +1789,46 @@ def main_menu():
             edit_dir.mkdir(parents=True, exist_ok=True)
             result_dir.mkdir(parents=True, exist_ok=True)
             
-            pak_file, _ = display_file_selector("📁 Available .pak files to REPACK (EXISTING FILES):", pak_dir)
+            pak_file, _ = pick_file_from_folder("Replace Files", pak_dir)
             if not pak_file:
                 safe_input('\nPress Enter to continue...')
                 continue
             
             actual_edit_path = edit_dir
             if not edit_dir.exists() or not any(edit_dir.iterdir()):
-                console.print(f'[bold bright_yellow]⚠ Workspace EDIT folder ({edit_dir}) is empty.[/bold bright_yellow]')
-                console.print('[bold bright_cyan]👉 Enter custom folder OR file path to inject/add (or press Enter to cancel):[/bold bright_cyan]')
-                console.print('[bold dim]Examples:\n  • /sdcard/Download/my_lua_folder\n  • /sdcard/Download/CoreGame.lua[/bold dim]')
-                custom_edit = safe_input('📂 Enter path: ').strip().strip('"\'')
+                console.print(f'[yellow][!] Workspace EDIT folder ({edit_dir}) is empty.[/yellow]')
+                console.print('[cyan]-> Enter source folder or file path to inject:[/cyan]')
+                custom_edit = safe_input('Path: ').strip().strip('"\'')
                 if not custom_edit:
                     safe_input('\nPress Enter to continue...')
                     continue
                 custom_p = Path(custom_edit)
                 if not custom_p.exists():
-                    console.print(f'[bold bright_red]❌ Path does not exist: {custom_p}[/bold bright_red]')
+                    console.print(f'[bold red][X] Path does not exist: {custom_p}[/bold red]')
                     safe_input('\nPress Enter to continue...')
                     continue
                 actual_edit_path = custom_p
             
             try:
-                console.print(f'[bold #00FFFF]🚀 Repacking {pak_file.name} (ANY SIZE - Full Rebuild)...[/bold #00FFFF]')
+                console.print(f'[bold cyan][+] Replacing files in {pak_file.name}...[/bold cyan]')
                 pak = TencentPakFile(pak_file)
                 output_pak = result_dir / pak_file.name
                 
                 count = repack_pak_file_full(pak, actual_edit_path, output_pak)
                 
                 if count > 0:
-                    console.print(f'[bold #00FF88]✅ Repacked {count} file(s) successfully![/bold #00FF88]')
-                    console.print(f'[bold #00FF88]📦 Output: {output_pak}[/bold #00FF88]')
+                    console.print(f'[bold green][OK] Repacked {count} file(s) successfully![/bold green]')
+                    console.print(f'[bold green][+] Output: {output_pak}[/bold green]')
                     if pak_file.parent != pak_dir and pak_file.parent.exists():
-                        copy_back = safe_input('\n❓ Copy repacked PAK back to original directory? (y/N): ').strip().lower()
+                        copy_back = safe_input('\n-> Copy repacked PAK back to original directory? (y/N): ').strip().lower()
                         if copy_back == 'y':
                             shutil.copy2(output_pak, pak_file)
-                            console.print(f'[bold #00FF88]✅ Updated original file at {pak_file}[/bold #00FF88]')
+                            console.print(f'[bold green][OK] Updated original file at {pak_file}[/bold green]')
                 else:
-                    console.print('[bold #FF0055]❌ No files repacked![/bold #FF0055]')
+                    console.print('[bold red][X] No files repacked.[/bold red]')
                     
             except Exception as e:
-                console.print(f'[bold #FF0055]❌ Repack failed:[/bold #FF0055] {e}')
+                console.print(f'[bold red][X] Repack failed: {e}[/bold red]')
                 import traceback
                 traceback.print_exc()
             safe_input('\nPress Enter to continue...')
@@ -1806,48 +1842,44 @@ def main_menu():
             edit_dir.mkdir(parents=True, exist_ok=True)
             result_dir.mkdir(parents=True, exist_ok=True)
             
-            pak_file, _ = display_file_selector("📁 Available .pak files to REPACK TO PATH:", pak_dir)
+            pak_file, _ = pick_file_from_folder("Inject Path", pak_dir)
             if not pak_file:
                 safe_input('\nPress Enter to continue...')
                 continue
             
             actual_edit_path = edit_dir
             if not edit_dir.exists() or not any(edit_dir.iterdir()):
-                console.print(f'[bold bright_yellow]⚠ Workspace EDIT folder ({edit_dir}) is empty.[/bold bright_yellow]')
-                console.print('[bold bright_cyan]👉 Enter custom folder OR file path to inject/add (or press Enter to cancel):[/bold bright_cyan]')
-                console.print('[bold dim]Examples:\n  • /sdcard/Download/my_lua_folder\n  • /sdcard/Download/CoreGame.lua[/bold dim]')
-                custom_edit = safe_input('📂 Enter path: ').strip().strip('"\'')
+                console.print(f'[yellow][!] Workspace EDIT folder ({edit_dir}) is empty.[/yellow]')
+                console.print('[cyan]-> Enter source folder or file path to inject:[/cyan]')
+                custom_edit = safe_input('Path: ').strip().strip('"\'')
                 if not custom_edit:
                     safe_input('\nPress Enter to continue...')
                     continue
                 custom_p = Path(custom_edit)
                 if not custom_p.exists():
-                    console.print(f'[bold bright_red]❌ Path does not exist: {custom_p}[/bold bright_red]')
+                    console.print(f'[bold red][X] Path does not exist: {custom_p}[/bold red]')
                     safe_input('\nPress Enter to continue...')
                     continue
                 actual_edit_path = custom_p
             
             console.print()
-            console.print('[bold #FFFF00]📁 Enter the target path inside the PAK where files should be added:[/bold #FFFF00]')
+            console.print('[yellow]-> Enter target internal path inside PAK where files should be added:[/yellow]')
             console.print('[dim]Example: Content/Lua/GameLua/Mod/BRMod/Gameplay/Core[/dim]')
-            console.print('[bold green]✓ Uses EXACT SAME logic as Option 3[/bold green]')
-            console.print('[bold green]✓ 100% game compatible - no login stuck[/bold green]')
-            target_path = safe_input('[bold #00FFFF]Path: [/bold #00FFFF]').strip()
+            target_path = safe_input('Target Path: ').strip()
             
             if not target_path:
-                console.print('[bold #FF0055]❌ No path provided![/bold #FF0055]')
+                console.print('[bold red][X] No path provided.[/bold red]')
                 safe_input('\nPress Enter to continue...')
                 continue
             
             target_path = target_path.replace('\\', '/').strip('/')
             if not target_path:
-                console.print('[bold #FF0055]❌ Invalid target path![/bold #FF0055]')
+                console.print('[bold red][X] Invalid target path.[/bold red]')
                 safe_input('\nPress Enter to continue...')
                 continue
             
             try:
-                console.print(f'[bold #00FFFF]🚀 Adding files to {target_path} in {pak_file.name}...[/bold #00FFFF]')
-                console.print('[bold cyan]📋 Using EXACT Option 3 logic[/bold cyan]')
+                console.print(f'[bold cyan][+] Injecting files into {target_path} in {pak_file.name}...[/bold cyan]')
                 pak = TencentPakFile(pak_file)
                 output_pak = result_dir / pak_file.name
                 
@@ -1855,21 +1887,18 @@ def main_menu():
                 
                 if count > 0:
                     console.print()
-                    console.print(f'[bold #00FF88]✅ Successfully processed {count} file(s) to {target_path}![/bold #00FF88]')
-                    console.print(f'[bold #00FF88]📦 Output: {output_pak}[/bold #00FF88]')
-                    console.print()
-                    console.print('[bold green]🎮 PAK is now GAME READY![/bold green]')
-                    console.print('[bold green]✅ No login issues - same as Option 3[/bold green]')
+                    console.print(f'[bold green][OK] Successfully processed {count} file(s) to {target_path}[/bold green]')
+                    console.print(f'[bold green][+] Output: {output_pak}[/bold green]')
                     if pak_file.parent != pak_dir and pak_file.parent.exists():
-                        copy_back = safe_input('\n❓ Copy repacked PAK back to original directory? (y/N): ').strip().lower()
+                        copy_back = safe_input('\n-> Copy repacked PAK back to original directory? (y/N): ').strip().lower()
                         if copy_back == 'y':
                             shutil.copy2(output_pak, pak_file)
-                            console.print(f'[bold #00FF88]✅ Updated original file at {pak_file}[/bold #00FF88]')
+                            console.print(f'[bold green][OK] Updated original file at {pak_file}[/bold green]')
                 else:
-                    console.print('[bold #FF0055]❌ No files were processed![/bold #FF0055]')
+                    console.print('[bold red][X] No files were processed.[/bold red]')
                     
             except Exception as e:
-                console.print(f'[bold #FF0055]❌ Repack failed:[/bold #FF0055] {e}')
+                console.print(f'[bold red][X] Repack failed: {e}[/bold red]')
                 import traceback
                 traceback.print_exc()
             safe_input('\nPress Enter to continue...')
@@ -1879,21 +1908,21 @@ def main_menu():
             safe_input('\nPress Enter to continue...')
             
         elif choice == '0':
-            console.print("[bold magenta]Goodbye![/bold magenta]")
-            time.sleep(2)
+            console.print("[dim white]Exiting Featurestic Leaks. Goodbye![/dim white]")
+            time.sleep(1)
             break
         else:
-            console.print('[bold #FF0055]❌ Invalid choice![/bold #FF0055]')
-            time.sleep(2)
+            console.print('[bold red][X] Invalid option choice.[/bold red]')
+            time.sleep(1)
 
 if __name__ == '__main__':
     try:
         main_menu()
     except KeyboardInterrupt:
-        console.print('\n[bold #FFFF00]⚠ Interrupted. Exiting...[/bold #FFFF00]')
+        console.print('\n[yellow][!] Interrupted. Exiting...[/yellow]')
         sys.exit(0)
     except Exception as e:
-        console.print(f'[bold #FF0055]💥 ERROR:[/bold #FF0055] {escape(str(e))}')
+        console.print(f'[bold red][X] ERROR:[/bold red] {escape(str(e))}')
         import traceback
         traceback.print_exc()
         safe_input('\nPress Enter to exit...')
