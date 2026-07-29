@@ -23,6 +23,35 @@ from pathlib import PurePath, Path
 from typing import List, Dict, Tuple, Optional, Any
 import time
 import subprocess
+import threading
+import shutil
+
+# Audio welcome voice playback
+_AUDIO_PLAYED = False
+def play_welcome_audio():
+    global _AUDIO_PLAYED
+    if _AUDIO_PLAYED:
+        return
+    _AUDIO_PLAYED = True
+    def _speak():
+        msg = "Welcome to Featurestic Leaks World"
+        if shutil.which("termux-tts-speak"):
+            try:
+                subprocess.run(["termux-tts-speak", msg], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            except Exception:
+                pass
+        elif shutil.which("espeak"):
+            try:
+                subprocess.run(["espeak", msg], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            except Exception:
+                pass
+        elif shutil.which("spd-say"):
+            try:
+                subprocess.run(["spd-say", msg], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            except Exception:
+                pass
+
+    threading.Thread(target=_speak, daemon=True).start()
 
 # Auto-install missing dependencies if run directly with python
 def _ensure_package(pkg_name, import_name=None):
@@ -906,17 +935,21 @@ def repack_pak_file_full(pak_file, edited_root, output_path, target_path=None, f
     if target_path:
         console.print(f'[bold cyan]🎯 Target path: {target_path}[/bold cyan]')
     
-    # Get all files from edit folder
+    # Get all files from edit folder or file
     edit_files = []
-    for p in Path(edited_root).rglob('*'):
-        if p.is_file():
-            edit_files.append(p)
+    edit_p = Path(edited_root)
+    if edit_p.is_file():
+        edit_files.append(edit_p)
+    elif edit_p.is_dir():
+        for p in edit_p.rglob('*'):
+            if p.is_file():
+                edit_files.append(p)
     
     if not edit_files:
-        console.print('[bold red]❌ No files found in EDIT folder![/bold red]')
+        console.print('[bold red]❌ No files found to inject/add![/bold red]')
         return 0
     
-    console.print(f'[bold cyan]📁 Found {len(edit_files)} files in EDIT folder[/bold cyan]')
+    console.print(f'[bold cyan]📁 Found {len(edit_files)} file(s) to process[/bold cyan]')
 
     version = pak_file._pak_info.version
     keystream = PakCrypto.zuc_keystream()
@@ -1475,22 +1508,21 @@ def print_banner():
     now = datetime.now()
     date_str = now.strftime("%d/%b/%y %a")
     
-    ascii_title = (
-        "[bold cyan]███████╗███████╗██████╗ ████████╗██╗   ██╗██████╗ ██╗███████╗████████╗██╗ ██████╗[/bold cyan]\n"
-        "[bold cyan]██╔════╝██╔════╝██╔══██╗╚══██╔══╝██║   ██║██╔══██╗██║██╔════╝╚══██╔══╝██║██╔════╝[/bold cyan]\n"
-        "[bold bright_cyan]█████╗  █████╗  ██████╔╝   ██║   ██║   ██║██████╔╝██║███████╗   ██║   ██║██║     [/bold bright_cyan]\n"
-        "[bold yellow]██╔══╝  ██╔══╝  ██╔══██╗   ██║   ██║   ██║██╔══██╗██║╚════██║   ██║   ██║██║     [/bold yellow]\n"
-        "[bold red]██║     ███████╗██║  ██║   ██║   ╚██████╔╝██║  ██║██║███████║   ██║   ██║╚██████╗[/bold red]\n"
-        "[bold bright_red]╚═╝     ╚══════╝╚═╝  ╚═╝   ╚═╝    ╚═════╝ ╚═╝  ╚═╝╚═╝╚══════╝   ╚═╝   ╚═╝ ╚═════╝[/bold bright_red]\n\n"
-        "[bold bright_yellow]⚡ PAK TOOL v2.0 - TERMUX ULTIMATE REVERSE ENGINEERING SUITE ⚡[/bold bright_yellow]\n"
+    fox_banner = (
+        "[bold bright_yellow]          /\\___/\\          [/bold bright_yellow]\n"
+        "[bold bright_yellow]         /  [bold bright_white]o[/bold bright_white]   [bold bright_white]o[/bold bright_white]  \\         [/bold bright_yellow]\n"
+        "[bold bright_yellow]        (    [bold red]▲[/bold red]    )        [/bold bright_yellow]\n"
+        "[bold bright_yellow]         \\  [bold white]===[/bold white]  /         [/bold bright_yellow]\n"
+        "[bold bright_yellow]          \\_____/          [/bold bright_yellow]\n"
+        "[bold bright_cyan]⚡ FEATURESTIC LEAKS PAK TOOL v2.0 ⚡[/bold bright_cyan]\n"
         "[bold bright_green]📢 Official Telegram: https://t.me/FeaturesticLeaks[/bold bright_green]"
     )
     
     banner_panel = Panel(
-        Align.center(ascii_title),
+        Align.center(fox_banner),
         border_style="bold bright_blue",
         box=ROUNDED,
-        padding=(0, 2)
+        padding=(0, 1)
     )
     console.print(banner_panel)
     
@@ -1498,7 +1530,7 @@ def print_banner():
         f"[bold bright_red]┌──[[/bold bright_red][bold bright_blue]FeaturesticLeaks[/bold bright_blue]"
         f"[bold bright_red]@[/bold bright_red][bold cyan]termux[/bold cyan]"
         f"[bold bright_red]─[[/bold bright_red][bold yellow]~[/bold yellow][bold bright_red]]──────────────────────────[/bold bright_red]"
-        f" [black on green] 📅 {date_str} [/black on green]\n"
+        f" [black on bright_green] 📅 {date_str} [/black on bright_green]\n"
         f"[bold bright_red]└──[/bold bright_red][bold yellow]❯❯❯[/bold yellow]"
     )
     console.print(prompt_header)
@@ -1625,6 +1657,7 @@ def display_file_selector(title, folder_path, file_pattern="*.pak"):
         return None, None
 
 def main_menu():
+    play_welcome_audio()
     if getattr(sys, 'frozen', False):
         data_path = Path(sys.executable).parent
     else:
@@ -1635,21 +1668,21 @@ def main_menu():
         menu_table = Table(
             title="[bold bright_yellow]⚡ FEATURESTIC LEAKS - MAIN CONTROL MENU ⚡[/bold bright_yellow]",
             show_header=True,
-            header_style="bold cyan",
+            header_style="bold bright_cyan",
             box=ROUNDED,
             border_style="bright_blue",
             expand=True
         )
-        menu_table.add_column("Option", style="bold yellow", justify="center", width=10)
-        menu_table.add_column("Description / Action", style="bold white", justify="left")
-        menu_table.add_column("Type", style="bold green", justify="center", width=14)
+        menu_table.add_column("Option", style="bold", justify="center", width=10)
+        menu_table.add_column("Description / Action", style="bold bright_white", justify="left")
+        menu_table.add_column("Type", style="bold", justify="center", width=12)
         
-        menu_table.add_row("[black on cyan]  1  [/black on cyan]", "📦 UNPACK ALL TYPES PAKS", "[bold green]EXTRACT[/bold green]")
-        menu_table.add_row("[black on yellow]  2  [/black on yellow]", "🛠️ REPACK ALL TYPES PAKS", "[bold yellow]REBUILD[/bold yellow]")
-        menu_table.add_row("[black on blue]  3  [/black on blue]", "🔄 REPACK ANY SIZE (EXISTING FILES)", "[bold blue]INJECT[/bold blue]")
-        menu_table.add_row("[black on magenta]  4  [/black on magenta]", "🎯 REPACK TO PATH (NEW FILES)", "[bold magenta]PATH EDIT[/bold magenta]")
-        menu_table.add_row("[black on red]  5  [/black on red]", "🗑️ DELETE FOLDER WORKSPACE", "[bold red]CLEANUP[/bold red]")
-        menu_table.add_row("[white on grey37]  0  [/white on grey37]", "❌ EXIT TOOL", "[bold dim]DISCONNECT[/bold dim]")
+        menu_table.add_row("[bold black on bright_cyan]  1  [/bold black on bright_cyan]", "📦 UNPACK ALL TYPES PAKS", "[bold bright_cyan]EXTRACT[/bold bright_cyan]")
+        menu_table.add_row("[bold black on bright_green]  2  [/bold black on bright_green]", "🛠️ REPACK ALL TYPES PAKS", "[bold bright_green]REBUILD[/bold bright_green]")
+        menu_table.add_row("[bold black on bright_yellow]  3  [/bold black on bright_yellow]", "🔄 REPACK ANY SIZE (EXISTING FILES)", "[bold bright_yellow]INJECT[/bold bright_yellow]")
+        menu_table.add_row("[bold black on bright_magenta]  4  [/bold black on bright_magenta]", "🎯 REPACK TO PATH (NEW FILES)", "[bold bright_magenta]PATH EDIT[/bold bright_magenta]")
+        menu_table.add_row("[bold black on bright_red]  5  [/bold black on bright_red]", "🗑️ DELETE FOLDER WORKSPACE", "[bold bright_red]CLEANUP[/bold bright_red]")
+        menu_table.add_row("[bold white on grey37]  0  [/bold white on grey37]", "❌ EXIT TOOL", "[bold dim]DISCONNECT[/bold dim]")
         
         console.print(menu_table)
         console.print()
@@ -1724,22 +1757,37 @@ def main_menu():
                 safe_input('\nPress Enter to continue...')
                 continue
             
+            actual_edit_path = edit_dir
             if not edit_dir.exists() or not any(edit_dir.iterdir()):
-                console.print(f'[bold #FF0055]❌ ERROR: No files in EDIT folder.[/bold #FF0055]')
-                console.print('[#FFAA00]⚠ Please place edited files in PAK TOOL/EDIT folder.[/#FFAA00]')
-                safe_input('\nPress Enter to continue...')
-                continue
+                console.print(f'[bold bright_yellow]⚠ Workspace EDIT folder ({edit_dir}) is empty.[/bold bright_yellow]')
+                console.print('[bold bright_cyan]👉 Enter custom folder OR file path to inject/add (or press Enter to cancel):[/bold bright_cyan]')
+                console.print('[bold dim]Examples:\n  • /sdcard/Download/my_lua_folder\n  • /sdcard/Download/CoreGame.lua[/bold dim]')
+                custom_edit = safe_input('📂 Enter path: ').strip().strip('"\'')
+                if not custom_edit:
+                    safe_input('\nPress Enter to continue...')
+                    continue
+                custom_p = Path(custom_edit)
+                if not custom_p.exists():
+                    console.print(f'[bold bright_red]❌ Path does not exist: {custom_p}[/bold bright_red]')
+                    safe_input('\nPress Enter to continue...')
+                    continue
+                actual_edit_path = custom_p
             
             try:
                 console.print(f'[bold #00FFFF]🚀 Repacking {pak_file.name} (ANY SIZE - Full Rebuild)...[/bold #00FFFF]')
                 pak = TencentPakFile(pak_file)
                 output_pak = result_dir / pak_file.name
                 
-                count = repack_pak_file_full(pak, edit_dir, output_pak)
+                count = repack_pak_file_full(pak, actual_edit_path, output_pak)
                 
                 if count > 0:
-                    console.print(f'[bold #00FF88]✅ Repacked {count} files successfully![/bold #00FF88]')
+                    console.print(f'[bold #00FF88]✅ Repacked {count} file(s) successfully![/bold #00FF88]')
                     console.print(f'[bold #00FF88]📦 Output: {output_pak}[/bold #00FF88]')
+                    if pak_file.parent != pak_dir and pak_file.parent.exists():
+                        copy_back = safe_input('\n❓ Copy repacked PAK back to original directory? (y/N): ').strip().lower()
+                        if copy_back == 'y':
+                            shutil.copy2(output_pak, pak_file)
+                            console.print(f'[bold #00FF88]✅ Updated original file at {pak_file}[/bold #00FF88]')
                 else:
                     console.print('[bold #FF0055]❌ No files repacked![/bold #FF0055]')
                     
@@ -1763,11 +1811,21 @@ def main_menu():
                 safe_input('\nPress Enter to continue...')
                 continue
             
+            actual_edit_path = edit_dir
             if not edit_dir.exists() or not any(edit_dir.iterdir()):
-                console.print(f'[bold #FF0055]❌ ERROR: No files in EDIT folder.[/bold #FF0055]')
-                console.print('[#FFAA00]⚠ Please place files to add in PAK TOOL/EDIT folder.[/#FFAA00]')
-                safe_input('\nPress Enter to continue...')
-                continue
+                console.print(f'[bold bright_yellow]⚠ Workspace EDIT folder ({edit_dir}) is empty.[/bold bright_yellow]')
+                console.print('[bold bright_cyan]👉 Enter custom folder OR file path to inject/add (or press Enter to cancel):[/bold bright_cyan]')
+                console.print('[bold dim]Examples:\n  • /sdcard/Download/my_lua_folder\n  • /sdcard/Download/CoreGame.lua[/bold dim]')
+                custom_edit = safe_input('📂 Enter path: ').strip().strip('"\'')
+                if not custom_edit:
+                    safe_input('\nPress Enter to continue...')
+                    continue
+                custom_p = Path(custom_edit)
+                if not custom_p.exists():
+                    console.print(f'[bold bright_red]❌ Path does not exist: {custom_p}[/bold bright_red]')
+                    safe_input('\nPress Enter to continue...')
+                    continue
+                actual_edit_path = custom_p
             
             console.print()
             console.print('[bold #FFFF00]📁 Enter the target path inside the PAK where files should be added:[/bold #FFFF00]')
@@ -1793,15 +1851,20 @@ def main_menu():
                 pak = TencentPakFile(pak_file)
                 output_pak = result_dir / pak_file.name
                 
-                count = repack_pak_file_full(pak, edit_dir, output_pak, target_path, force_add=True)
+                count = repack_pak_file_full(pak, actual_edit_path, output_pak, target_path, force_add=True)
                 
                 if count > 0:
                     console.print()
-                    console.print(f'[bold #00FF88]✅ Successfully processed {count} files to {target_path}![/bold #00FF88]')
+                    console.print(f'[bold #00FF88]✅ Successfully processed {count} file(s) to {target_path}![/bold #00FF88]')
                     console.print(f'[bold #00FF88]📦 Output: {output_pak}[/bold #00FF88]')
                     console.print()
                     console.print('[bold green]🎮 PAK is now GAME READY![/bold green]')
                     console.print('[bold green]✅ No login issues - same as Option 3[/bold green]')
+                    if pak_file.parent != pak_dir and pak_file.parent.exists():
+                        copy_back = safe_input('\n❓ Copy repacked PAK back to original directory? (y/N): ').strip().lower()
+                        if copy_back == 'y':
+                            shutil.copy2(output_pak, pak_file)
+                            console.print(f'[bold #00FF88]✅ Updated original file at {pak_file}[/bold #00FF88]')
                 else:
                     console.print('[bold #FF0055]❌ No files were processed![/bold #FF0055]')
                     
