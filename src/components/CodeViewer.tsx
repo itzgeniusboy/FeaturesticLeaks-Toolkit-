@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { Code, Copy, Check, Download, FileText, Search, Info, ShieldCheck, Cpu, Terminal, Sparkles } from 'lucide-react';
-import { PYTHON_SCRIPT, PHP_SCRIPT, SETUP_SCRIPT } from '../data/sourceCode';
+import { Code, Copy, Check, Download, FileText, Search, Info, ShieldCheck, Cpu, Terminal, Sparkles, BookOpen, Trash2, FolderCheck } from 'lucide-react';
+import { PYTHON_SCRIPT, PHP_SCRIPT, SETUP_SCRIPT, README_MD, HOW_TO_USE_MD, GITIGNORE_CONTENT, CLEAN_REPO_SH } from '../data/sourceCode';
 import { ThemeMode } from '../types';
 
 interface CodeViewerProps {
@@ -8,7 +8,7 @@ interface CodeViewerProps {
 }
 
 export const CodeViewer: React.FC<CodeViewerProps> = ({ theme = 'matrix' }) => {
-  const [selectedFile, setSelectedFile] = useState<'python' | 'php' | 'setup'>('python');
+  const [selectedFile, setSelectedFile] = useState<'python' | 'php' | 'setup' | 'readme' | 'guide' | 'gitignore' | 'clean'>('python');
   const [copied, setCopied] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
 
@@ -71,6 +71,34 @@ export const CodeViewer: React.FC<CodeViewerProps> = ({ theme = 'matrix' }) => {
       type: 'Termux Auto-Launcher Script',
       description: 'Automated launcher script that installs dependencies (pip install rich requests pycryptodome zstandard) and executes FeaturesticLeaks.py.',
     },
+    readme: {
+      name: 'README.md',
+      language: 'markdown',
+      code: README_MD,
+      type: 'Repository Overview',
+      description: 'GitHub repository documentation explaining features, Termux 1-click install, and structure.',
+    },
+    guide: {
+      name: 'HOW_TO_USE.md',
+      language: 'markdown',
+      code: HOW_TO_USE_MD,
+      type: 'Termux Guide Documentation',
+      description: 'Comprehensive step-by-step Termux execution and manual installation guide.',
+    },
+    gitignore: {
+      name: '.gitignore',
+      language: 'gitignore',
+      code: GITIGNORE_CONTENT,
+      type: 'Git Exclusions',
+      description: 'Rules to ignore temporary, cache, and compiled files when pushing to GitHub.',
+    },
+    clean: {
+      name: 'clean-repo.sh',
+      language: 'bash',
+      code: CLEAN_REPO_SH,
+      type: 'Git Clean & Push Script',
+      description: 'Shell command to remove extra web files and push only pure Termux Python/PHP toolkit to GitHub.',
+    },
   };
 
   const currentFile = fileMap[selectedFile];
@@ -108,47 +136,95 @@ export const CodeViewer: React.FC<CodeViewerProps> = ({ theme = 'matrix' }) => {
               <Code className="w-6 h-6 animate-pulse" />
             </div>
             <div>
-              <h2 className={`text-lg font-black ${style.accent} ${style.accentGlow}`}>Source Code Studio</h2>
-              <p className="text-xs text-slate-400">Inspect, edit, copy, and download production codebase files.</p>
+              <h2 className={`text-lg font-black ${style.accent} ${style.accentGlow}`}>Termux Codebase & Git Exporter</h2>
+              <p className="text-xs text-slate-400">Inspect, download, or copy all Termux toolkit files and git cleanup scripts.</p>
             </div>
           </div>
 
           {/* Selector Tabs */}
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap items-center gap-1.5">
             <button
               onClick={() => setSelectedFile('python')}
-              className={`flex items-center space-x-2 px-4 py-2 rounded-xl text-xs transition-all ${
+              className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs transition-all ${
                 selectedFile === 'python'
                   ? style.activeTab
                   : 'bg-slate-950 text-slate-300 border border-slate-800 hover:border-slate-700'
               }`}
             >
-              <Terminal className="w-4 h-4" />
+              <Terminal className="w-3.5 h-3.5" />
               <span>FeaturesticLeaks.py</span>
             </button>
 
             <button
               onClick={() => setSelectedFile('php')}
-              className={`flex items-center space-x-2 px-4 py-2 rounded-xl text-xs transition-all ${
+              className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs transition-all ${
                 selectedFile === 'php'
                   ? style.activeTab
                   : 'bg-slate-950 text-slate-300 border border-slate-800 hover:border-slate-700'
               }`}
             >
-              <FileText className="w-4 h-4" />
+              <FileText className="w-3.5 h-3.5" />
               <span>verify.php</span>
             </button>
 
             <button
               onClick={() => setSelectedFile('setup')}
-              className={`flex items-center space-x-2 px-4 py-2 rounded-xl text-xs transition-all ${
+              className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs transition-all ${
                 selectedFile === 'setup'
                   ? style.activeTab
                   : 'bg-slate-950 text-slate-300 border border-slate-800 hover:border-slate-700'
               }`}
             >
-              <Cpu className="w-4 h-4" />
+              <Cpu className="w-3.5 h-3.5" />
               <span>run.sh</span>
+            </button>
+
+            <button
+              onClick={() => setSelectedFile('readme')}
+              className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs transition-all ${
+                selectedFile === 'readme'
+                  ? style.activeTab
+                  : 'bg-slate-950 text-slate-300 border border-slate-800 hover:border-slate-700'
+              }`}
+            >
+              <BookOpen className="w-3.5 h-3.5" />
+              <span>README.md</span>
+            </button>
+
+            <button
+              onClick={() => setSelectedFile('guide')}
+              className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs transition-all ${
+                selectedFile === 'guide'
+                  ? style.activeTab
+                  : 'bg-slate-950 text-slate-300 border border-slate-800 hover:border-slate-700'
+              }`}
+            >
+              <BookOpen className="w-3.5 h-3.5 text-amber-400" />
+              <span>HOW_TO_USE.md</span>
+            </button>
+
+            <button
+              onClick={() => setSelectedFile('gitignore')}
+              className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs transition-all ${
+                selectedFile === 'gitignore'
+                  ? style.activeTab
+                  : 'bg-slate-950 text-slate-300 border border-slate-800 hover:border-slate-700'
+              }`}
+            >
+              <FolderCheck className="w-3.5 h-3.5" />
+              <span>.gitignore</span>
+            </button>
+
+            <button
+              onClick={() => setSelectedFile('clean')}
+              className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs transition-all ${
+                selectedFile === 'clean'
+                  ? 'bg-rose-600 text-white font-black shadow-lg shadow-rose-600/30'
+                  : 'bg-slate-950 text-rose-300 border border-rose-500/40 hover:border-rose-400'
+              }`}
+            >
+              <Trash2 className="w-3.5 h-3.5 text-rose-400" />
+              <span>clean-repo.sh</span>
             </button>
           </div>
         </div>

@@ -903,3 +903,181 @@ else
     echo -e "\\e[1;31m[✖] FeaturesticLeaks.py file missing!\\e[0m"
 fi
 `;
+
+export const README_MD = `# 🚀 FeaturesticLeaks PAK Tool v2.0-ULTIMATE
+
+> **Professional Termux & Android Asset Reverse Engineering Toolkit**  
+> *Unpack, Repack, Decompile, and Inject UE4/UE5 PAK files, Lua bytecode, and OBB archives directly on Android using Termux CLI.*
+
+---
+
+## 🌟 Key Features
+
+* 📦 **PAK Container Engine**: AES-256 decryption & zstandard compression for Unreal Engine .pak archives.
+* 📜 **Lua Bytecode Decompiler**: Compile and decompile Lua 5.1, 5.2, 5.3, and LuaJIT 2.1 bytecode opcodes.
+* 📦 **ZIP & OBB Manager**: Extract, modify, and repack APK/OBB assets with zero quality loss.
+* ⚡ **Bytecode Injector**: Inject modded textures and bytecode header offsets into target PAK files.
+* 🛡️ **Offline Hardware Binding (HWID)**: Automatic Android serial & device model fingerprint binding.
+* 🎨 **Rich Terminal UI**: Cyberpunk-style ASCII art, animated progress bars, and interactive menus.
+
+---
+
+## ⚡ 1-Click Termux Installation
+
+Copy and paste this single command in your **Termux** application on Android:
+
+\`\`\`bash
+pkg update -y && pkg install -y git python php && pip install rich requests pycryptodome zstandard && git clone https://github.com/itzgeniusboy/FeaturesticLeaks-Toolkit-.git && cd FeaturesticLeaks-Toolkit- && python FeaturesticLeaks.py
+\`\`\`
+
+---
+
+## 📁 Repository Directory Structure
+
+\`\`\`
+FeaturesticLeaks-Toolkit-/
+├── FeaturesticLeaks.py        # Main Python CLI Reverse Engineering Tool
+├── verify.php                 # PHP REST API Key & HWID Verification Backend
+├── run.sh                     # Termux Auto-Launcher & Installer Script
+├── README.md                  # Project Documentation
+├── HOW_TO_USE.md              # Complete Termux Usage & Execution Guide
+├── .gitignore                 # Git Exclusions
+├── pak/                       # PAK Archive Folders (original, unpack, repack)
+├── lua/                       # Lua Script Folders (original, decompiled, compiled)
+├── zip/                       # Archive Folders (extracted, output)
+└── injector/                  # Asset Injector Folders (target, backup)
+\`\`\`
+
+---
+
+## 🔒 Security & Offline Mode
+* Requires **Python 3.10+** and **Termux**.
+* Supports completely offline execution with built-in bypass keys (\`VIP-AUTO-BYPASS\`).
+* Licensed under the MIT License.
+`;
+
+export const HOW_TO_USE_MD = `# 📖 Termux Installation & Execution Guide
+
+Follow these simple step-by-step instructions to run **FeaturesticLeaks.py** on any Android device using **Termux**.
+
+---
+
+## 📱 Step 1: Install Termux on Android
+1. Download **Termux** from [F-Droid](https://f-droid.org/en/packages/com.termux/) or GitHub Releases (do not use outdated Google Play Store version).
+2. Open Termux and grant storage permissions:
+   \`\`\`bash
+   termux-setup-storage
+   \`\`\`
+
+---
+
+## ⚡ Step 2: One-Click Automatic Installation
+Copy and paste this command into Termux:
+
+\`\`\`bash
+pkg update -y && pkg install -y git python php && pip install rich requests pycryptodome zstandard && git clone https://github.com/itzgeniusboy/FeaturesticLeaks-Toolkit-.git && cd FeaturesticLeaks-Toolkit- && python FeaturesticLeaks.py
+\`\`\`
+
+---
+
+## 🛠️ Step 3: Manual Step-by-Step Installation
+
+If you prefer installing packages manually:
+
+1. **Update Packages & Install Prerequisites**:
+   \`\`\`bash
+   pkg update -y && pkg upgrade -y
+   pkg install -y python php git clang libffi zlib
+   \`\`\`
+
+2. **Install Python Libraries**:
+   \`\`\`bash
+   pip install rich requests pycryptodome zstandard
+   \`\`\`
+
+3. **Clone Repository**:
+   \`\`\`bash
+   git clone https://github.com/itzgeniusboy/FeaturesticLeaks-Toolkit-.git
+   cd FeaturesticLeaks-Toolkit-
+   \`\`\`
+
+4. **Run FeaturesticLeaks**:
+   \`\`\`bash
+   python FeaturesticLeaks.py
+   \`\`\`
+
+---
+
+## 🔑 Bypass / VIP Keys for Offline Mode
+When prompted for a license key inside Termux, enter any of the following presets:
+- \`VIP-AUTO-BYPASS\`
+- \`PAK-VIP-9999-ULTIMATE\`
+- \`FL-TERMUX-FREE-2026\`
+`;
+
+export const GITIGNORE_CONTENT = `# Git Exclusions for FeaturesticLeaks Toolkit
+
+# Bytecode & Compiled Files
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# PAK Archives & Unpacked Assets
+pak/original/*
+!pak/original/.gitkeep
+pak/results/unpack/*
+!pak/results/unpack/.gitkeep
+pak/results/repack/*
+!pak/results/repack/.gitkeep
+
+# Lua Scripts
+lua/original/*
+!lua/original/.gitkeep
+lua/decompiled/*
+!lua/decompiled/.gitkeep
+lua/compiled/*
+!lua/compiled/.gitkeep
+
+# ZIP & OBB Archives
+zip/extracted/*
+!zip/extracted/.gitkeep
+zip/output/*
+!zip/output/.gitkeep
+
+# Injector Backups
+injector/backup/*
+!injector/backup/.gitkeep
+injector/target/*
+!injector/target/.gitkeep
+
+# Local Credentials & Database
+db.json
+config.json
+*.log
+*.tmp
+.DS_Store
+`;
+
+export const CLEAN_REPO_SH = `#!/usr/bin/env bash
+# ==============================================================================
+# FEATURESTIC LEAKS - REPOSITORY CLEANUP & GIT EXPORT SCRIPT FOR TERMUX
+# ==============================================================================
+
+echo "🧹 Cleaning repository to leave ONLY pure Termux Python & PHP files..."
+
+# 1. Remove web/app frontend files & assets
+rm -rf assets public src index.html metadata.json .env.example vite.config.ts tsconfig.json tsconfig.node.json components.json package.json package-lock.json
+
+# 2. Stage changes in Git
+git add .
+
+# 3. Commit cleanup changes
+git commit -m "Cleaned repo: Removed web UI files, kept Termux script only"
+
+# 4. Push cleanly to main branch
+git push origin main
+
+echo "✅ Clean Termux Repository Pushed Successfully to GitHub!"
+`;
+
