@@ -25,6 +25,7 @@ import time
 import subprocess
 import threading
 import shutil
+import traceback
 
 # Audio welcome voice playback
 _AUDIO_PLAYED = False
@@ -1507,23 +1508,59 @@ def print_banner():
     os.system('cls' if os.name == 'nt' else 'clear')
     
     banner_content = (
-        "[bold cyan]███████╗███████╗██████╗ ████████╗██╗   ██╗██████╗ ███████╗████████╗██╗ ██████╗[/bold cyan]\n"
-        "[bold cyan]██╔════╝██╔════╝██╔══██╗╚══██╔══╝██║   ██║██╔══██╗██╔════╝╚══██╔══╝██║██╔════╝[/bold cyan]\n"
-        "[bold cyan]█████╗  █████╗  ██████╔╝   ██║   ██║   ██║██████╔╝███████╗   ██║   ██║██║     [/bold cyan]\n"
-        "[bold cyan]██╔══╝  ██╔══╝  ██╔══██╗   ██║   ██║   ██║██╔══██╗╚════██║   ██║   ██║██║     [/bold cyan]\n"
-        "[bold cyan]██║     ███████╗██║  ██║   ██║   ╚██████╔╝██║  ██║███████║   ██║   ██║╚██████╗[/bold cyan]\n"
-        "[bold cyan]╚═╝     ╚══════╝╚═╝  ╚═╝   ╚═╝    ╚═════╝ ╚═╝  ╚═╝╚══════╝   ╚═╝   ╚═╝ ╚═════╝[/bold cyan]\n"
-        "[bold bright_white]          ⚡ LEAKS PAK TOOL v2.0 — TERMUX SUITE ⚡          [/bold bright_white]\n"
-        "[dim white]📢 Telegram: https://t.me/FeaturesticLeaks[/dim white]"
+        "[bold bright_cyan]⚡ FEATURESTIC LEAKS ⚡[/bold bright_cyan]\n"
+        "[dim cyan]────────────────────────────────────────────────[/dim cyan]\n"
+        "[bold white]PAK TOOL v2.0 — Termux Suite[/bold white]\n"
+        "[dim white]Telegram: https://t.me/FeaturesticLeaks[/dim white]"
     )
     
     banner_panel = Panel(
         Align.center(banner_content),
-        border_style="bold cyan",
+        border_style="cyan",
         box=ROUNDED,
-        padding=(0, 1)
+        padding=(0, 2)
     )
     console.print(banner_panel)
+
+def handle_exception(e: Exception, action_name: str = "Operation", data_path: Optional[Path] = None):
+    """
+    Centralized error handler:
+    - Displays clean 1-2 line summary with error type and details.
+    - Provides actionable hints for common Android/Termux errors.
+    - Logs full traceback to data_path/logs/error_<timestamp>.log without flooding terminal.
+    """
+    err_type = type(e).__name__
+    err_msg = str(e).strip() if (str(e) and str(e).strip()) else "No details available"
+    
+    console.print(f"[bold red][X] {action_name} Error: {err_type}: {escape(err_msg)}[/bold red]")
+    
+    # Specific user-friendly hints for common error scenarios
+    if isinstance(e, PermissionError):
+        console.print("[yellow][!] Hint: Folder access denied. File ko normal storage (Download/) me copy karke try karo, ya Shizuku setup karo.[/yellow]")
+    elif isinstance(e, FileNotFoundError):
+        console.print("[yellow][!] Hint: File/folder nahi mila. Path check karo.[/yellow]")
+    elif any(term in err_type.lower() or term in err_msg.lower() for term in ["zlib", "zstd", "decompress", "compress", "badzip"]):
+        console.print("[yellow][!] Hint: File corrupt hai ya unsupported PAK format hai.[/yellow]")
+    
+    # Save full traceback to log file
+    try:
+        base = data_path if data_path else Path(__file__).parent
+        logs_dir = base / "logs"
+        logs_dir.mkdir(parents=True, exist_ok=True)
+        
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        log_file = logs_dir / f"error_{timestamp}.log"
+        with open(log_file, "w", encoding="utf-8") as f:
+            f.write(f"Action: {action_name}\n")
+            f.write(f"Time: {datetime.now().isoformat()}\n")
+            f.write(f"Error Type: {err_type}\n")
+            f.write(f"Error Message: {err_msg}\n\n")
+            f.write("Traceback:\n")
+            f.write(traceback.format_exc())
+            
+        console.print(f"[dim white]Full log saved to: logs/{log_file.name}[/dim white]")
+    except Exception:
+        pass
 
 def check_and_auto_update():
     """
@@ -1825,7 +1862,7 @@ def main_menu():
                     current_repack_path.mkdir(parents=True, exist_ok=True)
                 console.print(f'[bold green][OK] Successfully extracted to: {unpack_path}[/bold green]')
             except Exception as e:
-                console.print(f'[bold red][X] Error: {escape(str(e))}[/bold red]')
+                handle_exception(e, "Unpack", data_path)
             safe_input('\nPress Enter to continue...')
             
         elif choice == '2':
@@ -1855,9 +1892,7 @@ def main_menu():
                     repack_obbzsdic(pak, repack_dir, output_pak)
                 console.print('[bold green][OK] Repack completed successfully![/bold green]')
             except Exception as e:
-                console.print(f'[bold red][X] Repack failed: {e}[/bold red]')
-                import traceback
-                traceback.print_exc()
+                handle_exception(e, "Repack", data_path)
             safe_input('\nPress Enter to continue...')
             
         elif choice == '3':
@@ -1908,9 +1943,7 @@ def main_menu():
                     console.print('[bold red][X] No files repacked.[/bold red]')
                     
             except Exception as e:
-                console.print(f'[bold red][X] Repack failed: {e}[/bold red]')
-                import traceback
-                traceback.print_exc()
+                handle_exception(e, "Replace Files", data_path)
             safe_input('\nPress Enter to continue...')
             
         elif choice == '4':
@@ -1978,9 +2011,7 @@ def main_menu():
                     console.print('[bold red][X] No files were processed.[/bold red]')
                     
             except Exception as e:
-                console.print(f'[bold red][X] Repack failed: {e}[/bold red]')
-                import traceback
-                traceback.print_exc()
+                handle_exception(e, "Inject Path", data_path)
             safe_input('\nPress Enter to continue...')
             
         elif choice == '5':
@@ -2002,8 +2033,6 @@ if __name__ == '__main__':
         console.print('\n[yellow][!] Interrupted. Exiting...[/yellow]')
         sys.exit(0)
     except Exception as e:
-        console.print(f'[bold red][X] ERROR:[/bold red] {escape(str(e))}')
-        import traceback
-        traceback.print_exc()
+        handle_exception(e, "Fatal", Path(__file__).parent)
         safe_input('\nPress Enter to exit...')
         sys.exit(1)
