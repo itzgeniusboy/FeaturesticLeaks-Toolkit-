@@ -4,25 +4,27 @@ import { BookOpen, Copy, Check, Terminal, ShieldAlert, Cpu, Download, ArrowRight
 export const SetupGuide: React.FC = () => {
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
 
+  const cleanCmd = 'cd ~ && rm -rf FeaturesticLeaks-Toolkit-';
+
   const steps = [
     {
-      title: 'Step 1: Update & Install Git, Python, PHP',
-      cmd: 'pkg update -y && pkg install -y git python php clang libffi zlib make',
-      desc: 'Installs Git, Python 3 runtime, PHP interpreter for verify.php API testing, and build chains.',
+      title: 'Step 1: Delete Old Broken Download (Clean Wipe)',
+      cmd: 'cd ~ && rm -rf FeaturesticLeaks-Toolkit-',
+      desc: 'Removes any old or corrupted downloaded folder from Termux home directory.',
     },
     {
-      title: 'Step 2: Clone GitHub Repository & Enter Directory',
+      title: 'Step 2: Install Packages (Python, PHP, Git, Compilers)',
+      cmd: 'pkg update -y && pkg install -y git python php clang libffi zlib make nano',
+      desc: 'Installs Git, Python 3 runtime, Nano editor, PHP interpreter, and build drivers.',
+    },
+    {
+      title: 'Step 3: Clone Repository OR Create Clean Project Folder',
       cmd: 'git clone https://github.com/itzgeniusboy/FeaturesticLeaks-Toolkit-.git && cd FeaturesticLeaks-Toolkit-',
-      desc: 'Clones the single-file FeaturesticLeaks repository and switches into the workspace directory.',
+      desc: 'Clones the GitHub repository and switches into the project folder.',
     },
     {
-      title: 'Step 3: Storage Permissions (Optional for File Extractor)',
-      cmd: 'termux-setup-storage',
-      desc: 'Grants Termux storage access to read/write game assets from Android storage (/sdcard/).',
-    },
-    {
-      title: 'Step 4: Execute Auto-Launcher Script',
-      cmd: 'chmod +x run.sh && ./run.sh',
+      title: 'Step 4: Install Dependencies & Run Tool',
+      cmd: 'pip install rich requests pycryptodome zstandard && python FeaturesticLeaks.py',
       desc: 'Installs required Python packages (rich, pycryptodome, zstandard) and launches FeaturesticLeaks.py.',
     },
   ];
@@ -33,7 +35,7 @@ export const SetupGuide: React.FC = () => {
     setTimeout(() => setCopiedIndex(null), 2000);
   };
 
-  const fullOneLiner = 'pkg update -y && pkg install -y git python php clang libffi zlib make && git clone https://github.com/itzgeniusboy/FeaturesticLeaks-Toolkit-.git && cd FeaturesticLeaks-Toolkit- && chmod +x run.sh && ./run.sh';
+  const fullCleanAndInstall = 'cd ~ && rm -rf FeaturesticLeaks-Toolkit- && pkg update -y && pkg install -y git python php clang libffi zlib make nano && git clone https://github.com/itzgeniusboy/FeaturesticLeaks-Toolkit-.git && cd FeaturesticLeaks-Toolkit- && pip install rich requests pycryptodome zstandard && python FeaturesticLeaks.py';
 
   return (
     <div className="space-y-6 font-mono">
@@ -44,12 +46,37 @@ export const SetupGuide: React.FC = () => {
             <BookOpen className="w-6 h-6" />
           </div>
           <div>
-            <h2 className="text-lg font-bold text-emerald-400">Termux Installation & Quickstart Setup Guide</h2>
+            <h2 className="text-lg font-bold text-emerald-400">Termux Setup & Cleanup Commands</h2>
             <p className="text-xs text-slate-400">
-              Complete command sequence for setting up Python, PHP, Rich UI, and Cryptographic drivers on Termux Android.
+              Clean old broken downloads and install FeaturesticLeaks PAK Tool v2.0-ULTIMATE on Termux.
             </p>
           </div>
         </div>
+      </div>
+
+      {/* Clean Old Download Box */}
+      <div className="bg-amber-950/40 border-2 border-amber-500/60 rounded-xl p-4 sm:p-5 shadow-xl space-y-3">
+        <div className="flex items-center justify-between">
+          <span className="text-sm font-bold text-amber-400 flex items-center gap-2">
+            <ShieldAlert className="w-4 h-4 text-amber-400" />
+            <span>🧹 Delete Old Downloaded Tool (Clean Reset)</span>
+          </span>
+          <button
+            onClick={() => handleCopy(cleanCmd, 88)}
+            className="flex items-center space-x-1.5 px-3 py-1 rounded bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs shadow transition"
+          >
+            {copiedIndex === 88 ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+            <span>{copiedIndex === 88 ? 'Copied Wipe Command!' : 'Copy Wipe Command'}</span>
+          </button>
+        </div>
+
+        <p className="text-xs text-amber-200/80">
+          Agar Termux me pehle ka koi adhoora ya purana folder downloaded hai jisse error aa raha hai, to is command se usko delete karein:
+        </p>
+
+        <pre className="p-3 bg-black rounded border border-amber-800 text-amber-300 text-xs overflow-x-auto whitespace-pre-wrap leading-relaxed">
+          {cleanCmd}
+        </pre>
       </div>
 
       {/* One-Liner Express Installer Box */}
@@ -57,19 +84,19 @@ export const SetupGuide: React.FC = () => {
         <div className="flex items-center justify-between">
           <span className="text-sm font-bold text-emerald-400 flex items-center gap-2">
             <Terminal className="w-4 h-4 text-emerald-400" />
-            <span>⚡ Express One-Line Auto Installer</span>
+            <span>⚡ Express One-Line Clean & Reinstall Command</span>
           </span>
           <button
-            onClick={() => handleCopy(fullOneLiner, 99)}
+            onClick={() => handleCopy(fullCleanAndInstall, 99)}
             className="flex items-center space-x-1.5 px-3 py-1 rounded bg-emerald-600 hover:bg-emerald-500 text-slate-950 font-bold text-xs shadow transition"
           >
             {copiedIndex === 99 ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-            <span>{copiedIndex === 99 ? 'Copied Command!' : 'Copy Express Command'}</span>
+            <span>{copiedIndex === 99 ? 'Copied Express Command!' : 'Copy Express Command'}</span>
           </button>
         </div>
 
         <pre className="p-3 bg-black rounded border border-emerald-800 text-emerald-300 text-xs overflow-x-auto whitespace-pre-wrap leading-relaxed">
-          {fullOneLiner}
+          {fullCleanAndInstall}
         </pre>
       </div>
 
@@ -97,23 +124,28 @@ export const SetupGuide: React.FC = () => {
         ))}
       </div>
 
-      {/* Troubleshooting & Permissions */}
-      <div className="bg-slate-900 border border-amber-900/60 rounded-xl p-4 sm:p-5 space-y-3">
-        <h3 className="text-sm font-bold text-amber-400 flex items-center gap-2">
-          <ShieldAlert className="w-4 h-4" />
-          <span>Troubleshooting & Storage Permissions in Termux</span>
+      {/* Manual File Creation If GitHub is Empty */}
+      <div className="bg-slate-950 border border-cyan-900/80 rounded-xl p-4 sm:p-5 space-y-3">
+        <h3 className="text-sm font-bold text-cyan-400 flex items-center gap-2">
+          <Download className="w-4 h-4 text-cyan-400" />
+          <span>If FeaturesticLeaks.py is Missing in Your GitHub Repository</span>
         </h3>
-        <ul className="text-xs text-slate-300 space-y-2 list-disc list-inside">
-          <li>
-            <strong className="text-amber-300">Storage Access:</strong> Run <code className="text-cyan-300">termux-setup-storage</code> in Termux to grant permission to read/write game assets from Android internal storage (`/sdcard/`).
-          </li>
-          <li>
-            <strong className="text-amber-300">Android HWID Detection:</strong> If <code className="text-cyan-300">getprop ro.serialno</code> returns empty or permission denied on Android 10+, the script automatically falls back to product model ID and machine-id SHA256 hashes.
-          </li>
-          <li>
-            <strong className="text-amber-300">verify.php Server Hosting:</strong> Ensure your PHP backend API is hosted on a public VPS / CPanel / local server and update <code className="text-cyan-300">API_ENDPOINT</code> inside <code className="text-cyan-300">FeaturesticLeaks.py</code>.
-          </li>
-        </ul>
+        <p className="text-xs text-slate-300 leading-relaxed">
+          Agar aapke GitHub repo me <code className="text-emerald-400">FeaturesticLeaks.py</code> missing hai, to Termux me direct file banane ke liye yeh karein:
+        </p>
+        <div className="p-3 bg-black rounded border border-slate-800 text-xs text-emerald-400 font-mono overflow-x-auto whitespace-pre">
+          {`# Step 1: Create folder and enter
+mkdir -p FeaturesticLeaks-Toolkit- && cd FeaturesticLeaks-Toolkit-
+
+# Step 2: Open Nano Editor
+nano FeaturesticLeaks.py
+
+# Step 3: Source Code Tab se FeaturesticLeaks.py ka poora code Copy karke Paste karein
+# Step 4: Ctrl + O (Save) -> Enter -> Ctrl + X (Exit)
+
+# Step 5: Run the tool
+python FeaturesticLeaks.py`}
+        </div>
       </div>
     </div>
   );

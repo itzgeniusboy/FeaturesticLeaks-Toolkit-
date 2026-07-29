@@ -9,11 +9,11 @@
 
 Termux me tool setup aur chalane ke liye pehle repo clone karein aur folder me enter karein:
 
-### ⚡ Complete One-Line Command (Copy-Paste)
-Termux open karein aur is poori line ko copy karke paste kar dein:
+### ⚡ Complete One-Line Clean & Run Command (Copy-Paste)
+Termux open karein aur is poori line ko copy karke paste kar dein (yeh purana folder delete karke fresh setup karega):
 
 ```bash
-pkg update -y && pkg install -y git python php clang libffi openssl zlib make tar wget && git clone https://github.com/itzgeniusboy/FeaturesticLeaks-Toolkit-.git && cd FeaturesticLeaks-Toolkit- && chmod +x run.sh && ./run.sh
+cd ~ && rm -rf FeaturesticLeaks-Toolkit- && pkg update -y && pkg install -y git python php clang libffi zlib make nano && git clone https://github.com/itzgeniusboy/FeaturesticLeaks-Toolkit-.git && cd FeaturesticLeaks-Toolkit- && pip install rich requests pycryptodome zstandard && python FeaturesticLeaks.py
 ```
 
 ---
