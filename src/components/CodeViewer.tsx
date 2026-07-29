@@ -1,11 +1,53 @@
 import React, { useState } from 'react';
-import { Code, Copy, Check, Download, FileText, Search, Info, ShieldCheck, Cpu, Terminal } from 'lucide-react';
+import { Code, Copy, Check, Download, FileText, Search, Info, ShieldCheck, Cpu, Terminal, Sparkles } from 'lucide-react';
 import { PYTHON_SCRIPT, PHP_SCRIPT, SETUP_SCRIPT } from '../data/sourceCode';
+import { ThemeMode } from '../types';
 
-export const CodeViewer: React.FC = () => {
+interface CodeViewerProps {
+  theme?: ThemeMode;
+}
+
+export const CodeViewer: React.FC<CodeViewerProps> = ({ theme = 'matrix' }) => {
   const [selectedFile, setSelectedFile] = useState<'python' | 'php' | 'setup'>('python');
   const [copied, setCopied] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+
+  const themeStyles = {
+    matrix: {
+      accent: 'text-emerald-400',
+      accentGlow: 'text-glow-emerald',
+      border: 'border-emerald-500/40',
+      buttonBg: 'bg-emerald-600 hover:bg-emerald-500 text-slate-950',
+      activeTab: 'bg-emerald-600 text-slate-950 shadow-lg shadow-emerald-600/30 font-black',
+      badge: 'bg-emerald-950 text-emerald-300 border-emerald-500/40',
+    },
+    cyan: {
+      accent: 'text-cyan-400',
+      accentGlow: 'text-glow-cyan',
+      border: 'border-cyan-500/40',
+      buttonBg: 'bg-cyan-600 hover:bg-cyan-500 text-slate-950',
+      activeTab: 'bg-cyan-600 text-slate-950 shadow-lg shadow-cyan-600/30 font-black',
+      badge: 'bg-cyan-950 text-cyan-300 border-cyan-500/40',
+    },
+    synthwave: {
+      accent: 'text-fuchsia-400',
+      accentGlow: 'text-glow-purple',
+      border: 'border-fuchsia-500/40',
+      buttonBg: 'bg-fuchsia-600 hover:bg-fuchsia-500 text-slate-950',
+      activeTab: 'bg-fuchsia-600 text-slate-950 shadow-lg shadow-fuchsia-600/30 font-black',
+      badge: 'bg-fuchsia-950 text-fuchsia-300 border-fuchsia-500/40',
+    },
+    solar: {
+      accent: 'text-amber-400',
+      accentGlow: 'text-glow-amber',
+      border: 'border-amber-500/40',
+      buttonBg: 'bg-amber-600 hover:bg-amber-500 text-slate-950',
+      activeTab: 'bg-amber-600 text-slate-950 shadow-lg shadow-amber-600/30 font-black',
+      badge: 'bg-amber-950 text-amber-300 border-amber-500/40',
+    },
+  };
+
+  const style = themeStyles[theme] || themeStyles.matrix;
 
   const fileMap = {
     python: {
@@ -13,7 +55,7 @@ export const CodeViewer: React.FC = () => {
       language: 'python',
       code: PYTHON_SCRIPT,
       type: 'Python CLI Application',
-      description: 'Main Termux reverse engineering tool using Rich library UI, Android HWID detection, and API client.',
+      description: 'Main Termux reverse engineering tool using Rich UI, Android HWID detection, and offline authentication.',
     },
     php: {
       name: 'verify.php',
@@ -26,7 +68,7 @@ export const CodeViewer: React.FC = () => {
       name: 'run.sh',
       language: 'bash',
       code: SETUP_SCRIPT,
-      type: 'Termux Auto-Launcher & Installer Script',
+      type: 'Termux Auto-Launcher Script',
       description: 'Automated launcher script that installs dependencies (pip install rich requests pycryptodome zstandard) and executes FeaturesticLeaks.py.',
     },
   };
@@ -58,15 +100,15 @@ export const CodeViewer: React.FC = () => {
 
   return (
     <div className="space-y-6 font-mono">
-      {/* File Selection Tabs Header */}
-      <div className="bg-slate-900 border border-emerald-900/80 rounded-xl p-4 sm:p-5 shadow-xl">
+      {/* File Selection Header */}
+      <div className={`bg-slate-900/90 border ${style.border} rounded-2xl p-5 shadow-2xl backdrop-blur-md`}>
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
           <div className="flex items-center space-x-3">
-            <div className="p-2.5 bg-emerald-950 rounded-lg border border-emerald-500/30 text-emerald-400">
-              <Code className="w-6 h-6" />
+            <div className={`p-3 bg-slate-950 rounded-xl border ${style.border} ${style.accent}`}>
+              <Code className="w-6 h-6 animate-pulse" />
             </div>
             <div>
-              <h2 className="text-lg font-bold text-emerald-400">Source Code Studio</h2>
+              <h2 className={`text-lg font-black ${style.accent} ${style.accentGlow}`}>Source Code Studio</h2>
               <p className="text-xs text-slate-400">Inspect, edit, copy, and download production codebase files.</p>
             </div>
           </div>
@@ -75,10 +117,10 @@ export const CodeViewer: React.FC = () => {
           <div className="flex flex-wrap items-center gap-2">
             <button
               onClick={() => setSelectedFile('python')}
-              className={`flex items-center space-x-2 px-3.5 py-1.5 rounded-lg text-xs font-bold transition ${
+              className={`flex items-center space-x-2 px-4 py-2 rounded-xl text-xs transition-all ${
                 selectedFile === 'python'
-                  ? 'bg-emerald-600 text-slate-950 shadow-md shadow-emerald-600/30'
-                  : 'bg-slate-950 text-slate-300 border border-slate-800 hover:border-emerald-500/50'
+                  ? style.activeTab
+                  : 'bg-slate-950 text-slate-300 border border-slate-800 hover:border-slate-700'
               }`}
             >
               <Terminal className="w-4 h-4" />
@@ -87,10 +129,10 @@ export const CodeViewer: React.FC = () => {
 
             <button
               onClick={() => setSelectedFile('php')}
-              className={`flex items-center space-x-2 px-3.5 py-1.5 rounded-lg text-xs font-bold transition ${
+              className={`flex items-center space-x-2 px-4 py-2 rounded-xl text-xs transition-all ${
                 selectedFile === 'php'
-                  ? 'bg-emerald-600 text-slate-950 shadow-md shadow-emerald-600/30'
-                  : 'bg-slate-950 text-slate-300 border border-slate-800 hover:border-emerald-500/50'
+                  ? style.activeTab
+                  : 'bg-slate-950 text-slate-300 border border-slate-800 hover:border-slate-700'
               }`}
             >
               <FileText className="w-4 h-4" />
@@ -99,10 +141,10 @@ export const CodeViewer: React.FC = () => {
 
             <button
               onClick={() => setSelectedFile('setup')}
-              className={`flex items-center space-x-2 px-3.5 py-1.5 rounded-lg text-xs font-bold transition ${
+              className={`flex items-center space-x-2 px-4 py-2 rounded-xl text-xs transition-all ${
                 selectedFile === 'setup'
-                  ? 'bg-emerald-600 text-slate-950 shadow-md shadow-emerald-600/30'
-                  : 'bg-slate-950 text-slate-300 border border-slate-800 hover:border-emerald-500/50'
+                  ? style.activeTab
+                  : 'bg-slate-950 text-slate-300 border border-slate-800 hover:border-slate-700'
               }`}
             >
               <Cpu className="w-4 h-4" />
@@ -111,39 +153,37 @@ export const CodeViewer: React.FC = () => {
           </div>
         </div>
 
-        {/* File Summary Description */}
-        <div className="mt-4 pt-3 border-t border-slate-800 text-xs text-slate-300 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+        {/* File Description */}
+        <div className="mt-4 pt-3 border-t border-slate-800/80 text-xs text-slate-300 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
           <div>
-            <span className="font-bold text-emerald-400">{currentFile.type}: </span>
+            <span className={`font-bold ${style.accent}`}>{currentFile.type}: </span>
             <span className="text-slate-300">{currentFile.description}</span>
           </div>
-          <span className="text-[11px] text-slate-400 bg-slate-950 px-2 py-1 rounded border border-slate-800">
+          <span className={`text-[11px] text-slate-300 px-2.5 py-1 rounded-md border ${style.badge}`}>
             {lines.length} Total Lines • UTF-8
           </span>
         </div>
       </div>
 
-      {/* Code Editor Toolbar & Content Window */}
-      <div className="bg-slate-950 border border-emerald-900/80 rounded-xl overflow-hidden shadow-2xl">
-        {/* Editor Toolbar */}
-        <div className="bg-slate-900 border-b border-emerald-900/60 p-3 flex flex-col sm:flex-row items-center justify-between gap-3">
-          {/* Search Box */}
+      {/* Editor Toolbar & Code Area */}
+      <div className={`bg-slate-950 border ${style.border} rounded-2xl overflow-hidden shadow-2xl`}>
+        {/* Editor Bar */}
+        <div className="bg-slate-900/90 border-b border-slate-800 p-3.5 flex flex-col sm:flex-row items-center justify-between gap-3">
           <div className="relative w-full sm:w-72">
-            <Search className="w-4 h-4 text-slate-400 absolute left-2.5 top-2.5" />
+            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
             <input
               type="text"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               placeholder="Search code..."
-              className="w-full bg-slate-950 border border-slate-800 focus:border-emerald-500 rounded pl-8 pr-3 py-1 text-xs text-emerald-300 placeholder-slate-500 focus:outline-none"
+              className={`w-full bg-slate-950 border border-slate-800 focus:${style.border} rounded-lg pl-9 pr-3 py-1.5 text-xs ${style.accent} placeholder-slate-500 focus:outline-none`}
             />
           </div>
 
-          {/* Action Buttons */}
           <div className="flex items-center space-x-2 w-full sm:w-auto justify-end">
             <button
               onClick={handleCopy}
-              className="flex items-center space-x-1.5 px-3 py-1.5 rounded bg-slate-800 hover:bg-emerald-900 border border-slate-700 hover:border-emerald-500 text-xs text-emerald-300 font-bold transition"
+              className="flex items-center space-x-1.5 px-3.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs text-slate-200 font-bold transition"
             >
               {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
               <span>{copied ? 'Copied!' : 'Copy Code'}</span>
@@ -151,7 +191,7 @@ export const CodeViewer: React.FC = () => {
 
             <button
               onClick={handleDownload}
-              className="flex items-center space-x-1.5 px-3 py-1.5 rounded bg-emerald-600 hover:bg-emerald-500 text-slate-950 font-bold text-xs shadow transition"
+              className={`flex items-center space-x-1.5 px-4 py-1.5 rounded-lg ${style.buttonBg} font-extrabold text-xs shadow-lg transition`}
             >
               <Download className="w-3.5 h-3.5" />
               <span>Download {currentFile.name}</span>
@@ -159,10 +199,9 @@ export const CodeViewer: React.FC = () => {
           </div>
         </div>
 
-        {/* Code Lines Display */}
-        <div className="p-4 overflow-x-auto max-h-[600px] overflow-y-auto font-mono text-xs text-slate-200 leading-relaxed bg-black/90 select-text">
+        {/* Code Content */}
+        <div className="p-4 overflow-x-auto max-h-[600px] overflow-y-auto font-mono text-xs text-slate-200 leading-relaxed bg-black/95 select-text">
           {filteredLines.map(({ line, num }) => {
-            // Basic syntax color styling for readability
             const isComment = line.trim().startsWith('#') || line.trim().startsWith('//') || line.trim().startsWith('/*') || line.trim().startsWith('*');
             const isImport = line.trim().startsWith('import') || line.trim().startsWith('from') || line.trim().startsWith('require') || line.trim().startsWith('use');
             const isDef = line.includes('def ') || line.includes('function ') || line.includes('class ');
@@ -193,35 +232,35 @@ export const CodeViewer: React.FC = () => {
         </div>
       </div>
 
-      {/* Code Architecture Highlights */}
+      {/* Feature Highlights */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 font-mono text-xs">
-        <div className="bg-slate-900 border border-emerald-900/60 rounded-xl p-4 space-y-2">
-          <div className="flex items-center space-x-2 text-emerald-400 font-bold">
+        <div className={`bg-slate-900/90 border ${style.border} rounded-2xl p-4 space-y-2`}>
+          <div className={`flex items-center space-x-2 ${style.accent} font-extrabold`}>
             <ShieldCheck className="w-4 h-4" />
             <span>Android HWID Lock</span>
           </div>
           <p className="text-slate-400">
-            Executes <code className="text-emerald-300">getprop ro.serialno</code> via subprocess on Android Termux with fallback to machine-id and MAC hashing.
+            Executes <code className={style.accent}>getprop ro.serialno</code> on Android Termux with local fallback hashing.
           </p>
         </div>
 
-        <div className="bg-slate-900 border border-emerald-900/60 rounded-xl p-4 space-y-2">
-          <div className="flex items-center space-x-2 text-cyan-400 font-bold">
+        <div className={`bg-slate-900/90 border ${style.border} rounded-2xl p-4 space-y-2`}>
+          <div className="flex items-center space-x-2 text-cyan-400 font-extrabold">
             <Cpu className="w-4 h-4" />
-            <span>Cryptographic Cryptography</span>
+            <span>Zstandard & PyCryptodome</span>
           </div>
           <p className="text-slate-400">
-            Integrates Zstandard compression and PyCryptodome AES-256 for PAK file container header parsing.
+            Integrates zstd decompression and PyCryptodome AES-256 for PAK binary header extraction.
           </p>
         </div>
 
-        <div className="bg-slate-900 border border-emerald-900/60 rounded-xl p-4 space-y-2">
-          <div className="flex items-center space-x-2 text-amber-400 font-bold">
+        <div className={`bg-slate-900/90 border ${style.border} rounded-2xl p-4 space-y-2`}>
+          <div className="flex items-center space-x-2 text-amber-400 font-extrabold">
             <Info className="w-4 h-4" />
-            <span>PHP JSON Database Engine</span>
+            <span>Zero-Config PHP Engine</span>
           </div>
           <p className="text-slate-400">
-            Zero-dependency <code className="text-yellow-300">keys_db.json</code> fallback engine for instant server deployment without needing MySQL setup.
+            Zero-dependency <code className="text-yellow-300">keys_db.json</code> fallback engine for instant PHP deployment.
           </p>
         </div>
       </div>

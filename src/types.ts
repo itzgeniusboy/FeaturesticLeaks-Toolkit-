@@ -1,4 +1,5 @@
 export type ActiveTab = 'emulator' | 'code' | 'keys' | 'files' | 'setup';
+export type ThemeMode = 'matrix' | 'cyan' | 'synthwave' | 'solar';
 
 export interface LicenseKey {
   id: string;

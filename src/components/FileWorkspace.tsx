@@ -1,8 +1,45 @@
 import React, { useState } from 'react';
-import { FolderTree, FileCode, Folder, FileArchive, CheckCircle2, FileText, HardDrive, Cpu, Plus } from 'lucide-react';
-import { VirtualFile } from '../types';
+import { FolderTree, FileCode, Folder, FileArchive, CheckCircle2, FileText, HardDrive, Cpu, Plus, Sparkles } from 'lucide-react';
+import { VirtualFile, ThemeMode } from '../types';
 
-export const FileWorkspace: React.FC = () => {
+interface FileWorkspaceProps {
+  theme?: ThemeMode;
+}
+
+export const FileWorkspace: React.FC<FileWorkspaceProps> = ({ theme = 'matrix' }) => {
+  const themeStyles = {
+    matrix: {
+      accent: 'text-emerald-400',
+      accentGlow: 'text-glow-emerald',
+      border: 'border-emerald-500/40',
+      activeItem: 'bg-emerald-950 text-emerald-300 font-bold border border-emerald-500/50 box-glow-emerald',
+      badge: 'bg-emerald-950 text-emerald-300 border-emerald-500/40',
+    },
+    cyan: {
+      accent: 'text-cyan-400',
+      accentGlow: 'text-glow-cyan',
+      border: 'border-cyan-500/40',
+      activeItem: 'bg-cyan-950 text-cyan-300 font-bold border border-cyan-500/50 box-glow-cyan',
+      badge: 'bg-cyan-950 text-cyan-300 border-cyan-500/40',
+    },
+    synthwave: {
+      accent: 'text-fuchsia-400',
+      accentGlow: 'text-glow-purple',
+      border: 'border-fuchsia-500/40',
+      activeItem: 'bg-fuchsia-950 text-fuchsia-300 font-bold border border-fuchsia-500/50 box-glow-purple',
+      badge: 'bg-fuchsia-950 text-fuchsia-300 border-fuchsia-500/40',
+    },
+    solar: {
+      accent: 'text-amber-400',
+      accentGlow: 'text-glow-amber',
+      border: 'border-amber-500/40',
+      activeItem: 'bg-amber-950 text-amber-300 font-bold border border-amber-500/50 box-glow-amber',
+      badge: 'bg-amber-950 text-amber-300 border-amber-500/40',
+    },
+  };
+
+  const style = themeStyles[theme] || themeStyles.matrix;
+
   const [selectedPath, setSelectedPath] = useState<string>('pak/results/unpack/extracted_assets.json');
   const [activeFileContent, setActiveFileContent] = useState<string>(`{
   "source_pak": "game_patch_v2.pak",
@@ -17,7 +54,6 @@ export const FileWorkspace: React.FC = () => {
   ]
 }`);
 
-  // Folder Hierarchy Data Structure
   const fileTree: VirtualFile[] = [
     {
       id: '1',
@@ -88,28 +124,29 @@ export const FileWorkspace: React.FC = () => {
   const renderTree = (items: VirtualFile[]) => {
     return items.map((item) => {
       const isDir = item.type === 'directory';
+      const isSelected = selectedPath === item.path;
       return (
         <div key={item.id} className="ml-3 my-1 font-mono text-xs">
           <div
             onClick={() => !isDir && handleSelectFile(item)}
-            className={`flex items-center space-x-2 px-2 py-1 rounded cursor-pointer transition ${
-              selectedPath === item.path
-                ? 'bg-emerald-900 text-emerald-300 font-bold border border-emerald-500/50'
+            className={`flex items-center space-x-2 px-2.5 py-1.5 rounded-lg cursor-pointer transition ${
+              isSelected
+                ? style.activeItem
                 : 'text-slate-300 hover:bg-slate-900 hover:text-emerald-400'
             }`}
           >
             {isDir ? (
-              <Folder className="w-4 h-4 text-cyan-400" />
+              <Folder className="w-4 h-4 text-cyan-400 shrink-0" />
             ) : item.name.endsWith('.pak') ? (
-              <FileArchive className="w-4 h-4 text-amber-400" />
+              <FileArchive className="w-4 h-4 text-amber-400 shrink-0" />
             ) : (
-              <FileCode className="w-4 h-4 text-emerald-400" />
+              <FileCode className={`w-4 h-4 ${style.accent} shrink-0`} />
             )}
             <span>{item.name}</span>
           </div>
 
           {isDir && item.children && (
-            <div className="border-l border-slate-800 ml-2 pl-2">
+            <div className="border-l border-slate-800 ml-2.5 pl-2">
               {renderTree(item.children)}
             </div>
           )}
@@ -121,15 +158,15 @@ export const FileWorkspace: React.FC = () => {
   return (
     <div className="space-y-6 font-mono">
       {/* Header */}
-      <div className="bg-slate-900 border border-emerald-900/80 rounded-xl p-4 sm:p-5 shadow-xl">
+      <div className={`bg-slate-900/90 border ${style.border} rounded-2xl p-5 shadow-2xl backdrop-blur-md`}>
         <div className="flex items-center space-x-3">
-          <div className="p-2.5 bg-emerald-950 rounded-lg border border-emerald-500/30 text-emerald-400">
-            <FolderTree className="w-6 h-6" />
+          <div className={`p-3 bg-slate-950 rounded-xl border ${style.border} ${style.accent}`}>
+            <FolderTree className="w-6 h-6 animate-pulse" />
           </div>
           <div>
-            <h2 className="text-lg font-bold text-emerald-400">Termux Virtual File Workspace</h2>
+            <h2 className={`text-lg font-black ${style.accent} ${style.accentGlow}`}>Termux Virtual File Workspace</h2>
             <p className="text-xs text-slate-400">
-              Automatic directory structure generated by <code className="text-emerald-300">FeaturesticLeaks.py</code> on startup.
+              Directory structure generated by <code className={style.accent}>FeaturesticLeaks.py</code> on startup.
             </p>
           </div>
         </div>
@@ -137,10 +174,10 @@ export const FileWorkspace: React.FC = () => {
 
       <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
         {/* Left Tree Inspector */}
-        <div className="md:col-span-5 bg-slate-950 border border-emerald-900/80 rounded-xl p-4 shadow-lg space-y-3">
-          <div className="flex items-center justify-between pb-2 border-b border-slate-800 text-xs">
-            <span className="font-bold text-emerald-400">Termux Workspace Directories</span>
-            <span className="text-slate-500">Auto-Created</span>
+        <div className={`md:col-span-5 bg-slate-950 border ${style.border} rounded-2xl p-5 shadow-xl space-y-3`}>
+          <div className="flex items-center justify-between pb-3 border-b border-slate-800 text-xs">
+            <span className={`font-black ${style.accent}`}>Termux Workspace Directories</span>
+            <span className={`text-[10px] px-2 py-0.5 rounded-full border ${style.badge}`}>Auto-Created</span>
           </div>
 
           <div className="overflow-y-auto max-h-[480px]">
@@ -149,14 +186,14 @@ export const FileWorkspace: React.FC = () => {
         </div>
 
         {/* Right Content Viewer */}
-        <div className="md:col-span-7 bg-slate-950 border border-emerald-900/80 rounded-xl p-4 shadow-lg space-y-3">
-          <div className="flex items-center justify-between pb-2 border-b border-slate-800 text-xs">
-            <span className="font-bold text-emerald-400">Viewing File: <code className="text-cyan-300">{selectedPath}</code></span>
+        <div className={`md:col-span-7 bg-slate-950 border ${style.border} rounded-2xl p-5 shadow-xl space-y-3`}>
+          <div className="flex items-center justify-between pb-3 border-b border-slate-800 text-xs">
+            <span className={`font-bold ${style.accent}`}>Viewing File: <code className="text-cyan-300">{selectedPath}</code></span>
             <span className="text-xs text-slate-400">Read-Only Preview</span>
           </div>
 
-          <div className="bg-black border border-slate-800 rounded p-4">
-            <pre className="text-xs text-emerald-300 overflow-x-auto whitespace-pre font-mono leading-relaxed">
+          <div className="bg-black/95 border border-slate-800 rounded-xl p-4">
+            <pre className={`text-xs ${style.accent} overflow-x-auto whitespace-pre font-mono leading-relaxed`}>
               {activeFileContent}
             </pre>
           </div>

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Key, Plus, RefreshCw, Send, ShieldAlert, CheckCircle, Clock, Trash2, Copy, Check, Terminal } from 'lucide-react';
-import { VerificationResponse } from '../types';
+import { Key, Plus, RefreshCw, Send, ShieldAlert, CheckCircle, Clock, Trash2, Copy, Check, Terminal, Sparkles } from 'lucide-react';
+import { VerificationResponse, ThemeMode } from '../types';
 
 interface KeyItem {
   key: string;
@@ -12,14 +12,51 @@ interface KeyItem {
   isExpired?: boolean;
 }
 
-export const KeyManager: React.FC = () => {
+interface KeyManagerProps {
+  theme?: ThemeMode;
+}
+
+export const KeyManager: React.FC<KeyManagerProps> = ({ theme = 'matrix' }) => {
+  const themeStyles = {
+    matrix: {
+      accent: 'text-emerald-400',
+      accentGlow: 'text-glow-emerald',
+      border: 'border-emerald-500/40',
+      buttonBg: 'bg-emerald-600 hover:bg-emerald-500 text-slate-950',
+      badge: 'bg-emerald-950 text-emerald-300 border-emerald-500/40',
+    },
+    cyan: {
+      accent: 'text-cyan-400',
+      accentGlow: 'text-glow-cyan',
+      border: 'border-cyan-500/40',
+      buttonBg: 'bg-cyan-600 hover:bg-cyan-500 text-slate-950',
+      badge: 'bg-cyan-950 text-cyan-300 border-cyan-500/40',
+    },
+    synthwave: {
+      accent: 'text-fuchsia-400',
+      accentGlow: 'text-glow-purple',
+      border: 'border-fuchsia-500/40',
+      buttonBg: 'bg-fuchsia-600 hover:bg-fuchsia-500 text-slate-950',
+      badge: 'bg-fuchsia-950 text-fuchsia-300 border-fuchsia-500/40',
+    },
+    solar: {
+      accent: 'text-amber-400',
+      accentGlow: 'text-glow-amber',
+      border: 'border-amber-500/40',
+      buttonBg: 'bg-amber-600 hover:bg-amber-500 text-slate-950',
+      badge: 'bg-amber-950 text-amber-300 border-amber-500/40',
+    },
+  };
+
+  const style = themeStyles[theme] || themeStyles.matrix;
+
   const [keysList, setKeysList] = useState<KeyItem[]>([]);
   const [isLoadingKeys, setIsLoadingKeys] = useState(false);
 
   // Key Creator Form State
   const [newKey, setNewKey] = useState(`PAK-KEY-${Math.floor(1000 + Math.random() * 9000)}-VIP`);
   const [daysValid, setDaysValid] = useState('30');
-  const [noteInput, setNoteInput] = useState('New Client License');
+  const [noteInput, setNoteInput] = useState('New VIP License');
 
   // API Tester State
   const [testKey, setTestKey] = useState('PAK-VIP-9999-ULTIMATE');
@@ -128,26 +165,28 @@ export const KeyManager: React.FC = () => {
   return (
     <div className="space-y-6 font-mono">
       {/* Header Banner */}
-      <div className="bg-slate-900 border border-emerald-900/80 rounded-xl p-4 sm:p-5 shadow-xl">
+      <div className={`bg-slate-900/90 border ${style.border} rounded-2xl p-5 shadow-2xl backdrop-blur-md`}>
         <div className="flex items-center space-x-3">
-          <div className="p-2.5 bg-emerald-950 rounded-lg border border-emerald-500/30 text-emerald-400">
-            <Key className="w-6 h-6" />
+          <div className={`p-3 bg-slate-950 rounded-xl border ${style.border} ${style.accent}`}>
+            <Key className="w-6 h-6 animate-pulse" />
           </div>
           <div>
-            <h2 className="text-lg font-bold text-emerald-400">verify.php API & License Key Manager</h2>
+            <h2 className={`text-lg font-black ${style.accent} ${style.accentGlow}`}>
+              verify.php API & License Key Manager
+            </h2>
             <p className="text-xs text-slate-400">
-              Manage active keys, test HTTP POST requests, and configure single-device HWID locks.
+              Manage database keys, test HTTP POST verification, and configure device locks.
             </p>
           </div>
         </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* Left Column: License Key Generator & Database */}
+        {/* Left Column */}
         <div className="lg:col-span-7 space-y-6">
-          {/* Key Creation Panel */}
-          <div className="bg-slate-950 border border-emerald-900/80 rounded-xl p-4 sm:p-5 shadow-lg">
-            <h3 className="text-sm font-bold text-emerald-400 mb-3 flex items-center gap-2">
+          {/* Key Creation Form */}
+          <div className={`bg-slate-950 border ${style.border} rounded-2xl p-5 shadow-xl`}>
+            <h3 className={`text-sm font-black ${style.accent} mb-4 flex items-center gap-2`}>
               <Plus className="w-4 h-4" />
               <span>Generate New License Key</span>
             </h3>
@@ -159,7 +198,7 @@ export const KeyManager: React.FC = () => {
                   type="text"
                   value={newKey}
                   onChange={(e) => setNewKey(e.target.value)}
-                  className="w-full bg-slate-900 border border-slate-800 rounded px-3 py-1.5 text-emerald-300 focus:outline-none focus:border-emerald-500 font-bold"
+                  className={`w-full bg-slate-900 border border-slate-800 focus:${style.border} rounded-lg px-3 py-2 ${style.accent} font-bold focus:outline-none`}
                   required
                 />
               </div>
@@ -169,7 +208,7 @@ export const KeyManager: React.FC = () => {
                 <select
                   value={daysValid}
                   onChange={(e) => setDaysValid(e.target.value)}
-                  className="w-full bg-slate-900 border border-slate-800 rounded px-3 py-1.5 text-emerald-300 focus:outline-none focus:border-emerald-500"
+                  className={`w-full bg-slate-900 border border-slate-800 focus:${style.border} rounded-lg px-3 py-2 ${style.accent} focus:outline-none`}
                 >
                   <option value="7">7 Days</option>
                   <option value="30">30 Days</option>
@@ -186,14 +225,14 @@ export const KeyManager: React.FC = () => {
                   value={noteInput}
                   onChange={(e) => setNoteInput(e.target.value)}
                   placeholder="Note / User ID"
-                  className="w-full bg-slate-900 border border-slate-800 rounded px-3 py-1.5 text-slate-300 focus:outline-none focus:border-emerald-500"
+                  className={`w-full bg-slate-900 border border-slate-800 focus:${style.border} rounded-lg px-3 py-2 text-slate-200 focus:outline-none`}
                 />
               </div>
 
               <div className="sm:col-span-3 pt-2">
                 <button
                   type="submit"
-                  className="w-full bg-emerald-600 hover:bg-emerald-500 text-slate-950 font-bold py-2 rounded shadow transition flex items-center justify-center gap-2"
+                  className={`w-full ${style.buttonBg} font-extrabold py-2.5 rounded-xl shadow-lg transition flex items-center justify-center gap-2`}
                 >
                   <Plus className="w-4 h-4" />
                   <span>Create & Store Key in verify.php Database</span>
@@ -203,14 +242,14 @@ export const KeyManager: React.FC = () => {
           </div>
 
           {/* Database Keys Table */}
-          <div className="bg-slate-950 border border-emerald-900/80 rounded-xl p-4 shadow-lg space-y-3">
-            <div className="flex items-center justify-between pb-2 border-b border-slate-800">
-              <h3 className="text-sm font-bold text-emerald-400 flex items-center gap-2">
+          <div className={`bg-slate-950 border ${style.border} rounded-2xl p-5 shadow-xl space-y-4`}>
+            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+              <h3 className={`text-sm font-black ${style.accent} flex items-center gap-2`}>
                 <span>Active Database Keys ({keysList.length})</span>
               </h3>
               <button
                 onClick={fetchKeys}
-                className="text-xs text-slate-400 hover:text-emerald-400 flex items-center gap-1"
+                className={`text-xs text-slate-400 hover:${style.accent} flex items-center gap-1.5 transition`}
               >
                 <RefreshCw className={`w-3.5 h-3.5 ${isLoadingKeys ? 'animate-spin' : ''}`} />
                 <span>Refresh DB</span>
@@ -221,59 +260,58 @@ export const KeyManager: React.FC = () => {
               <table className="w-full text-left text-xs border-collapse">
                 <thead>
                   <tr className="border-b border-slate-800 text-slate-400">
-                    <th className="py-2 px-2">Key</th>
-                    <th className="py-2 px-2">Expiry</th>
-                    <th className="py-2 px-2">Registered HWID</th>
-                    <th className="py-2 px-2">Status</th>
-                    <th className="py-2 px-2 text-right">Actions</th>
+                    <th className="py-2.5 px-2">Key</th>
+                    <th className="py-2.5 px-2">Expiry</th>
+                    <th className="py-2.5 px-2">Registered HWID</th>
+                    <th className="py-2.5 px-2">Status</th>
+                    <th className="py-2.5 px-2 text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-900">
                   {keysList.map((item) => (
-                    <tr key={item.key} className="hover:bg-slate-900/60">
-                      <td className="py-2 px-2 font-bold text-emerald-300">
+                    <tr key={item.key} className="hover:bg-slate-900/60 transition-colors">
+                      <td className={`py-3 px-2 font-black ${style.accent}`}>
                         {item.key}
-                        <div className="text-[10px] text-slate-500">{item.note}</div>
+                        <div className="text-[10px] text-slate-500 font-normal">{item.note}</div>
                       </td>
-                      <td className="py-2 px-2">
+                      <td className="py-3 px-2">
                         <span className={item.isExpired ? 'text-rose-400 font-bold' : 'text-slate-300'}>
                           {item.expiry_date}
                         </span>
                         <div className="text-[10px] text-slate-500">{item.daysRemaining}d remaining</div>
                       </td>
-                      <td className="py-2 px-2">
+                      <td className="py-3 px-2">
                         {item.registered_hwid ? (
                           <span className="text-cyan-300 font-mono text-[11px]">{item.registered_hwid}</span>
                         ) : (
-                          <span className="text-amber-400 font-semibold text-[10px] bg-amber-950/60 px-1.5 py-0.5 rounded border border-amber-800">
+                          <span className="text-amber-400 font-bold text-[10px] bg-amber-950/80 px-2 py-0.5 rounded-full border border-amber-800">
                             Unbound (Locks on use)
                           </span>
                         )}
                       </td>
-                      <td className="py-2 px-2">
+                      <td className="py-3 px-2">
                         <span
-                          className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${
+                          className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
                             item.status === 'ACTIVE'
-                              ? 'bg-emerald-950 text-emerald-300 border border-emerald-800'
-                              : 'bg-rose-950 text-rose-300 border border-rose-800'
+                              ? 'bg-emerald-950 text-emerald-300 border border-emerald-500/40'
+                              : 'bg-rose-950 text-rose-300 border border-rose-500/40'
                           }`}
                         >
                           {item.status}
                         </span>
                       </td>
-                      <td className="py-2 px-2 text-right space-x-1">
+                      <td className="py-3 px-2 text-right space-x-1.5">
                         {item.registered_hwid && (
                           <button
                             onClick={() => handleResetHWID(item.key)}
-                            title="Reset Device HWID Lock"
-                            className="px-2 py-1 text-[10px] bg-amber-950 text-amber-300 border border-amber-800 rounded hover:bg-amber-900"
+                            className="px-2.5 py-1 text-[10px] font-bold bg-amber-950 text-amber-300 border border-amber-800 rounded-lg hover:bg-amber-900"
                           >
                             Reset HWID
                           </button>
                         )}
                         <button
                           onClick={() => handleToggleStatus(item.key)}
-                          className="px-2 py-1 text-[10px] bg-slate-800 text-slate-300 border border-slate-700 rounded hover:bg-slate-700"
+                          className="px-2.5 py-1 text-[10px] font-bold bg-slate-800 text-slate-300 border border-slate-700 rounded-lg hover:bg-slate-700"
                         >
                           Toggle
                         </button>
@@ -286,10 +324,10 @@ export const KeyManager: React.FC = () => {
           </div>
         </div>
 
-        {/* Right Column: Live API Sandbox & Endpoint Inspector */}
+        {/* Right Column */}
         <div className="lg:col-span-5 space-y-6">
-          <div className="bg-slate-950 border border-emerald-900/80 rounded-xl p-4 sm:p-5 shadow-lg space-y-4">
-            <h3 className="text-sm font-bold text-emerald-400 flex items-center gap-2">
+          <div className={`bg-slate-950 border ${style.border} rounded-2xl p-5 shadow-xl space-y-4`}>
+            <h3 className={`text-sm font-black ${style.accent} flex items-center gap-2`}>
               <Send className="w-4 h-4" />
               <span>PHP API Live Endpoint Sandbox</span>
             </h3>
@@ -301,37 +339,37 @@ export const KeyManager: React.FC = () => {
                   type="text"
                   value={testKey}
                   onChange={(e) => setTestKey(e.target.value)}
-                  className="w-full bg-slate-900 border border-slate-800 rounded px-3 py-1.5 text-emerald-300 focus:outline-none"
+                  className={`w-full bg-slate-900 border border-slate-800 focus:${style.border} rounded-lg px-3 py-2 ${style.accent} focus:outline-none`}
                 />
               </div>
 
               <div>
-                <label className="block text-slate-400 mb-1">Client Hardware ID (hwid):</label>
+                <label className="block text-slate-400 mb-1">Hardware ID (HWID):</label>
                 <input
                   type="text"
                   value={testHwid}
                   onChange={(e) => setTestHwid(e.target.value)}
-                  className="w-full bg-slate-900 border border-slate-800 rounded px-3 py-1.5 text-cyan-300 focus:outline-none"
+                  className={`w-full bg-slate-900 border border-slate-800 focus:${style.border} rounded-lg px-3 py-2 text-cyan-300 focus:outline-none`}
                 />
               </div>
 
               <button
                 onClick={handleTestApi}
                 disabled={isTestingApi}
-                className="w-full bg-cyan-600 hover:bg-cyan-500 text-slate-950 font-bold py-2 rounded shadow flex items-center justify-center gap-2 transition"
+                className="w-full bg-cyan-600 hover:bg-cyan-500 text-slate-950 font-extrabold py-2.5 rounded-xl shadow-lg flex items-center justify-center gap-2 transition"
               >
                 <Send className="w-3.5 h-3.5" />
                 <span>Send POST Request to /api/verify</span>
               </button>
             </div>
 
-            {/* Response Preview Box */}
+            {/* Response Preview */}
             {apiResponse && (
-              <div className="border border-emerald-800 rounded bg-slate-900 p-3 space-y-2 text-xs">
-                <div className="flex items-center justify-between border-b border-slate-800 pb-1">
-                  <span className="font-bold text-emerald-400">Response JSON Body:</span>
+              <div className="border border-slate-800 rounded-xl bg-slate-900 p-3 space-y-2 text-xs">
+                <div className="flex items-center justify-between border-b border-slate-800 pb-1.5">
+                  <span className={`font-bold ${style.accent}`}>Response JSON:</span>
                   <span
-                    className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${
+                    className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
                       apiResponse.status === 'SUCCESS'
                         ? 'bg-emerald-950 text-emerald-300 border border-emerald-500'
                         : 'bg-rose-950 text-rose-300 border border-rose-500'
@@ -340,28 +378,28 @@ export const KeyManager: React.FC = () => {
                     {apiResponse.status}
                   </span>
                 </div>
-                <pre className="text-[11px] text-emerald-300 overflow-x-auto whitespace-pre bg-black p-2 rounded border border-slate-800">
+                <pre className={`text-[11px] ${style.accent} overflow-x-auto whitespace-pre bg-black/90 p-3 rounded-lg border border-slate-800`}>
                   {JSON.stringify(apiResponse, null, 2)}
                 </pre>
               </div>
             )}
 
             {/* cURL Command Generator */}
-            <div className="pt-3 border-t border-slate-800 space-y-2">
+            <div className="pt-3 border-t border-slate-800/80 space-y-2">
               <div className="flex justify-between items-center text-xs">
-                <span className="text-slate-400 font-bold flex items-center gap-1">
+                <span className="text-slate-400 font-bold flex items-center gap-1.5">
                   <Terminal className="w-3.5 h-3.5" />
-                  <span>cURL Terminal Command:</span>
+                  <span>cURL Command:</span>
                 </span>
                 <button
                   onClick={copyCurl}
-                  className="text-xs text-emerald-400 hover:underline flex items-center gap-1"
+                  className={`text-xs ${style.accent} hover:underline flex items-center gap-1 font-bold`}
                 >
-                  {copiedCurl ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
+                  {copiedCurl ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
                   <span>{copiedCurl ? 'Copied' : 'Copy cURL'}</span>
                 </button>
               </div>
-              <pre className="p-2.5 rounded bg-black border border-slate-800 text-[10px] text-emerald-400 overflow-x-auto">
+              <pre className={`p-3 rounded-xl bg-black/90 border border-slate-800 text-[10px] ${style.accent} overflow-x-auto`}>
                 {curlCommand}
               </pre>
             </div>
