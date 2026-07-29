@@ -1,116 +1,132 @@
-# 📖 FeaturesticLeaks PAK Tool v2.0-ULTIMATE — Complete Usage Guide
+# 📖 FeaturesticLeaks PAK Tool v2.0-ULTIMATE — Complete Termux Usage Manual
 
-Is guide me Termux me **FeaturesticLeaks PAK Tool** ko install karne, run karne, aur iske saare 5 modules ko use karne ka poora detail bataya gaya hai.
-
----
-
-## 🔑 License Key / Password (At Launch)
-Jab aap tool launch karenge, to screen par **License Key** poojha jayega:
-- **Offline VIP Bypass Active**: Aap koi bhi key daal sakte hain (jaise `VIP`, `123`, `ADMIN`, ya direct **Enter** press kar sakte hain).
-- **Instant Unlocked**: Koi online server check ki zaroorat nahi hai, 100% Offline VIP Access hamesha mil jayega.
+Is manual me Termux me **FeaturesticLeaks PAK Tool** ko setup karne aur iske saare features ko step-by-step use karne ka tareeka bataya gaya hai.
 
 ---
 
-## ⚡ 1. Termux One-Line Quick Setup & Launch
+## ⚡ 1. Termux One-Line Installation & Run
 
-Termux open karein aur is single command ko copy-paste karein:
+Termux Terminal kholein aur yeh command paste karke Enter dabayein:
 
 ```bash
-cd ~ && rm -rf FeaturesticLeaks-Toolkit- && pkg update -y && pkg install -y git python php clang libffi zlib make nano && git clone https://github.com/itzgeniusboy/FeaturesticLeaks-Toolkit-.git && cd FeaturesticLeaks-Toolkit- && pip install rich requests pycryptodome zstandard && python public/FeaturesticLeaks.py
+cd ~ && rm -rf FeaturesticLeaks-Toolkit- && pkg update -y && pkg install -y git python clang libffi zlib make nano && git clone https://github.com/itzgeniusboy/FeaturesticLeaks-Toolkit-.git && cd FeaturesticLeaks-Toolkit- && pip install rich requests pycryptodome zstandard && python FeaturesticLeaks.py
 ```
 
 ---
 
-## 🚀 2. Step-by-Step Manual Commands
+## 🚀 2. Manual Installation Steps
 
-Agar aap alag-alag commands chalana chahte hain:
+Agar aap ek-ek command chala kar setup karna chahte hain:
 
 ```bash
-# Step 1: Termux Home Directory me purana folder delete karein
+# 1. Purana repository clear karein
 cd ~ && rm -rf FeaturesticLeaks-Toolkit-
 
-# Step 2: System Packages & Python Install karein
-pkg update -y && pkg install -y git python php clang libffi zlib make nano
+# 2. Termux packages install karein
+pkg update -y && pkg install -y git python clang libffi zlib make nano
 
-# Step 3: Required Python Modules Install karein
+# 3. Required Python modules install karein
 pip install rich requests pycryptodome zstandard
 
-# Step 4: GitHub Repo Clone karein
+# 4. Repository clone karein
 git clone https://github.com/itzgeniusboy/FeaturesticLeaks-Toolkit-.git
 
-# Step 5: Folder me enter karein
+# 5. Project folder me jayein
 cd FeaturesticLeaks-Toolkit-
 
-# Step 6: Tool Launch Karein
-python public/FeaturesticLeaks.py
+# 6. Main Python tool run karein
+python FeaturesticLeaks.py
 ```
 
 ---
 
-## 🛠️ 3. Main Menu & Module Usage Details
+## 🛠️ 3. Detailed Main Menu Guide
 
-Jab tool launch hoga, aapko 6 modules milenge:
-
-### 📦 [1] Unpack PAK File (Extract UE / Game Asset Archives)
-- **Kaise Use Karein**:
-  1. Apni target `.pak` file ko Termux folder `pak/original/` me copy karein.
-  2. Main Menu me `1` press karein.
-  3. Apni `.pak` file ka number select karein.
-  4. Extracted files `pak/results/unpack/<file_name>_extracted/` folder me save ho jayengi.
-
-### 🔨 [2] Repack PAK File (Re-build Modified PAK Archive)
-- **Kaise Use Karein**:
-  1. Modded asset files ko `pak/results/unpack/` ke andar edit karein.
-  2. Main Menu me `2` press karein.
-  3. Select karein kis folder ko dubara `.pak` me convert karna hai.
-  4. Modified `.pak` file `pak/results/repack/` me save ho jayegi.
-
-### 📜 [3] Decompile Lua Script (LuaJIT Bytecode -> Readable Code)
-- **Kaise Use Karein**:
-  1. Target `.luac` ya `.lua` compiled bytecode file ko `lua/original/` folder me rakhein.
-  2. Main Menu me `3` press karein.
-  3. File select karke decompile karein.
-  4. Readable source code `lua/decompiled/` folder me `.lua` file ke roop me save ho jayega.
-
-### ⚙️ [4] Compile Lua Script (Source Code -> Bytecode)
-- **Kaise Use Karein**:
-  1. Edit ki hui `.lua` file ko `lua/decompiled/` folder me rakhein.
-  2. Main Menu me `4` press karein.
-  3. File select karke compile karein.
-  4. Output compiled file `lua/compiled/` me `.luac` format me milegi.
-
-### 🗜️ [5] ZIP / APK / OBB Extractor (Archive Utility)
-- **Kaise Use Karein**:
-  1. Target `.zip`, `.apk`, ya `.obb` archive ko `zip/output/` folder me rakhein.
-  2. Main Menu me `5` press karein aur extract option chunein.
-  3. Files `zip/extracted/` directory me extract ho jayengi.
-
-### ℹ️ [6] System Info & HWID Inspector
-- View device hardware fingerprint, Python version, and offline VIP subscription status.
+Jab aap `python FeaturesticLeaks.py` run karenge, screen par main menu dikhega:
 
 ---
 
-## 🚨 Troubleshooting Common Errors
+### 📦 Option 1: UNPACK ALL TYPES PAKS
+* **Use Case**: Target `.pak` ya `.obb` file ke andar ke saare game assets (textures, Lua scripts, configs) extract karne ke liye.
+* **Step-by-Step Instructions**:
+  1. Apni `.pak` file ko Termux me `PAK/` folder ke andar copy karein:
+     ```bash
+     cp /sdcard/Download/game.pak PAK/
+     ```
+  2. Tool me `1` press karke Enter dabayein.
+  3. Screen par dikhne wali `.pak` files me se apni file ka number select karein.
+  4. Script file ko unpack karke files `UNPACK/<file_name>/` folder me save kar degi.
+  5. Ek `Debug_<file_name>.log` file bhi `UNPACK/` me create hoti hai jo detailed header information deti hai.
 
-### Error 1: `python: can't open file 'FeaturesticLeaks.py': No such file or directory`
-- **Solution**: FeaturesticLeaks.py file `public/` folder ke andar hai.
-- Is command se chalayein:
+---
+
+### 🔨 Option 2: REPACK ALL TYPES PAKS
+* **Use Case**: Unpack ki hui files ko edit karne ke baad dobara `.pak` container me convert karne ke liye.
+* **Step-by-Step Instructions**:
+  1. Ensure karein ki aapne pehle Option 1 se `.pak` file unpack kar li hai.
+  2. `UNPACK/<file_name>/` ya `REPACK/<file_name>/` me apni modified files place karein.
+  3. Main menu me `2` press karein.
+  4. Repack mode (`MINI_OBB`, `GAMEPATCH`, ya `OBBZSDIC`) automatically detect hoga.
+  5. Repacking complete hone par output `.pak` file `RESULT/` folder me save ho jayegi.
+
+---
+
+### 🔄 Option 3: REPACK ANY SIZE (EXISTING FILES)
+* **Use Case**: PAK ke andar pehle se maujood files ko replace karne ke liye, chahe modified file ka size kitna bhi bada ya chota ho.
+* **Step-by-Step Instructions**:
+  1. Apni original `.pak` file ko `PAK TOOL/PAK/` folder me rakhein:
+     ```bash
+     cp /sdcard/Download/game.pak "PAK TOOL/PAK/"
+     ```
+  2. Apni edit ki hui files (same folder structure ke saath) `PAK TOOL/EDIT/` folder me rakhein.
+  3. Main menu me `3` press karein.
+  4. Tool original `.pak` file ke headers, size offsets, aur index block rebuild karke file ko replace kar dega.
+  5. Final output `PAK TOOL/RESULT/` me milegi.
+
+---
+
+### 🚀 Option 4: REPACK TO PATH (NEW FILES)
+* **Use Case**: PAK container me kisi specific internal path par brand new files ya folders add karne ke liye.
+* **Step-by-Step Instructions**:
+  1. Original `.pak` file ko `PAK TOOL/PAK/` me rakhein.
+  2. Jo nayi files inject karni hain unhe `PAK TOOL/EDIT/` me rakhein.
+  3. Main menu me `4` press karein.
+  4. Screen par target internal path poochead jayega. Internal path enter karein (e.g. `Content/Lua/GameLua/Mod/BRMod/Gameplay/Core`).
+  5. Tool target path par naye files safely inject karke game-ready `.pak` rebuild kar dega (`PAK TOOL/RESULT/`).
+  6. **Game Ready**: Is method se game login stuck ya crash hone ka issue 100% resolve rehta hai.
+
+---
+
+### 🗑️ Option 5: DELETE FOLDER
+* **Use Case**: Workspaces clear karne aur Termux storage free karne ke liye.
+* **Step-by-Step Instructions**:
+  1. Main menu me `5` press karein.
+  2. Temporary output folders ki list dikhegi.
+  3. Folder number select karke `yes` type karein aur delete confirm karein.
+
+---
+
+## 🚨 Common Termux Questions & Fixes
+
+### Q1: `python: can't open file 'FeaturesticLeaks.py': No such file or directory`
+* **Fix**: Check karein ki aap `FeaturesticLeaks-Toolkit-` directory ke andar ho:
   ```bash
-  python public/FeaturesticLeaks.py
-  ```
-  ya file copy karein main folder me:
-  ```bash
-  cp public/FeaturesticLeaks.py . && python FeaturesticLeaks.py
+  cd ~/FeaturesticLeaks-Toolkit- && python FeaturesticLeaks.py
   ```
 
-### Error 2: `pip install pip is forbidden (termux)`
-- **Solution**: Pip upgrade skip karein, direct libraries install karein:
+### Q2: `pip install pip is forbidden on Termux`
+* **Fix**: Termux me `pip` ko upgrade mat karein, direct packages install karein:
   ```bash
   pip install rich requests pycryptodome zstandard
   ```
 
-### Error 3: `Permission Denied`
-- Executable permission dein:
+### Q3: How to run launcher script?
+* **Fix**: Execution permission dekar run.sh se launch karein:
   ```bash
-  chmod +x run.sh public/FeaturesticLeaks.py
+  chmod +x run.sh && ./run.sh
   ```
+
+---
+
+## 👤 Credits
+* **Tool Name**: `FeaturesticLeaks PAK Tool v2.0`

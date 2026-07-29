@@ -1,4 +1,4 @@
-# FEATURESTIC LEAKS - PAK TOOL v2.0
+export const PYTHON_SCRIPT = `# FEATURESTIC LEAKS - PAK TOOL v2.0
 # Termux / Linux Android Game Reverse Engineering & PAK Manipulation Toolkit
 
 #One_Of_The_Best_Tool_In_Whole_Telegram - 100% WORKING FINAL
@@ -137,7 +137,7 @@ SIMPLE2_DECRYPT_KEY = bytes.fromhex('E55B4ED1')
 SIMPLE2_BLOCK_SIZE = 16
 
 SM4_SECRET_4 = 'eb691efea914241317a8'
-SM4_SECRET_2 = 'Q0hVTKey$as*1ZFlQCiA'
+SM4_SECRET_2 = 'Q0hVTKey\$as*1ZFlQCiA'
 SM4_SECRET_NEW = [
     'xG2qW5lP7lV2iN5fN5pG',
     'xT1cJ6dL5wC0kK1rB4dK',
@@ -299,7 +299,7 @@ class Misc:
         if padding == n:
             return data
         else:
-            return data + b'\x00' * padding
+            return data + b'\\x00' * padding
     @staticmethod
     def align_up(x: int, n: int) -> int:
         return (x + n - 1) // n * n
@@ -334,7 +334,7 @@ class Reader:
         else:
             assert length > 0
             offset = 0 if move_cursor else 4
-            return self.unpack(f'{length}s', offset=offset, move_cursor=move_cursor)[0].rstrip(b'\x00').decode()
+            return self.unpack(f'{length}s', offset=offset, move_cursor=move_cursor)[0].rstrip(b'\\x00').decode()
 
 class PakInfo:
     def __init__(self, buffer, keystream: List[int]):
@@ -450,7 +450,7 @@ class PakCrypto:
             result = result[:n]
             return result
         else:
-            result += b'\x00' * (n - len(result))
+            result += b'\\x00' * (n - len(result))
             return result
     @staticmethod
     def _meowmeow(buffer) -> bytes:
@@ -465,7 +465,7 @@ class PakCrypto:
             x1 = PakCrypto._xorxor(x1, PakCrypto._hashhash(x2, len(x1)))
             x2 = PakCrypto._xorxor(x2, PakCrypto._hashhash(x1, len(x2)))
             part1, m = (x2[:SHA1.digest_size], x2[SHA1.digest_size:])
-            if part1!= SHA1.new(b'\x00' * SHA1.digest_size).digest():
+            if part1!= SHA1.new(b'\\x00' * SHA1.digest_size).digest():
                 return bytes()
             else:
                 return unpad(m)
@@ -474,7 +474,7 @@ class PakCrypto:
         c = int.from_bytes(signature, 'little')
         n = int.from_bytes(modulus, 'little')
         e = 65537
-        m = pow(c, e, n).to_bytes(256, 'little').rstrip(b'\x00')
+        m = pow(c, e, n).to_bytes(256, 'little').rstrip(b'\\x00')
         return PakCrypto._meowmeow(Misc.pad_to_n(m, 4))
     @staticmethod
     def _decrypt_simple1(ciphertext) -> bytes:
@@ -723,31 +723,31 @@ class TencentPakFile:
 
 def dump_unpacking_log(pak_file, output_log_path: Path):
     with open(output_log_path, 'w', encoding='utf-8') as log_file:
-        log_file.write('================================================================================\n')
-        log_file.write('PAK UNPACKING DEBUG LOG\n')
-        log_file.write('================================================================================\n\n')
-        log_file.write(f'PAK File: {pak_file._file_path}\n')
-        log_file.write(f'PAK Info Version: {pak_file._pak_info.version}\n')
-        log_file.write(f'Mount Point: {pak_file._mount_point}\n')
-        log_file.write('--------------------------------------------------------------------------------\n\n')
+        log_file.write('================================================================================\\n')
+        log_file.write('PAK UNPACKING DEBUG LOG\\n')
+        log_file.write('================================================================================\\n\\n')
+        log_file.write(f'PAK File: {pak_file._file_path}\\n')
+        log_file.write(f'PAK Info Version: {pak_file._pak_info.version}\\n')
+        log_file.write(f'Mount Point: {pak_file._mount_point}\\n')
+        log_file.write('--------------------------------------------------------------------------------\\n\\n')
         file_count = 0
         for dir_path, files in pak_file._index.items():
             for file_name, entry in files.items():
                 file_count += 1
-                full_path = str(PurePath(dir_path) / file_name).replace('\\', '/')
-                log_file.write(f'\n[{file_count}] {full_path}\n')
-                log_file.write(f'  Uncompressed Size: {entry.uncompressed_size:,} bytes\n')
-                log_file.write(f'  Compressed Size: {entry.size:,} bytes\n')
-                log_file.write(f'  Compression Method: {entry.compression_method}\n')
-                log_file.write(f'  Encryption Method: {entry.encryption_method}\n')
-                log_file.write(f'  Compressed Blocks: {len(entry.compressed_blocks)}\n')
+                full_path = str(PurePath(dir_path) / file_name).replace('\\\\', '/')
+                log_file.write(f'\\n[{file_count}] {full_path}\\n')
+                log_file.write(f'  Uncompressed Size: {entry.uncompressed_size:,} bytes\\n')
+                log_file.write(f'  Compressed Size: {entry.size:,} bytes\\n')
+                log_file.write(f'  Compression Method: {entry.compression_method}\\n')
+                log_file.write(f'  Encryption Method: {entry.encryption_method}\\n')
+                log_file.write(f'  Compressed Blocks: {len(entry.compressed_blocks)}\\n')
                 if entry.compressed_blocks:
                     for i, blk in enumerate(entry.compressed_blocks):
                         block_size = blk.end - blk.start
-                        log_file.write(f'    Block {i}: Offset={blk.start:,} Size={block_size:,} bytes\n')
-        log_file.write('\n================================================================================\n')
-        log_file.write('END OF LOG\n')
-        log_file.write('================================================================================\n')
+                        log_file.write(f'    Block {i}: Offset={blk.start:,} Size={block_size:,} bytes\\n')
+        log_file.write('\\n================================================================================\\n')
+        log_file.write('END OF LOG\\n')
+        log_file.write('================================================================================\\n')
     console.print(f'[bold #00FF88]✅ Debug log saved to: {output_log_path}[/bold #00FF88]')
 
 def _zstd_add_skippable_padding(data: bytes, pad_len: int) -> bytes:
@@ -757,9 +757,9 @@ def _zstd_add_skippable_padding(data: bytes, pad_len: int) -> bytes:
         out = bytearray(data)
         while pad_len > 0:
             frame_len = min(max(pad_len - 8, 0), 1048576)
-            out += b'P*M\x18'
+            out += b'P*M\\x18'
             out += struct.pack('<I', frame_len)
-            out += b'\x00' * frame_len
+            out += b'\\x00' * frame_len
             pad_len -= 8 + frame_len
         return bytes(out)
 
@@ -769,7 +769,7 @@ def _encrypt_plaintext(plaintext: bytes, pak_relative_path: PurePath, encryption
     else:
         if PakCrypto._is_simple2_method(encryption_method):
             pad = -len(plaintext) % SIMPLE2_BLOCK_SIZE
-            plaintext += b'\x00' * pad
+            plaintext += b'\\x00' * pad
             key, = struct.unpack('<I', SIMPLE2_DECRYPT_KEY)
             rolling = key
             out = []
@@ -784,12 +784,12 @@ def _encrypt_plaintext(plaintext: bytes, pak_relative_path: PurePath, encryption
                 sm4 = PakCrypto._sm4_context_for_key(key)
                 pad_len = -len(plaintext) % 16
                 if pad_len > 0:
-                    plaintext = plaintext + b'\x00' * pad_len
+                    plaintext = plaintext + b'\\x00' * pad_len
                 out = bytearray()
                 for i in range(0, len(plaintext), 16):
                     block = plaintext[i:i + 16]
                     if len(block) < 16:
-                        block = block.ljust(16, b'\x00')
+                        block = block.ljust(16, b'\\x00')
                     out.extend(sm4.encrypt(block))
                 return bytes(out)
             else:
@@ -804,7 +804,7 @@ def _repack_uncompressed(outfh, pak_file, entry, pak_relative_path: PurePath, ne
     plaintext = new_data[:enc_region]
     if entry.encrypted:
         a = PakCrypto.align_encrypted_content_size(len(plaintext), enc_method)
-        plaintext += b'\x00' * (a - len(plaintext))
+        plaintext += b'\\x00' * (a - len(plaintext))
         cipher = _encrypt_plaintext(plaintext, pak_relative_path, enc_method)
         outfh.seek(entry.offset)
         outfh.write(cipher)
@@ -834,7 +834,7 @@ def _best_compress(chunk, cm, zstd_dict=None):
 def _pw_string(s):
     """PAK string serialiser: i4(len_with_null) + bytes + null."""
     if not s: return struct.pack('<i', 0)
-    b = s.encode('utf-8') + b'\x00'
+    b = s.encode('utf-8') + b'\\x00'
     return struct.pack('<i', len(b)) + b
 
 def _pw_entry(e, v):
@@ -907,7 +907,7 @@ def repack_pak_file_full(pak_file, edited_root, output_path, target_path=None, f
 
     # Normalize target_path to match exact case and slashes of existing dirs
     if target_path and force_add:
-        target_path = target_path.replace('\\', '/')
+        target_path = target_path.replace('\\\\', '/')
         matched_dir = None
         for existing_dir in all_dirs.keys():
             if existing_dir.strip('/').lower() == target_path.strip('/').lower():
@@ -922,7 +922,7 @@ def repack_pak_file_full(pak_file, edited_root, output_path, target_path=None, f
     pak_name_map = {}
     for dir_path, files in pak_file._index.items():
         for name, entry in files.items():
-            full_path = str(PurePath(dir_path)/name).replace('\\', '/')
+            full_path = str(PurePath(dir_path)/name).replace('\\\\', '/')
             pak_name_map.setdefault(name.lower(), []).append((full_path, entry))
 
     # Find matching files
@@ -960,7 +960,7 @@ def repack_pak_file_full(pak_file, edited_root, output_path, target_path=None, f
             for dir_path, files in pak_file._index.items():
                 for name, entry in files.items():
                     if Path(name).stem.lower() == stem and Path(name).suffix.lower() == ext:
-                        full_path = str(PurePath(dir_path)/name).replace('\\', '/')
+                        full_path = str(PurePath(dir_path)/name).replace('\\\\', '/')
                         if target_path:
                             new_fp = f"{target_path.rstrip('/')}/{p.name}"
                             edited[new_fp] = (p, entry)
@@ -1010,7 +1010,7 @@ def repack_pak_file_full(pak_file, edited_root, output_path, target_path=None, f
 
     for dp_str, dir_files in list(all_dirs.items()):
         for name, old_entry in list(dir_files.items()):
-            full_path = str(PurePath(dp_str)/name).replace('\\', '/')
+            full_path = str(PurePath(dp_str)/name).replace('\\\\', '/')
             ne = old_to_new.get(id(old_entry), None)
             
             if ne is None:
@@ -1098,7 +1098,7 @@ def repack_pak_file_full(pak_file, edited_root, output_path, target_path=None, f
             already_processed = False
             for dp_str, dir_files in all_dirs.items():
                 for name, entry in dir_files.items():
-                    if str(PurePath(dp_str)/name).replace('\\', '/') == fp:
+                    if str(PurePath(dp_str)/name).replace('\\\\', '/') == fp:
                         already_processed = True
                         break
                 if already_processed:
@@ -1221,7 +1221,7 @@ def _repack_compressed_with_display(outfh, pak_file, entry, pak_relative_path, n
     
     if len(new_data) != entry.uncompressed_size:
         if len(new_data) < entry.uncompressed_size:
-            new_data = new_data.ljust(entry.uncompressed_size, b'\x00')
+            new_data = new_data.ljust(entry.uncompressed_size, b'\\x00')
         else:
             new_data = new_data[:entry.uncompressed_size]
 
@@ -1273,7 +1273,7 @@ def _repack_compressed_with_display(outfh, pak_file, entry, pak_relative_path, n
             if entry.encrypted:
                 if PakCrypto._is_sm4_method(enc_method):
                     pad_len = -len(new_compressed) % 16
-                    if pad_len > 0: new_compressed += b'\x00' * pad_len
+                    if pad_len > 0: new_compressed += b'\\x00' * pad_len
                 new_compressed = _encrypt_plaintext(new_compressed, pak_relative_path, enc_method)
             
             if len(new_compressed) > target_size:
@@ -1284,7 +1284,7 @@ def _repack_compressed_with_display(outfh, pak_file, entry, pak_relative_path, n
                 outfh.seek(blk.start)
                 outfh.write(new_compressed)
                 if len(new_compressed) < target_size:
-                    outfh.write(b'\x00' * (target_size - len(new_compressed)))
+                    outfh.write(b'\\x00' * (target_size - len(new_compressed)))
                 ratio = len(new_compressed) / len(chunk) if len(chunk) > 0 else 1
                 display.add_block(logical_i, target_size, True, ratio)
     else:
@@ -1321,7 +1321,7 @@ def _repack_compressed_with_display(outfh, pak_file, entry, pak_relative_path, n
         if entry.encrypted:
             if PakCrypto._is_sm4_method(enc_method):
                 pad_len = -len(new_compressed) % 16
-                if pad_len > 0: new_compressed += b'\x00' * pad_len
+                if pad_len > 0: new_compressed += b'\\x00' * pad_len
             new_compressed = _encrypt_plaintext(new_compressed, pak_relative_path, enc_method)
         
         if len(new_compressed) > target_size:
@@ -1332,7 +1332,7 @@ def _repack_compressed_with_display(outfh, pak_file, entry, pak_relative_path, n
             outfh.seek(blk.start)
             outfh.write(new_compressed)
             if len(new_compressed) < target_size:
-                outfh.write(b'\x00' * (target_size - len(new_compressed)))
+                outfh.write(b'\\x00' * (target_size - len(new_compressed)))
             ratio = len(new_compressed) / len(new_data) if len(new_data) > 0 else 1
             display.add_block(0, target_size, True, ratio)
 
@@ -1358,7 +1358,7 @@ def repack_pak_file_with_block_display(pak_file, edited_root: Path, output_path:
     pak_name_map = {}
     for dir_path, files in pak_file._index.items():
         for name, entry in files.items():
-            full_path = str(PurePath(dir_path) / name).replace('\\', '/')
+            full_path = str(PurePath(dir_path) / name).replace('\\\\', '/')
             key = name.lower()
             pak_name_map.setdefault(key, []).append((full_path, entry))
     
@@ -1383,7 +1383,7 @@ def repack_pak_file_with_block_display(pak_file, edited_root: Path, output_path:
             for dir_path, files in pak_file._index.items():
                 for name, entry in files.items():
                     if Path(name).stem.lower() == stem and Path(name).suffix.lower() == ext:
-                        full_path = str(PurePath(dir_path) / name).replace('\\', '/')
+                        full_path = str(PurePath(dir_path) / name).replace('\\\\', '/')
                         edited[full_path] = (p, entry)
                         break
     
@@ -1452,7 +1452,7 @@ def ensure_directories(base_dir: Path):
 
 def print_banner():
     os.system('cls' if os.name == 'nt' else 'clear')
-    banner_text = "[bold cyan]FEATURESTIC LEAKS[/bold cyan]\n[bold green]PAK TOOL v2.0 - Termux Edition[/bold green]"
+    banner_text = "[bold cyan]FEATURESTIC LEAKS[/bold cyan]\\n[bold green]PAK TOOL v2.0 - Termux Edition[/bold green]"
     console.print(Panel(banner_text, expand=False, border_style="bold magenta"))
     console.print()
 
@@ -1465,12 +1465,12 @@ def safe_input(prompt: str='') -> str:
                 with open('/dev/tty', 'r') as tty:
                     sys.stderr.write(prompt)
                     sys.stderr.flush()
-                    return tty.readline().rstrip('\n')
+                    return tty.readline().rstrip('\\n')
             else:
                 with open('CON', 'r') as con:
                     sys.stderr.write(prompt)
                     sys.stderr.flush()
-                    return con.readline().rstrip('\r\n')
+                    return con.readline().rstrip('\\r\\n')
         except Exception:
             return ''
     except Exception:
@@ -1505,7 +1505,7 @@ def delete_folder(data_path: Path) -> None:
         folder_table.add_row(str(i), folder.name, human_size(folder_size))
     console.print(folder_table)
     try:
-        choice = int(console.input(f"\n[bold #FFFF00]Select folder number (1-{len(folders)}): [/bold #FFFF00]"))
+        choice = int(console.input(f"\\n[bold #FFFF00]Select folder number (1-{len(folders)}): [/bold #FFFF00]"))
         if 1 <= choice <= len(folders):
             selected_folder = folders[choice - 1]
             confirm = safe_input(f"[bold #FFFF00]Delete {selected_folder.name}? (yes/no): [/bold #FFFF00]").strip().lower()
@@ -1533,7 +1533,7 @@ def display_file_selector(title, folder_path, file_pattern="*.pak"):
         selection_table.add_row(str(i), f.name, f"{size_mb:.2f} MB")
     console.print(selection_table)
     try:
-        idx = int(console.input(f"\n[bold yellow]Select file number (1-{len(files)}): [/]")) - 1
+        idx = int(console.input(f"\\n[bold yellow]Select file number (1-{len(files)}): [/]")) - 1
         if idx < 0 or idx >= len(files):
             console.print("[bold red][ERROR] Invalid selection[/]")
             return None, None
@@ -1564,11 +1564,11 @@ def main_menu():
             pak_dir = data_path / "PAK"
             if not pak_dir.exists():
                 console.print(f"[bold red]ERROR: PAK folder not found at {pak_dir}[/]")
-                safe_input('\nPress Enter to continue...')
+                safe_input('\\nPress Enter to continue...')
                 continue
             pak_file, _ = display_file_selector("📁 Available .pak files to UNPACK:", pak_dir)
             if not pak_file:
-                safe_input('\nPress Enter to continue...')
+                safe_input('\\nPress Enter to continue...')
                 continue
             try:
                 console.print(f'[bold #00FFFF]🚀 Unpacking {pak_file.name}...[/bold #00FFFF]')
@@ -1584,23 +1584,23 @@ def main_menu():
                 console.print(f'[bold #00FF88]✅ SUCCESS: Extracted to {unpack_path}[/bold #00FF88]')
             except Exception as e:
                 console.print(f'[bold #FF0055]❌ Error: {escape(str(e))}[/bold #FF0055]')
-            safe_input('\nPress Enter to continue...')
+            safe_input('\\nPress Enter to continue...')
             
         elif choice == '2':
             pak_dir = data_path / "PAK"
             if not pak_dir.exists():
                 console.print(f"[bold red]ERROR: PAK folder not found at {pak_dir}[/]")
-                safe_input('\nPress Enter to continue...')
+                safe_input('\\nPress Enter to continue...')
                 continue
             pak_file, _ = display_file_selector("📁 Available .pak files to REPACK:", pak_dir)
             if not pak_file:
-                safe_input('\nPress Enter to continue...')
+                safe_input('\\nPress Enter to continue...')
                 continue
             repack_dir = data_path / "REPACK" / pak_file.stem
             if not repack_dir.exists():
                 console.print(f'[bold #FF0055]❌ ERROR: {repack_dir} not found.[/bold #FF0055]')
                 console.print('[#FFAA00]⚠ Please unpack first using option 1.[/#FFAA00]')
-                safe_input('\nPress Enter to continue...')
+                safe_input('\\nPress Enter to continue...')
                 continue
             try:
                 console.print(f'[bold #00FFFF]🚀 Repacking {pak_file.name}...[/bold #00FFFF]')
@@ -1619,7 +1619,7 @@ def main_menu():
                 console.print(f'[bold #FF0055]❌ Repack failed:[/bold #FF0055] {e}')
                 import traceback
                 traceback.print_exc()
-            safe_input('\nPress Enter to continue...')
+            safe_input('\\nPress Enter to continue...')
             
         elif choice == '3':
             pak_tool_dir = data_path / "PAK TOOL"
@@ -1629,18 +1629,18 @@ def main_menu():
             
             if not pak_dir.exists():
                 console.print(f"[bold red]ERROR: PAK folder not found at {pak_dir}[/]")
-                safe_input('\nPress Enter to continue...')
+                safe_input('\\nPress Enter to continue...')
                 continue
             
             pak_file, _ = display_file_selector("📁 Available .pak files to REPACK (EXISTING FILES):", pak_dir)
             if not pak_file:
-                safe_input('\nPress Enter to continue...')
+                safe_input('\\nPress Enter to continue...')
                 continue
             
             if not edit_dir.exists() or not any(edit_dir.iterdir()):
                 console.print(f'[bold #FF0055]❌ ERROR: No files in EDIT folder.[/bold #FF0055]')
                 console.print('[#FFAA00]⚠ Please place edited files in PAK TOOL/EDIT folder.[/#FFAA00]')
-                safe_input('\nPress Enter to continue...')
+                safe_input('\\nPress Enter to continue...')
                 continue
             
             try:
@@ -1660,7 +1660,7 @@ def main_menu():
                 console.print(f'[bold #FF0055]❌ Repack failed:[/bold #FF0055] {e}')
                 import traceback
                 traceback.print_exc()
-            safe_input('\nPress Enter to continue...')
+            safe_input('\\nPress Enter to continue...')
             
         elif choice == '4':
             pak_tool_dir = data_path / "PAK TOOL"
@@ -1670,18 +1670,18 @@ def main_menu():
             
             if not pak_dir.exists():
                 console.print(f"[bold red]ERROR: PAK folder not found at {pak_dir}[/]")
-                safe_input('\nPress Enter to continue...')
+                safe_input('\\nPress Enter to continue...')
                 continue
             
             pak_file, _ = display_file_selector("📁 Available .pak files to REPACK TO PATH:", pak_dir)
             if not pak_file:
-                safe_input('\nPress Enter to continue...')
+                safe_input('\\nPress Enter to continue...')
                 continue
             
             if not edit_dir.exists() or not any(edit_dir.iterdir()):
                 console.print(f'[bold #FF0055]❌ ERROR: No files in EDIT folder.[/bold #FF0055]')
                 console.print('[#FFAA00]⚠ Please place files to add in PAK TOOL/EDIT folder.[/#FFAA00]')
-                safe_input('\nPress Enter to continue...')
+                safe_input('\\nPress Enter to continue...')
                 continue
             
             console.print()
@@ -1693,13 +1693,13 @@ def main_menu():
             
             if not target_path:
                 console.print('[bold #FF0055]❌ No path provided![/bold #FF0055]')
-                safe_input('\nPress Enter to continue...')
+                safe_input('\\nPress Enter to continue...')
                 continue
             
-            target_path = target_path.replace('\\', '/').strip('/')
+            target_path = target_path.replace('\\\\', '/').strip('/')
             if not target_path:
                 console.print('[bold #FF0055]❌ Invalid target path![/bold #FF0055]')
-                safe_input('\nPress Enter to continue...')
+                safe_input('\\nPress Enter to continue...')
                 continue
             
             try:
@@ -1724,11 +1724,11 @@ def main_menu():
                 console.print(f'[bold #FF0055]❌ Repack failed:[/bold #FF0055] {e}')
                 import traceback
                 traceback.print_exc()
-            safe_input('\nPress Enter to continue...')
+            safe_input('\\nPress Enter to continue...')
             
         elif choice == '5':
             delete_folder(data_path)
-            safe_input('\nPress Enter to continue...')
+            safe_input('\\nPress Enter to continue...')
             
         elif choice == '0':
             console.print("[bold magenta]Goodbye![/bold magenta]")
@@ -1742,11 +1742,351 @@ if __name__ == '__main__':
     try:
         main_menu()
     except KeyboardInterrupt:
-        console.print('\n[bold #FFFF00]⚠ Interrupted. Exiting...[/bold #FFFF00]')
+        console.print('\\n[bold #FFFF00]⚠ Interrupted. Exiting...[/bold #FFFF00]')
         sys.exit(0)
     except Exception as e:
         console.print(f'[bold #FF0055]💥 ERROR:[/bold #FF0055] {escape(str(e))}')
         import traceback
         traceback.print_exc()
-        safe_input('\nPress Enter to exit...')
+        safe_input('\\nPress Enter to exit...')
         sys.exit(1)
+`;
+
+export const PHP_SCRIPT = `<?php
+// FeaturesticLeaks Server Key Auth API
+header('Content-Type: application/json');
+
+\$keys = [
+    'VIP-KEY-2026' => ['expires' => '2028-12-31', 'hwid' => null],
+    'TERMUX-USER-99' => ['expires' => '2027-01-01', 'hwid' => null],
+];
+
+\$input = json_decode(file_get_contents('php://input'), true);
+\$action = \$input['action'] ?? '';
+\$key = \$input['key'] ?? '';
+\$hwid = \$input['hwid'] ?? '';
+
+if (\$action === 'validate_key') {
+    if (isset(\$keys[\$key])) {
+        echo json_encode(['status' => 'success', 'valid' => true, 'expires' => \$keys[\$key]['expires']]);
+    } else {
+        echo json_encode(['status' => 'error', 'valid' => false, 'message' => 'Invalid Key']);
+    }
+    exit;
+}
+
+echo json_encode(['status' => 'ok', 'server' => 'FeaturesticLeaks Auth v2.0']);
+`;
+
+export const SETUP_SCRIPT = `#!/usr/bin/env bash
+# Termux Setup Script for FeaturesticLeaks PAK Tool
+set -e
+
+echo "[+] Updating Termux packages..."
+pkg update -y && pkg upgrade -y
+
+echo "[+] Installing required dependencies..."
+pkg install -y python python-pip git clang libffi openssl libxml2 libxslt zlib libjpeg-turbo rust
+
+echo "[+] Installing Python libraries..."
+pip install --upgrade pip
+pip install rich requests pycryptodome pytz gmalg zstandard pillow
+
+echo "[+] Termux setup complete! Run: python FeaturesticLeaks.py"
+`;
+
+export const README_MD = `# FEATURESTIC LEAKS PAK TOOL v2.0-ULTIMATE ⚡
+
+> **Termux / Linux Android Game Reverse Engineering & PAK Manipulation Toolkit**  
+> Complete high-performance reverse engineering suite for unpacking, repacking, path-injecting, and rebuilding Unreal Engine / Tencent \`.pak\` and \`.obb\` containers natively on Termux / Android.
+>
+> **Tool Name**: \`FeaturesticLeaks PAK Tool v2.0\`
+
+---
+
+## 🚀 Termux Installation & Quick Start
+
+Termux me tool setup aur run karne ke sabse easy steps niche diye gaye hain:
+
+### ⚡ Express One-Line Command (Wipe & Fresh Launch)
+Termux open karke is poori line ko copy-paste karein (yeh old repository clean karke fresh setup ke saath launch karega):
+
+\`\`\`bash
+cd ~ && rm -rf FeaturesticLeaks-Toolkit- && pkg update -y && pkg install -y git python clang libffi zlib make nano && git clone https://github.com/itzgeniusboy/FeaturesticLeaks-Toolkit-.git && cd FeaturesticLeaks-Toolkit- && pip install rich requests pycryptodome zstandard && python FeaturesticLeaks.py
+\`\`\`
+
+📖 **Detailed Guide**: Sabhi options aur folder structure ke baare me detail janne ke liye [HOW_TO_USE.md](./HOW_TO_USE.md) dekhein.
+
+---
+
+## 🛠️ Step-by-Step Termux Commands
+
+Agar aap har command ek-ek karke run karna chahte hain:
+
+### **Step 1: Old Directory Clear Karein**
+\`\`\`bash
+cd ~ && rm -rf FeaturesticLeaks-Toolkit-
+\`\`\`
+
+### **Step 2: Termux Packages Install Karein**
+\`\`\`bash
+pkg update -y && pkg install -y git python clang libffi zlib make nano
+\`\`\`
+
+### **Step 3: Python Requirements Install Karein**
+\`\`\`bash
+pip install rich requests pycryptodome zstandard
+\`\`\`
+
+### **Step 4: Repository Clone Karein**
+\`\`\`bash
+git clone https://github.com/itzgeniusboy/FeaturesticLeaks-Toolkit-.git
+\`\`\`
+
+### **Step 5: Directory Enter Karein**
+\`\`\`bash
+cd FeaturesticLeaks-Toolkit-
+\`\`\`
+
+### **Step 6: Tool Run Karein**
+\`\`\`bash
+python FeaturesticLeaks.py
+\`\`\`
+
+---
+
+## 💡 Quick Launch Command
+Jab aap pehle se \`FeaturesticLeaks-Toolkit-\` folder me ho:
+\`\`\`bash
+python FeaturesticLeaks.py
+\`\`\`
+*Ya phir auto-launcher script se:*
+\`\`\`bash
+chmod +x run.sh && ./run.sh
+\`\`\`
+
+---
+
+## 📁 Automatic Directory Hierarchy
+
+Termux me tool run hote hi yeh folders automatically generate ho jaate hain:
+
+\`\`\`text
+FeaturesticLeaks-Toolkit-/
+├── FeaturesticLeaks.py       <-- Main Termux Python Tool
+├── run.sh                    <-- Shell Launcher Script
+├── verify.php                <-- Optional PHP Auth Panel API
+├── README.md                 <-- Overview & Setup Guide
+├── HOW_TO_USE.md             <-- Detailed Usage Manual
+│
+├── PAK/                      <-- Original .pak/.obb files paste karein (For Menu 1 & 2)
+├── UNPACK/                   <-- Extracted assets & debug logs output
+├── REPACK/                   <-- Structured workspace for repacking
+├── RESULT/                   <-- Final repacked .pak files output
+│
+└── PAK TOOL/                 <-- Path Injector Workspace (For Menu 3 & 4)
+    ├── PAK/                  <-- Target .pak files for Option 3 & 4
+    ├── EDIT/                 <-- Modified assets or new files to inject
+    ├── UNPACK/               <-- Sub-unpack workspace
+    └── RESULT/               <-- Final injected .pak output
+\`\`\`
+
+---
+
+## 🧰 Core Main Menu Features
+
+1. **[1] UNPACK ALL TYPES PAKS**
+   - Unpacks Unreal Engine, Tencent, GamePatch, & Mini OBB containers.
+   - Decrypts SM4/AES crypts and handles Zstandard decompression.
+   - Saves output in \`UNPACK/\` and creates a detailed \`Debug_<pak_name>.log\`.
+
+2. **[2] REPACK ALL TYPES PAKS**
+   - Auto-detects container mode (\`MINI_OBB\`, \`GAMEPATCH\`, \`OBBZSDIC\`).
+   - Re-compresses modified assets with block-by-block progress displays.
+   - Saves final archive in \`RESULT/\`.
+
+3. **[3] REPACK ANY SIZE (EXISTING FILES)**
+   - Replaces existing files inside \`.pak\` regardless of file size differences.
+   - Uses files from \`PAK TOOL/EDIT/\` and replaces matching items in \`PAK TOOL/PAK/\`.
+   - Prevents header corruptions and game crashes.
+
+4. **[4] REPACK TO PATH (NEW FILES)**
+   - Injects brand new files/folders directly to any specified internal path inside the \`.pak\` (e.g. \`Content/Lua/GameLua/Mod/BRMod/Gameplay/Core\`).
+   - 100% game compatible logic — guarantees no login stuck or crash issues.
+
+5. **[5] DELETE FOLDER**
+   - In-app utility to clean up temporary working folders and free Termux storage.
+
+---
+
+## 🌐 Optional PHP Verification API (\`verify.php\`)
+
+Agar aap online license management system rely karna chahte hain:
+1. \`verify.php\` ko apne web server / CPanel par host karein.
+2. Script user authentication and HWID binding manage karti hai.
+
+---
+
+## 👤 Credits & Support
+* **Tool Name**: \`FeaturesticLeaks PAK Tool v2.0\`
+* **Platform**: Termux / Android Linux
+`;
+
+export const HOW_TO_USE_MD = `# 📖 FeaturesticLeaks PAK Tool v2.0-ULTIMATE — Complete Termux Usage Manual
+
+Is manual me Termux me **FeaturesticLeaks PAK Tool** ko setup karne aur iske saare features ko step-by-step use karne ka tareeka bataya gaya hai.
+
+---
+
+## ⚡ 1. Termux One-Line Installation & Run
+
+Termux Terminal kholein aur yeh command paste karke Enter dabayein:
+
+\`\`\`bash
+cd ~ && rm -rf FeaturesticLeaks-Toolkit- && pkg update -y && pkg install -y git python clang libffi zlib make nano && git clone https://github.com/itzgeniusboy/FeaturesticLeaks-Toolkit-.git && cd FeaturesticLeaks-Toolkit- && pip install rich requests pycryptodome zstandard && python FeaturesticLeaks.py
+\`\`\`
+
+---
+
+## 🚀 2. Manual Installation Steps
+
+Agar aap ek-ek command chala kar setup karna chahte hain:
+
+\`\`\`bash
+# 1. Purana repository clear karein
+cd ~ && rm -rf FeaturesticLeaks-Toolkit-
+
+# 2. Termux packages install karein
+pkg update -y && pkg install -y git python clang libffi zlib make nano
+
+# 3. Required Python modules install karein
+pip install rich requests pycryptodome zstandard
+
+# 4. Repository clone karein
+git clone https://github.com/itzgeniusboy/FeaturesticLeaks-Toolkit-.git
+
+# 5. Project folder me jayein
+cd FeaturesticLeaks-Toolkit-
+
+# 6. Main Python tool run karein
+python FeaturesticLeaks.py
+\`\`\`
+
+---
+
+## 🛠️ 3. Detailed Main Menu Guide
+
+Jab aap \`python FeaturesticLeaks.py\` run karenge, screen par main menu dikhega:
+
+---
+
+### 📦 Option 1: UNPACK ALL TYPES PAKS
+* **Use Case**: Target \`.pak\` ya \`.obb\` file ke andar ke saare game assets (textures, Lua scripts, configs) extract karne ke liye.
+* **Step-by-Step Instructions**:
+  1. Apni \`.pak\` file ko Termux me \`PAK/\` folder ke andar copy karein:
+     \`\`\`bash
+     cp /sdcard/Download/game.pak PAK/
+     \`\`\`
+  2. Tool me \`1\` press karke Enter dabayein.
+  3. Screen par dikhne wali \`.pak\` files me se apni file ka number select karein.
+  4. Script file ko unpack karke files \`UNPACK/<file_name>/\` folder me save kar degi.
+  5. Ek \`Debug_<file_name>.log\` file bhi \`UNPACK/\` me create hoti hai jo detailed header information deti hai.
+
+---
+
+### 🔨 Option 2: REPACK ALL TYPES PAKS
+* **Use Case**: Unpack ki hui files ko edit karne ke baad dobara \`.pak\` container me convert karne ke liye.
+* **Step-by-Step Instructions**:
+  1. Ensure karein ki aapne pehle Option 1 se \`.pak\` file unpack kar li hai.
+  2. \`UNPACK/<file_name>/\` ya \`REPACK/<file_name>/\` me apni modified files place karein.
+  3. Main menu me \`2\` press karein.
+  4. Repack mode (\`MINI_OBB\`, \`GAMEPATCH\`, ya \`OBBZSDIC\`) automatically detect hoga.
+  5. Repacking complete hone par output \`.pak\` file \`RESULT/\` folder me save ho jayegi.
+
+---
+
+### 🔄 Option 3: REPACK ANY SIZE (EXISTING FILES)
+* **Use Case**: PAK ke andar pehle se maujood files ko replace karne ke liye, chahe modified file ka size kitna bhi bada ya chota ho.
+* **Step-by-Step Instructions**:
+  1. Apni original \`.pak\` file ko \`PAK TOOL/PAK/\` folder me rakhein:
+     \`\`\`bash
+     cp /sdcard/Download/game.pak "PAK TOOL/PAK/"
+     \`\`\`
+  2. Apni edit ki hui files (same folder structure ke saath) \`PAK TOOL/EDIT/\` folder me rakhein.
+  3. Main menu me \`3\` press karein.
+  4. Tool original \`.pak\` file ke headers, size offsets, aur index block rebuild karke file ko replace kar dega.
+  5. Final output \`PAK TOOL/RESULT/\` me milegi.
+
+---
+
+### 🚀 Option 4: REPACK TO PATH (NEW FILES)
+* **Use Case**: PAK container me kisi specific internal path par brand new files ya folders add karne ke liye.
+* **Step-by-Step Instructions**:
+  1. Original \`.pak\` file ko \`PAK TOOL/PAK/\` me rakhein.
+  2. Jo nayi files inject karni hain unhe \`PAK TOOL/EDIT/\` me rakhein.
+  3. Main menu me \`4\` press karein.
+  4. Screen par target internal path poochead jayega. Internal path enter karein (e.g. \`Content/Lua/GameLua/Mod/BRMod/Gameplay/Core\`).
+  5. Tool target path par naye files safely inject karke game-ready \`.pak\` rebuild kar dega (\`PAK TOOL/RESULT/\`).
+  6. **Game Ready**: Is method se game login stuck ya crash hone ka issue 100% resolve rehta hai.
+
+---
+
+### 🗑️ Option 5: DELETE FOLDER
+* **Use Case**: Workspaces clear karne aur Termux storage free karne ke liye.
+* **Step-by-Step Instructions**:
+  1. Main menu me \`5\` press karein.
+  2. Temporary output folders ki list dikhegi.
+  3. Folder number select karke \`yes\` type karein aur delete confirm karein.
+
+---
+
+## 🚨 Common Termux Questions & Fixes
+
+### Q1: \`python: can't open file 'FeaturesticLeaks.py': No such file or directory\`
+* **Fix**: Check karein ki aap \`FeaturesticLeaks-Toolkit-\` directory ke andar ho:
+  \`\`\`bash
+  cd ~/FeaturesticLeaks-Toolkit- && python FeaturesticLeaks.py
+  \`\`\`
+
+### Q2: \`pip install pip is forbidden on Termux\`
+* **Fix**: Termux me \`pip\` ko upgrade mat karein, direct packages install karein:
+  \`\`\`bash
+  pip install rich requests pycryptodome zstandard
+  \`\`\`
+
+### Q3: How to run launcher script?
+* **Fix**: Execution permission dekar run.sh se launch karein:
+  \`\`\`bash
+  chmod +x run.sh && ./run.sh
+  \`\`\`
+
+---
+
+## 👤 Credits
+* **Tool Name**: \`FeaturesticLeaks PAK Tool v2.0\`
+`;
+
+export const GITIGNORE_CONTENT = `__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+*.pak.bak
+extracted_out/
+repacked_out/
+.env
+node_modules/
+dist/
+`;
+
+export const CLEAN_REPO_SH = `#!/usr/bin/env bash
+# Clean repository to leave only pure Termux Python files
+echo "🧹 Cleaning web files..."
+rm -rf assets public src index.html metadata.json .env.example vite.config.ts tsconfig.json tsconfig.node.json components.json package.json package-lock.json
+git add .
+git commit -m "Keep Termux python script only"
+git push origin main
+echo "✅ Done!"
+`;
