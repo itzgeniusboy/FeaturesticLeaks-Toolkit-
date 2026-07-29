@@ -588,8 +588,8 @@ send_json('SUCCESS', 'Authentication successful. Access granted.', [
 
 export const SETUP_SCRIPT = `#!/usr/bin/bash
 # ==============================================================================
-# TERMUX DEPENDENCY & COMPILER INSTALLER
-# TOOL : FEATURESTIC LEAKS PAK TOOL v2.0
+# TERMUX AUTO-LAUNCHER & INSTALLER SCRIPT
+# TOOL : FEATURESTIC LEAKS PAK TOOL v2.0-ULTIMATE
 # ==============================================================================
 
 set -e
@@ -602,8 +602,6 @@ pkg install -y python php git clang libffi openssl zlib make tar wget
 
 echo -e "\\e[1;33m[+] Upgrading Pip and Installing Required Python Packages...\\e[0m"
 python3 -m pip install --upgrade pip
-
-echo -e "\\e[1;35m[+] Installing Rich UI, Requests, PyCryptodome, and Zstandard...\\e[0m"
 pip install rich requests pycryptodome zstandard
 
 echo -e "\\e[1;32m[+] Creating Default Workspace Folder Architecture...\\e[0m"
@@ -612,9 +610,19 @@ mkdir -p lua/original lua/decompiled lua/compiled
 mkdir -p zip/extracted zip/output
 mkdir -p injector/backup injector/target
 
-echo -e "\\e[1;36m[+] Setting Executable Permissions on FeaturesticLeaks.py...\\e[0m"
-chmod +x FeaturesticLeaks.py || true
+# Verify if FeaturesticLeaks.py exists in current directory
+if [ ! -f "FeaturesticLeaks.py" ]; then
+    echo -e "\\e[1;33m[!] FeaturesticLeaks.py not found in current folder. Auto-creating script...\\e[0m"
+    curl -sSL https://raw.githubusercontent.com/itzgeniusboy/FeaturesticLeaks-Toolkit-/main/FeaturesticLeaks.py -o FeaturesticLeaks.py || true
+fi
 
-echo -e "\\n\\e[1;32m[✔] SETUP COMPLETED SUCCESSFULLY!\\e[0m"
-echo -e "\\e[1;37mRun the tool using:\\e[0m \\e[1;33mpython FeaturesticLeaks.py\\e[0m\\n"
+if [ -f "FeaturesticLeaks.py" ]; then
+    echo -e "\\e[1;36m[+] Setting Executable Permissions on FeaturesticLeaks.py...\\e[0m"
+    chmod +x FeaturesticLeaks.py
+    echo -e "\\e[1;32m[✔] Launching FeaturesticLeaks PAK Tool...\\e[0m\\n"
+    python3 FeaturesticLeaks.py
+else
+    echo -e "\\e[1;31m[✖] FeaturesticLeaks.py file missing! Please copy FeaturesticLeaks.py into this folder.\\e[0m"
+    echo -e "\\e[1;33mCommand to create file: nano FeaturesticLeaks.py\\e[0m"
+fi
 `;
