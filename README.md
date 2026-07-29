@@ -59,14 +59,18 @@ python FeaturesticLeaks.py
 
 ---
 
-## 💡 Quick Launch Command
-Jab aap pehle se `FeaturesticLeaks-Toolkit-` folder me ho:
+## 💡 Quick Launch Commands
+Termux me kisi bhi jagah se launch karne ke liye:
 ```bash
-python FeaturesticLeaks.py
+paktool
 ```
-*Ya phir auto-launcher script se:*
+*Ya project directory me ho to:*
 ```bash
 chmod +x run.sh && ./run.sh
+```
+*Ya direct Python se:*
+```bash
+python FeaturesticLeaks.py
 ```
 
 ---

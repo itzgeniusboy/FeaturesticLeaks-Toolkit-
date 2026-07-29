@@ -120,8 +120,12 @@ Jab aap `python FeaturesticLeaks.py` run karenge, screen par main menu dikhega:
   pip install rich requests pycryptodome zstandard
   ```
 
-### Q3: How to run launcher script?
-* **Fix**: Execution permission dekar run.sh se launch karein:
+### Q3: Quick Launch Command (`paktool`)
+* **Fix**: Pehli baar `run.sh` chalane par `paktool` shortcut binary ban jaati hai. Iske baad aap Termux me direct type karke launch kar sakte hain:
+  ```bash
+  paktool
+  ```
+  *Ya direct launcher script se:*
   ```bash
   chmod +x run.sh && ./run.sh
   ```

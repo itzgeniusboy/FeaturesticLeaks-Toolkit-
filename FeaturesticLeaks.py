@@ -1551,15 +1551,20 @@ def main_menu():
     ensure_directories(data_path)
     while True:
         print_banner()
-        console.print("[bold]MAIN MENU[/bold]")
-        console.print("1. UNPACK ALL TYPES PAKS")
-        console.print("2. REPACK ALL TYPES PAKS")
-        console.print("3. REPACK ANY SIZE (EXISTING FILES)")
-        console.print("4. REPACK TO PATH (NEW FILES)")
-        console.print("5. DELETE FOLDER")
-        console.print("0. EXIT")
-        print()
-        choice = safe_input('ENTER YOUR CHOICE:').strip()
+        menu_table = Table(title="[bold yellow]FEATURESTIC LEAKS - MAIN MENU[/bold yellow]", show_header=True, header_style="bold cyan", box=ROUNDED, border_style="magenta", expand=True)
+        menu_table.add_column("Option", style="bold green", justify="center", width=8)
+        menu_table.add_column("Description", style="bold white", justify="left")
+        
+        menu_table.add_row("1", "UNPACK ALL TYPES PAKS")
+        menu_table.add_row("2", "REPACK ALL TYPES PAKS")
+        menu_table.add_row("3", "REPACK ANY SIZE (EXISTING FILES)")
+        menu_table.add_row("4", "REPACK TO PATH (NEW FILES)")
+        menu_table.add_row("5", "DELETE FOLDER WORKSPACE")
+        menu_table.add_row("0", "EXIT")
+        
+        console.print(menu_table)
+        console.print()
+        choice = safe_input('👉 ENTER YOUR CHOICE (0-5): ').strip()
         
         if choice == '1':
             pak_dir = data_path / "PAK"
