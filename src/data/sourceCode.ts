@@ -595,13 +595,12 @@ export const SETUP_SCRIPT = `#!/usr/bin/bash
 set -e
 
 echo -e "\\e[1;32m[+] Updating Termux Package Repositories...\\e[0m"
-pkg update -y && pkg upgrade -y
+pkg update -y
 
 echo -e "\\e[1;36m[+] Installing Core Runtime Tools (Python, PHP, Git, Clang, OpenSSL)...\\e[0m"
-pkg install -y python php git clang libffi openssl zlib make tar wget
+pkg install -y python php git clang libffi zlib make nano
 
-echo -e "\\e[1;33m[+] Upgrading Pip and Installing Required Python Packages...\\e[0m"
-python3 -m pip install --upgrade pip
+echo -e "\\e[1;33m[+] Installing Required Python Packages (Rich, Requests, PyCryptodome, Zstandard)...\\e[0m"
 pip install rich requests pycryptodome zstandard
 
 echo -e "\\e[1;32m[+] Creating Default Workspace Folder Architecture...\\e[0m"
@@ -610,19 +609,13 @@ mkdir -p lua/original lua/decompiled lua/compiled
 mkdir -p zip/extracted zip/output
 mkdir -p injector/backup injector/target
 
-# Verify if FeaturesticLeaks.py exists in current directory
-if [ ! -f "FeaturesticLeaks.py" ]; then
-    echo -e "\\e[1;33m[!] FeaturesticLeaks.py not found in current folder. Auto-creating script...\\e[0m"
-    curl -sSL https://raw.githubusercontent.com/itzgeniusboy/FeaturesticLeaks-Toolkit-/main/FeaturesticLeaks.py -o FeaturesticLeaks.py || true
-fi
-
 if [ -f "FeaturesticLeaks.py" ]; then
     echo -e "\\e[1;36m[+] Setting Executable Permissions on FeaturesticLeaks.py...\\e[0m"
     chmod +x FeaturesticLeaks.py
     echo -e "\\e[1;32m[✔] Launching FeaturesticLeaks PAK Tool...\\e[0m\\n"
     python3 FeaturesticLeaks.py
 else
-    echo -e "\\e[1;31m[✖] FeaturesticLeaks.py file missing! Please copy FeaturesticLeaks.py into this folder.\\e[0m"
-    echo -e "\\e[1;33mCommand to create file: nano FeaturesticLeaks.py\\e[0m"
+    echo -e "\\e[1;31m[✖] FeaturesticLeaks.py file missing in this directory!\\e[0m"
+    echo -e "\\e[1;33mPlease copy FeaturesticLeaks.py into this folder or run: python FeaturesticLeaks.py\\e[0m"
 fi
 `;
