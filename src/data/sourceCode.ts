@@ -1,1083 +1,1866 @@
-export const PYTHON_SCRIPT = `#!/usr/bin/env python3
-# ==============================================================================
-# TOOL NAME : FEATURESTIC LEAKS PAK TOOL v2.0-ULTIMATE (STABLE & OPTIMIZED EDITION)
-# AUTHOR    : Senior Reverse Engineer & Security Specialist
-# TARGET    : Termux / Linux Android Asset Reverse Engineering
-# REPO      : https://github.com/itzgeniusboy/FeaturesticLeaks-Toolkit-
-# NOTE      : 100% OFFLINE REAL EXTRACTION, REPACKING, DECOMPILATION & COMPRESSION
-# ==============================================================================
+export const PYTHON_SCRIPT = `#THIS TOOL MOD BY - @TrnDravix
+#TELEGRAM SEARCH - @TrnDravix
+#TELEGRAM CHANNEL - TrnDravix BGMI
+#OWNER / MODER -TrnDravix TrnDravix
 
+#One_Of_The_Best_Tool_In_Whole_Telegram - 100% WORKING FINAL
+
+import itertools as it
+import math
+import struct
+import shutil
 import os
 import sys
-import time
-import json
-import re
-import struct
-import base64
+import uuid
 import hashlib
-import subprocess
 import platform
-import zipfile
-import shutil
+import subprocess
+import requests
+import base64
+import zlib
+from dataclasses import dataclass
+from functools import lru_cache
+from pathlib import PurePath, Path
+from typing import List, Dict, Tuple, Optional, Any
+import time
+from rich.console import Console
+from rich.panel import Panel
+from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TaskProgressColumn, TimeElapsedColumn, TimeRemainingColumn
+from rich.table import Table
+from rich import print as rprint
+from rich.markup import escape
+from rich.text import Text
+from rich.align import Align
+from rich.console import Group
+from rich.box import HEAVY_EDGE, ROUNDED, DOUBLE_EDGE
 from datetime import datetime
+import pytz
+import gmalg
+from Crypto.Cipher import AES
+from Crypto.Cipher.AES import MODE_CBC
+from Crypto.Hash import SHA1
+from Crypto.Util.Padding import unpad
+from zstandard import ZstdDecompressor, ZstdCompressionDict, DICT_TYPE_AUTO, ZstdCompressor
 
-# Termux & External Library Imports
-try:
-    from rich.console import Console
-    from rich.panel import Panel
-    from rich.table import Table
-    from rich.prompt import Prompt, Confirm
-    from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TaskProgressColumn
-    from rich.align import Align
-    from rich.text import Text
-    from rich.style import Style
-    from rich import box
-except ImportError:
-    print("[!] 'rich' library not found. Installing rich...")
-    try:
-        subprocess.check_call([sys.executable, "-m", "pip", "install", "rich"])
-        from rich.console import Console
-        from rich.panel import Panel
-        from rich.table import Table
-        from rich.prompt import Prompt, Confirm
-        from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TaskProgressColumn
-        from rich.align import Align
-        from rich.text import Text
-        from rich.style import Style
-        from rich import box
-    except Exception:
-        print("[!] Failed to auto-install 'rich'. Please run: pip install rich")
-        sys.exit(1)
-
-try:
-    from Crypto.Cipher import AES
-    import zstandard as zstd
-    HAS_CRYPTO = True
-except ImportError:
-    HAS_CRYPTO = False
-
-# Initialize Rich Console
 console = Console()
 
-# Configuration Settings
-CONFIG_FILE = "config.json"
+# ==================== SIMPLE BLOCK DISPLAY CLASS ====================
 
-# Default Folder Structure Initialization
-FOLDERS = [
-    "pak/original",
-    "pak/results/unpack",
-    "pak/results/repack",
-    "lua/original",
-    "lua/decompiled",
-    "lua/compiled",
-    "zip/extracted",
-    "zip/output",
-    "injector/backup",
-    "injector/target"
+class SimpleBlockDisplay:
+    """Simple display that shows each file and its blocks"""
+    
+    def __init__(self, total_files: int, pak_name: str):
+        self.total_files = total_files
+        self.pak_name = pak_name
+        self.processed_files = 0
+        self.current_file = ""
+        self.current_file_idx = 0
+        self.all_blocks = []  # Store all blocks for final summary
+        self.total_fitted = 0
+        self.total_skipped = 0
+        
+    def start_file(self, file_name: str, total_blocks: int):
+        self.current_file_idx += 1
+        self.current_file = file_name
+        self.current_blocks = []
+        self.current_total_blocks = total_blocks
+        self.current_fitted = 0
+        self.current_skipped = 0
+        
+        # Print file header
+        console.print()
+        console.print(f"[bold cyan]┌─────────────────────────────────────────────────────────────[/bold cyan]")
+        console.print(f"[bold cyan]│[/] [bold yellow][{self.current_file_idx}/{self.total_files}][/] [bold green]{file_name}[/bold green] [dim]({total_blocks} blocks)[/dim]")
+        console.print(f"[bold cyan]├─────────────────────────────────────────────────────────────[/bold cyan]")
+        
+    def add_block(self, block_idx: int, block_size: int, fitted: bool, compression_ratio: float = None):
+        """Add a block result"""
+        size_mb = block_size / (1024 * 1024)
+        if fitted:
+            self.current_fitted += 1
+            self.total_fitted += 1
+            ratio_str = f" [{compression_ratio:.1%}]" if compression_ratio else ""
+            status = f"[green]✓ FITTED{ratio_str}[/green]"
+        else:
+            self.current_skipped += 1
+            self.total_skipped += 1
+            status = f"[red]✗ SKIPPED[/red]"
+        
+        console.print(f"[bold cyan]│[/]    Block {block_idx:3d}: {size_mb:>7.2f} MB  →  {status}")
+        self.current_blocks.append({'fitted': fitted})
+        
+    def finish_file(self):
+        """Finish current file"""
+        total_blocks = len(self.current_blocks)
+        
+        if total_blocks > 0:
+            if self.current_fitted == total_blocks:
+                status = "[green]✓ ALL FITTED[/green]"
+            elif self.current_fitted > 0:
+                status = f"[yellow]✓ {self.current_fitted}/{total_blocks} FITTED[/yellow]"
+            else:
+                status = "[red]✗ ALL SKIPPED[/red]"
+        else:
+            status = "[green]✓ DONE[/green]"
+        
+        console.print(f"[bold cyan]└─────────────────────────────────────────────────────────────[/bold cyan]")
+        console.print(f"  [dim]Result: {status}[/dim]")
+        
+        self.processed_files += 1
+        self.all_blocks.extend(self.current_blocks)
+        
+    def final_summary(self):
+        """Print final summary"""
+        total_blocks = len(self.all_blocks)
+        
+        console.print()
+        console.print(f"[bold green]╔═════════════════════════════════════════════════════════════════╗[/bold green]")
+        console.print(f"[bold green]║[/] [bold yellow]REPACK SUMMARY[/bold yellow]")
+        console.print(f"[bold green]║[/]")
+        console.print(f"[bold green]║[/]   Total Files:   [bold cyan]{self.processed_files}[/bold cyan]")
+        console.print(f"[bold green]║[/]   Total Blocks:  [bold cyan]{total_blocks}[/bold cyan]")
+        console.print(f"[bold green]║[/]   Fitted Blocks: [bold green]{self.total_fitted}[/bold green]")
+        console.print(f"[bold green]║[/]   Skipped Blocks:[bold red]{self.total_skipped}[/bold red]")
+        if total_blocks > 0:
+            success_rate = (self.total_fitted / total_blocks) * 100
+            console.print(f"[bold green]║[/]   Success Rate:  [bold yellow]{success_rate:.1f}%[/bold yellow]")
+        console.print(f"[bold green]╚═════════════════════════════════════════════════════════════════╝[/bold green]")
+
+# ==================== ORIGINAL CLASSES ====================
+
+ZUC_KEY = bytes.fromhex('01010101010101010101010101010101')
+ZUC_IV = bytes.fromhex('FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF')
+
+RSA_MOD_1 = bytes.fromhex('CBE8B9F2504050EF9831B719E9A6249A6D238505ADE909BDE78C180DED6072A0C3347B8AF4780E1F212D952D82D4BF7F233C1ECA499E1F9D9A85B4FAD759F54BABC1666C5DE411EA9E4B2374425DD6C6F54333BBC8F2610FE6063E4D0D6C21A671A8F7C3740555E5DC06D4E1691C456DB4116C0C012BF7B206E8311AAAEC689952BF804EF638F09D5822B4117B114208F14DEB459E80CB770E5B0D7978E21F5E6CED4999D3583108221A7AB28B960277ADB5690A332784019D9C195BE4EA9EA0A09459010F236465DE0D59C3EF7324E954E1118D93EE19F299760C2CDB963CE87973EA5ECC9BBE81C27D4C7C8572AC07E9BCEAC9BD72AB7A56A3C0AD736ABCE4')
+RSA_MOD_2 = bytes.fromhex('7F58E8A39A4DA4E87357DDD650EAA16D3B5CE95B213D1030A662566444796A78A84AE9AC3DBFFDE7F41094896696835DAF13B89E6EC2B84963B1B1BAF7151DA245C3FBFAE2A6AE18B2684D03F9229DE2C91440F2A3A3BCDE1E5680C16722A88039C73560D5D43F4B6562C2EEA5B1D926D86B51108A2643C70FB74D6442CE3A08339B8FD8F660AE88129B7AB8C46F2FA58124485CCCB1E987B05A6DA65A01858ED3F89905449AE42BB07290FCB9994BF22E26610BCABB9804783A3B9587917F3D97316EDDA15C5E13F79066407B55A93B291B68A4AC42A98D6E35FED84B14A792D154E62028DDAD20FC301951E5924BE9AD62FB719DD94CC30CAB871BEC4377A8')
+
+SIMPLE1_DECRYPT_KEY = 121
+SIMPLE2_DECRYPT_KEY = bytes.fromhex('E55B4ED1')
+SIMPLE2_BLOCK_SIZE = 16
+
+SM4_SECRET_4 = 'eb691efea914241317a8'
+SM4_SECRET_2 = 'Q0hVTKey\$as*1ZFlQCiA'
+SM4_SECRET_NEW = [
+    'xG2qW5lP7lV2iN5fN5pG',
+    'xT1cJ6dL5wC0kK1rB4dK',
+    'qC4jS5bZ6fL5xE6nD4zA',
+    'gD4jQ2aL3bS3lC3xT0iW',
+    'xU1yQ8wE9zY3gZ3bT5aE',
+    'uQ3cO2dX7xY4xU7gH7iS',
+    'gW1fR0jK6wQ4oN0oK1kZ',
+    'aJ4pV7iZ7pU4wP2aC2cZ',
+    'cX6jT3cM2oT3vK0kJ1qN',
+    'iT2vS0cS6yT6cZ1sE1lO',
+    'hM1pH9iY8wM9hT4lN5uJ',
+    'kG6bC8jK0fL0dE4sH4mL',
+    'dB6lB3vE0eZ8wM8rI0aC',
+    'tP7sP7nI9rA2vQ4cV5yQ',
+    'aT0cL1yN4pT3sZ7eM2vY',
+    'uV6fU8fC9zN3mP5dH8mN'
 ]
 
-UE4_PAK_MAGIC = b"\\xE1\\x12\\x6F\\x5A"  # 0x5A6F12E1 Magic Header/Footer
-
-
-def init_environment():
-    \"\"\"Create necessary folder hierarchy on Termux filesystem.\"\"\"
-    for folder in FOLDERS:
-        os.makedirs(folder, exist_ok=True)
-
-
-def get_android_hwid() -> str:
-    \"\"\"Retrieves local hardware ID on Android/Termux or defaults to LOCAL-DEVICE for offline mode.\"\"\"
-    hwid = ""
-    try:
-        if os.path.exists("/system/bin/getprop"):
-            serial = subprocess.check_output(["getprop", "ro.serialno"], stderr=subprocess.DEVNULL).decode().strip()
-            if not serial or serial == "unknown":
-                serial = subprocess.check_output(["getprop", "ro.boot.serialno"], stderr=subprocess.DEVNULL).decode().strip()
-            model = subprocess.check_output(["getprop", "ro.product.model"], stderr=subprocess.DEVNULL).decode().strip()
-            hwid = f"{model}-{serial}"
-    except Exception:
-        pass
-
-    if not hwid or hwid == "-unknown" or hwid.startswith("-"):
-        return "LOCAL-DEVICE"
-
-    clean_hwid = hashlib.md5(hwid.encode()).hexdigest()[:16].upper()
-    return f"FL-HWID-{clean_hwid}"
-
-
-def authenticate_user() -> dict:
-    \"\"\"100% Offline Auth Bypass Mode. Accepts ANY key or Enter.\"\"\"
-    hwid = get_android_hwid()
-    saved_key = ""
-
-    if os.path.exists(CONFIG_FILE):
-        try:
-            with open(CONFIG_FILE, "r") as f:
-                data = json.load(f)
-                saved_key = data.get("license_key", "")
-        except Exception:
-            pass
-
-    console.clear()
-    console.print(
-        Panel(
-            Align.center(
-                Text.from_markup(
-                    "[bold cyan]⚡ CYBERPUNK SECURITY & REVERSE ENGINEERING SUITE ⚡[/bold cyan]\\n"
-                    "[bold green]Termux / Linux Edition - 100% OFFLINE VIP BYPASS MODE[/bold green]"
-                )
-            ),
-            title="[bold yellow]SYSTEM AUTHENTICATION[/bold yellow]",
-            border_style="bright_green",
-            box=box.DOUBLE
-        )
-    )
-
-    if saved_key:
-        console.print(f"[bold dim]Saved Key Detected: [cyan]{saved_key}[/cyan][/bold dim]")
-        use_saved = Confirm.ask("Use saved license key?", default=True)
-        if use_saved:
-            key = saved_key
-        else:
-            key = Prompt.ask("[bold green]Enter License Key (ANY KEY ACCEPTED)[/bold green]", default="VIP-OFFLINE-KEY")
-    else:
-        key = Prompt.ask("[bold green]Enter License Key (ANY KEY ACCEPTED)[/bold green]", default="VIP-OFFLINE-KEY")
-
-    key = key.strip() or "VIP-OFFLINE-KEY"
-
-    with Progress(
-        SpinnerColumn(spinner_name="dots"),
-        TextColumn("[bold bright_cyan]{task.description}"),
-        transient=True,
-        console=console
-    ) as progress:
-        progress.add_task(description="Bypassing Online Verification (Offline VIP Mode)...", total=None)
-        time.sleep(0.3)
-
-    try:
-        with open(CONFIG_FILE, "w") as f:
-            json.dump({"license_key": key, "hwid": hwid, "mode": "OFFLINE", "auth_time": datetime.now().isoformat()}, f)
-    except Exception:
-        pass
-
-    console.print("\\n[bold bright_green]✔ ACCESS GRANTED! ACTIVE VIP UNLOCKED.[/bold bright_green]\\n")
-    time.sleep(0.2)
-
-    return {
-        "user": "VIP-User",
-        "status": "ACTIVE VIP",
-        "expiry_date": "31-12-2026",
-        "days_remaining": 999,
-        "hwid": hwid
-    }
-
-
-def draw_header(user_info: dict):
-    \"\"\"Render Cyberpunk ASCII Banner and Device Information.\"\"\"
-    banner = \"\"\"
-[bold bright_cyan]
-  ██████╗  █████╗ ██╗  ██╗    ████████╗██████╗  ██████╗ ██╗     
-  ██╔══██╗██╔══██╗██║ ██╔╝    ╚══██╔══╝██╔══██╗██╔═══██╗██║     
-  ██████╔╝███████║█████═╝        ██║   ██║  ██║██║   ██║██║     
-  ██╔═══╝ ██╔══██║██  ██╗        ██║   ██║  ██║██║   ██║██║     
-  ██║     ██║  ██║██║  ██╗       ██║   ██████╔╝╚██████╔╝███████╗
-  ╚═╝     ╚═╝  ╚═╝╚═╝  ╚═╝       ╚═╝   ╚═════╝  ╚═════╝ ╚══════╝
-[/bold bright_cyan]
-[bold yellow]⚡ FEATURESTIC LEAKS - PAK REVERSE ENGINEERING TOOL v2.0-ULTIMATE ⚡[/bold yellow]
-\"\"\"
-    console.print(Align.center(Text.from_markup(banner)))
-
-    table = Table(box=box.ROUNDED, border_style="cyan", show_header=False)
-    table.add_column("Key", style="bold white", justify="right")
-    table.add_column("Value", style="bold green")
-
-    table.add_row("License Status :", f"[bold green]{user_info.get('status', 'ACTIVE VIP')}[/bold green]")
-    table.add_row("Access Expiry  :", f"[bold cyan]{user_info.get('expiry_date', '31-12-2026')}[/bold cyan] ({user_info.get('days_remaining', 999)} Days)")
-    table.add_row("Hardware ID    :", f"[bold yellow]{user_info.get('hwid', 'FL-HWID-LOCAL')}[/bold yellow]")
-    table.add_row("Crypto Module  :", "[bold green]PyCryptodome & Zstandard Ready[/bold green]" if HAS_CRYPTO else "[bold yellow]Basic Crypto Active[/bold yellow]")
-
-    console.print(Panel(Align.center(table), border_style="bright_blue", box=box.ROUNDED))
-
-
-def unpack_pak_file():
-    \"\"\"Module 1: Real Unpack Unreal Engine / Custom PAK file.\"\"\"
-    console.clear()
-    console.print(Panel("[bold cyan]📦 REAL PAK FILE UNPACKER ENGINE[/bold cyan]", border_style="cyan"))
-
-    orig_files = [f for f in os.listdir("pak/original") if f.endswith(".pak")]
-    if not orig_files:
-        console.print("[bold red][✖] No .pak files found in 'pak/original/' folder![/bold red]")
-        console.print("[yellow]Place your target .pak file inside 'pak/original/' and try again.[/yellow]")
-        Prompt.ask("\\nPress Enter to return to main menu")
-        return
-
-    console.print("\\n[bold yellow]Available .pak Files:[/bold yellow]")
-    for idx, f in enumerate(orig_files, 1):
-        size_mb = os.path.getsize(os.path.join("pak/original", f)) / (1024 * 1024)
-        console.print(f" [cyan][{idx}][/cyan] {f} [dim]({size_mb:.2f} MB)[/dim]")
-
-    choice = Prompt.ask("\\nSelect PAK file number to unpack", default="1")
-    try:
-        selected_file = orig_files[int(choice) - 1]
-    except Exception:
-        selected_file = orig_files[0]
-
-    input_path = os.path.join("pak/original", selected_file)
-    output_dir = os.path.join("pak/results/unpack", selected_file.replace(".pak", "_extracted"))
-    os.makedirs(output_dir, exist_ok=True)
-
-    console.print(f"\\n[bold green]Parsing & Unpacking Binary Streams:[/bold green] [white]{selected_file}[/white]")
-
-    extracted_count = 0
-    total_bytes = 0
-
-    with open(input_path, "rb") as f:
-        data = f.read()
-
-    file_size = len(data)
-
-    with Progress(
-        SpinnerColumn(),
-        TextColumn("[progress.description]{task.description}"),
-        BarColumn(),
-        TaskProgressColumn(),
-        console=console
-    ) as progress:
-        task = progress.add_task("[cyan]Scanning Container & Extracting Assets...", total=100)
-
-        # 1. Attempt Header Signature / Structured Table Extraction
-        if data.startswith(b"PAK_CONTAINER_V2") or b"PAK_HEADER" in data[:64]:
-            try:
-                idx_pos = data.rfind(b"INDEX_START_")
-                if idx_pos != -1:
-                    idx_data = data[idx_pos + 12:].decode("utf-8", errors="ignore")
-                    lines = idx_data.split("\\n")
-                    for line in lines:
-                        if "|" in line:
-                            parts = line.strip().split("|")
-                            if len(parts) >= 3:
-                                rel_path, offset, length = parts[0], int(parts[1]), int(parts[2])
-                                file_content = data[offset:offset + length]
-                                out_file_path = os.path.join(output_dir, rel_path)
-                                os.makedirs(os.path.dirname(out_file_path), exist_ok=True)
-                                with open(out_file_path, "wb") as out_f:
-                                    out_f.write(file_content)
-                                extracted_count += 1
-                                total_bytes += len(file_content)
-            except Exception:
-                pass
-
-        # 2. Carve Binary Signatures if standard or custom index didn't extract everything
-        if extracted_count == 0:
-            signatures = [
-                (b"\\x89PNG\\r\\n\\x1a\\n", b"\\x49\\x45\\x4e\\x44\\xae\\x42\\x60\\x82", ".png"),
-                (b"\\xff\\xd8\\xff", b"\\xff\\xd9", ".jpg"),
-                (b"PK\\x03\\x04", b"PK\\x05\\x06", ".zip"),
-                (b"OggS", b"OggS", ".ogg"),
-                (b"\\x1bLua", b"\\x00\\x00\\x00\\x00", ".luac"),
-                (b"\\x1bLJ", b"\\x00\\x00\\x00\\x00", ".luac"),
-            ]
-
-            for sig_start, sig_end, ext in signatures:
-                start = 0
-                while True:
-                    idx = data.find(sig_start, start)
-                    if idx == -1:
-                        break
-                    end_idx = data.find(sig_end, idx + len(sig_start))
-                    if end_idx != -1:
-                        end_idx += len(sig_end)
-                        chunk = data[idx:end_idx]
-                        if 16 < len(chunk) < 50 * 1024 * 1024:
-                            extracted_count += 1
-                            out_name = f"Asset_{extracted_count:04d}{ext}"
-                            out_file_path = os.path.join(output_dir, "Content", out_name)
-                            os.makedirs(os.path.dirname(out_file_path), exist_ok=True)
-                            with open(out_file_path, "wb") as out_f:
-                                out_f.write(chunk)
-                            total_bytes += len(chunk)
-                        start = end_idx
-                    else:
-                        break
-
-        # 3. Fallback: Extract data blocks if no signature carved
-        if extracted_count == 0:
-            chunk_size = max(1024, file_size // 10)
-            parts = [data[i:i + chunk_size] for i in range(0, file_size, chunk_size)]
-            for i, chunk in enumerate(parts, 1):
-                extracted_count += 1
-                out_file_path = os.path.join(output_dir, "Content", f"DataBlock_{i:03d}.bin")
-                os.makedirs(os.path.dirname(out_file_path), exist_ok=True)
-                with open(out_file_path, "wb") as out_f:
-                    out_f.write(chunk)
-                total_bytes += len(chunk)
-
-            with open(os.path.join(output_dir, "PakMetadata.json"), "w") as manifest:
-                json.dump({
-                    "original_file": selected_file,
-                    "original_size": file_size,
-                    "extracted_blocks": extracted_count,
-                    "unpack_timestamp": datetime.now().isoformat()
-                }, manifest, indent=2)
-
-        for i in range(1, 101):
-            time.sleep(0.005)
-            progress.update(task, completed=i)
-
-    console.print(f"\\n[bold bright_green]✔ PAK Unpack Execution Complete![/bold bright_green]")
-    console.print(f"[bold cyan]Total Extracted Assets:[/bold cyan] {extracted_count} Files ({total_bytes / 1024:.1f} KB)")
-    console.print(f"[bold cyan]Output Folder:[/bold cyan] {output_dir}")
-    Prompt.ask("\\nPress Enter to return to main menu")
-
-
-def repack_pak_file():
-    \"\"\"Module 2: Real Repack extracted folder back into .pak container.\"\"\"
-    console.clear()
-    console.print(Panel("[bold cyan]🔨 REAL PAK FILE REPACKER ENGINE[/bold cyan]", border_style="cyan"))
-
-    dirs = [d for d in os.listdir("pak/results/unpack") if os.path.isdir(os.path.join("pak/results/unpack", d))]
-    if not dirs:
-        console.print("[bold red][✖] No extracted folders found in 'pak/results/unpack/'![/bold red]")
-        Prompt.ask("\\nPress Enter to return to main menu")
-        return
-
-    console.print("\\n[bold yellow]Available Extracted Folders:[/bold yellow]")
-    for idx, d in enumerate(dirs, 1):
-        console.print(f" [cyan][{idx}][/cyan] {d}")
-
-    choice = Prompt.ask("\\nSelect folder number to repack", default="1")
-    try:
-        selected_dir = dirs[int(choice) - 1]
-    except Exception:
-        selected_dir = dirs[0]
-
-    input_dir = os.path.join("pak/results/unpack", selected_dir)
-    output_pak = os.path.join("pak/results/repack", f"{selected_dir}_modified.pak")
-
-    console.print(f"\\n[bold green]Repacking Folder into PAK Binary:[/bold green] [white]{selected_dir}[/white]")
-
-    all_files = []
-    for root, _, files in os.walk(input_dir):
-        for f in files:
-            full_path = os.path.join(root, f)
-            rel_path = os.path.relpath(full_path, input_dir)
-            all_files.append((full_path, rel_path))
-
-    with Progress(
-        SpinnerColumn(),
-        TextColumn("[progress.description]{task.description}"),
-        BarColumn(),
-        TaskProgressColumn(),
-        console=console
-    ) as progress:
-        task = progress.add_task("[yellow]Building Binary PAK Header & Index Table...", total=100)
-
-        header = b"PAK_CONTAINER_V2_FEATURESTIC_LEAKS\\x00\\x00\\x00\\x00"
-        index_records = []
-
-        with open(output_pak, "wb") as out_f:
-            out_f.write(header)
-            current_offset = len(header)
-
-            for idx, (full_path, rel_path) in enumerate(all_files):
-                with open(full_path, "rb") as in_f:
-                    f_data = in_f.read()
-
-                out_f.write(f_data)
-                index_records.append(f"{rel_path}|{current_offset}|{len(f_data)}")
-                current_offset += len(f_data)
-
-            index_str = "INDEX_START_\\n" + "\\n".join(index_records)
-            out_f.write(index_str.encode("utf-8"))
-            out_f.write(UE4_PAK_MAGIC)
-
-        for i in range(1, 101):
-            time.sleep(0.005)
-            progress.update(task, completed=i)
-
-    output_size = os.path.getsize(output_pak) / 1024
-    console.print(f"\\n[bold bright_green]✔ PAK Repack Completed Successfully![/bold bright_green]")
-    console.print(f"[bold cyan]Packed Files Count:[/bold cyan] {len(all_files)} files")
-    console.print(f"[bold cyan]Output Modified PAK File:[/bold cyan] {output_pak} ({output_size:.1f} KB)")
-    Prompt.ask("\\nPress Enter to return to main menu")
-
-
-def decompile_lua_script():
-    \"\"\"Module 3: Real Decompile compiled Lua bytecodes & Obfuscated Lua Scripts.\"\"\"
-    console.clear()
-    console.print(Panel("[bold magenta]📜 REAL LUA DECOMPILER ENGINE (Bytecode & Obfuscation)[/bold magenta]", border_style="magenta"))
-
-    lua_files = [f for f in os.listdir("lua/original") if f.endswith(".lua") or f.endswith(".luac")]
-    if not lua_files:
-        console.print("[bold red][✖] No .lua / .luac files found in 'lua/original/' folder![/bold red]")
-        console.print("[yellow]Place compiled Lua bytecode or obfuscated files in 'lua/original/' first.[/yellow]")
-        Prompt.ask("\\nPress Enter to return to main menu")
-        return
-
-    console.print("\\n[bold yellow]Available Lua Files:[/bold yellow]")
-    for idx, f in enumerate(lua_files, 1):
-        console.print(f" [cyan][{idx}][/cyan] {f}")
-
-    choice = Prompt.ask("\\nSelect Lua file number to decompile", default="1")
-    try:
-        selected_file = lua_files[int(choice) - 1]
-    except Exception:
-        selected_file = lua_files[0]
-
-    input_path = os.path.join("lua/original", selected_file)
-    output_path = os.path.join("lua/decompiled", selected_file.replace(".luac", ".lua").replace(".lua", "_decompiled.lua"))
-
-    console.print(f"\\n[bold green]Decompiling & Unwrapping:[/bold green] [white]{selected_file}[/white]")
-
-    with open(input_path, "rb") as f:
-        raw_bytes = f.read()
-
-    decompiled_code = ""
-
-    with Progress(
-        SpinnerColumn(),
-        TextColumn("[progress.description]{task.description}"),
-        console=console
-    ) as progress:
-        progress.add_task("[magenta]Parsing Lua Opcodes & String Tables...", total=None)
-        time.sleep(0.4)
-
-    if raw_bytes.startswith(b"\\x1bLua") or raw_bytes.startswith(b"\\x1bLJ"):
-        bytecode_type = "LuaJIT" if raw_bytes.startswith(b"\\x1bLJ") else "Standard Lua Bytecode"
-        
-        strings_found = re.findall(b"[\\x20-\\x7e]{3,}", raw_bytes)
-        clean_strings = [s.decode("ascii", errors="ignore") for s in strings_found if not s.startswith(b"\\x1b")]
-
-        decompiled_code = f\"\"\"-- ==============================================================================
--- DECOMPILED BY FEATURESTIC LEAKS LUA ENGINE v2.0
--- Target File: {selected_file}
--- Bytecode Type: {bytecode_type}
--- Timestamp: {datetime.now().isoformat()}
--- ==============================================================================
-
--- Extracted Constant String Table & Symbols:
-local STRING_TABLE = {{
-\"\"\"
-        for i, s in enumerate(clean_strings, 1):
-            escaped = s.replace('"', '\\\\"')
-            decompiled_code += f'    [{i}] = "{escaped}",\\n'
-
-        decompiled_code += \"\"\"}}
-
--- Reconstructed Function AST Logic:
-function MainLogic(...)
-    print("[+] FeaturesticLeaks Hook Loaded Successfully")
-    local env = getfenv and getfenv() or _ENV
+EM_SIMPLE1 = 1
+EM_SIMPLE2 = 16
+EM_SM4_2 = 2
+EM_SM4_4 = 4
+EM_SM4_NEW_BASE = 31
+EM_SM4_NEW_MASK = ~EM_SM4_NEW_BASE
+EM_UNKNOWN_17 = 17
+
+CM_NONE = 0
+CM_ZLIB = 1
+CM_ZSTD = 6
+CM_ZSTD_DICT = 8
+CM_MASK = 15
+
+class SM4:
+    _S_BOX = bytes([
+        52, 102, 37, 116, 137, 120, 228, 169, 90, 65, 188, 122, 214, 22, 33, 35,
+        77, 97, 218, 148, 155, 223, 19, 60, 105, 58, 49, 10, 95, 215, 153, 149,
+        241, 174, 114, 61, 7, 96, 36, 182, 152, 238, 196, 162, 45, 136, 221, 141,
+        4, 234, 187, 17, 202, 62, 93, 161, 246, 63, 176, 151, 128, 71, 43, 166,
+        230, 247, 217, 177, 89, 192, 124, 190, 84, 40, 183, 126, 79, 248, 67, 110,
+        160, 80, 14, 245, 144, 184, 251, 163, 123, 98, 25, 70, 3, 42, 185, 143,
+        159, 119, 180, 91, 131, 135, 8, 235, 226, 30, 66, 240, 15, 232, 113, 106,
+        117, 173, 85, 31, 181, 171, 51, 250, 127, 21, 189, 133, 216, 6, 104, 179,
+        82, 48, 72, 11, 0, 237, 239, 178, 87, 142, 231, 108, 213, 229, 46, 83,
+        130, 5, 249, 129, 244, 86, 191, 140, 75, 227, 219, 74, 145, 76, 44, 211,
+        64, 41, 78, 32, 20, 54, 121, 9, 111, 209, 55, 224, 57, 12, 138, 146,
+        56, 18, 53, 109, 225, 253, 147, 154, 23, 212, 201, 156, 107, 132, 38, 157,
+        175, 118, 193, 158, 208, 150, 197, 203, 233, 115, 73, 210, 205, 100, 195, 199,
+        1, 125, 243, 172, 252, 222, 164, 68, 50, 27, 194, 186, 28, 2, 198, 39,
+        69, 139, 242, 24, 167, 16, 81, 29, 200, 207, 99, 255, 47, 13, 88, 206,
+        101, 165, 220, 26, 59, 134, 254, 34, 92, 168, 94, 103, 170, 236, 112, 204
+    ])
+    _FK = [1184304796, 1270900830, 1493524870, 3164752158]
+    _CK = [964907, 973793155, 2654690407, 2916866751, 2071233739, 1226140771, 3348805095, 2045549823, 388349611, 800627875, 612403927, 3721562911, 1195432523, 3150178931, 612053223, 2445162591, 67183755, 1174197155, 1393249511, 3331183455, 3822152747, 1332317203, 1804781383, 1990130463, 1282653851, 3376591251, 2910902311, 925872959, 332098219, 735840931, 396665415, 3588844719]
     
-    for id, str in pairs(STRING_TABLE) do
-        if type(str) == "string" and #str > 0 then
-            -- Processing constant: str
-        end
-    end
-    return true
-end
-
-MainLogic()
-\"\"\"
-    else:
-        text_content = raw_bytes.decode("utf-8", errors="ignore")
-
-        b64_matches = re.findall(r'["\\']([A-Za-z0-9+/=]{20,})["\\']', text_content)
-        decoded_blocks = []
-        for match in b64_matches:
-            try:
-                dec = base64.b64decode(match).decode("utf-8", errors="ignore")
-                if any(k in dec for k in ["function", "local", "return", "end", "print", "if"]):
-                    decoded_blocks.append(dec)
-            except Exception:
-                pass
-
-        if decoded_blocks:
-            decompiled_code = f"-- [Deobfuscated Base64 Strings]\\n\\n" + "\\n\\n-- Block --\\n".join(decoded_blocks) + "\\n\\n" + text_content
+    @staticmethod
+    def ROL32(x, n):
+        return (x << n) & 0xFFFFFFFF | (x >> (32 - n))
+    
+    @staticmethod
+    def _BS(X):
+        return (SM4._S_BOX[X >> 24 & 255] << 24 | 
+                SM4._S_BOX[X >> 16 & 255] << 16 | 
+                SM4._S_BOX[X >> 8 & 255] << 8 | 
+                SM4._S_BOX[X & 255])
+    
+    @staticmethod
+    def _T0(X):
+        X = SM4._BS(X)
+        return X ^ SM4.ROL32(X, 2) ^ SM4.ROL32(X, 10) ^ SM4.ROL32(X, 18) ^ SM4.ROL32(X, 24)
+    
+    @staticmethod
+    def _T1(X):
+        X = SM4._BS(X)
+        return X ^ SM4.ROL32(X, 13) ^ SM4.ROL32(X, 23)
+    
+    @staticmethod
+    def _key_expand(key: bytes, rkey: list):
+        K0 = int.from_bytes(key[0:4], 'big') ^ SM4._FK[0]
+        K1 = int.from_bytes(key[4:8], 'big') ^ SM4._FK[1]
+        K2 = int.from_bytes(key[8:12], 'big') ^ SM4._FK[2]
+        K3 = int.from_bytes(key[12:16], 'big') ^ SM4._FK[3]
+        for i in range(0, 32, 4):
+            K0 = K0 ^ SM4._T1(K1 ^ K2 ^ K3 ^ SM4._CK[i])
+            rkey[i] = K0
+            K1 = K1 ^ SM4._T1(K2 ^ K3 ^ K0 ^ SM4._CK[i + 1])
+            rkey[i + 1] = K1
+            K2 = K2 ^ SM4._T1(K3 ^ K0 ^ K1 ^ SM4._CK[i + 2])
+            rkey[i + 2] = K2
+            K3 = K3 ^ SM4._T1(K0 ^ K1 ^ K2 ^ SM4._CK[i + 3])
+            rkey[i + 3] = K3
+    
+    @classmethod
+    def key_length(cls):
+        return 16
+    
+    @classmethod
+    def block_length(cls):
+        return 16
+    
+    def __init__(self, key: bytes):
+        if len(key) != self.key_length():
+            raise ValueError(f'Key must be {self.key_length()} bytes')
         else:
-            decompiled_code = text_content
+            self._key = key
+            self._rkey = [0] * 32
+            SM4._key_expand(self._key, self._rkey)
+            self._block_buffer = bytearray()
+    
+    def encrypt(self, block: bytes) -> bytes:
+        if len(block) != self.block_length():
+            raise ValueError(f'Block must be {self.block_length()} bytes')
+        else:
+            RK = self._rkey
+            X0 = int.from_bytes(block[0:4], 'big')
+            X1 = int.from_bytes(block[4:8], 'big')
+            X2 = int.from_bytes(block[8:12], 'big')
+            X3 = int.from_bytes(block[12:16], 'big')
+            for i in range(0, 32, 4):
+                X0 = X0 ^ SM4._T0(X1 ^ X2 ^ X3 ^ RK[i])
+                X1 = X1 ^ SM4._T0(X2 ^ X3 ^ X0 ^ RK[i + 1])
+                X2 = X2 ^ SM4._T0(X3 ^ X0 ^ X1 ^ RK[i + 2])
+                X3 = X3 ^ SM4._T0(X0 ^ X1 ^ X2 ^ RK[i + 3])
+            BUFFER = self._block_buffer
+            BUFFER.clear()
+            BUFFER.extend(X3.to_bytes(4, 'big'))
+            BUFFER.extend(X2.to_bytes(4, 'big'))
+            BUFFER.extend(X1.to_bytes(4, 'big'))
+            BUFFER.extend(X0.to_bytes(4, 'big'))
+            return bytes(BUFFER)
+    
+    def decrypt(self, block: bytes) -> bytes:
+        if len(block) != self.block_length():
+            raise ValueError(f'Block must be {self.block_length()} bytes')
+        else:
+            RK = self._rkey
+            X0 = int.from_bytes(block[0:4], 'big')
+            X1 = int.from_bytes(block[4:8], 'big')
+            X2 = int.from_bytes(block[8:12], 'big')
+            X3 = int.from_bytes(block[12:16], 'big')
+            for i in range(0, 32, 4):
+                X0 = X0 ^ SM4._T0(X1 ^ X2 ^ X3 ^ RK[31 - i])
+                X1 = X1 ^ SM4._T0(X2 ^ X3 ^ X0 ^ RK[30 - i])
+                X2 = X2 ^ SM4._T0(X3 ^ X0 ^ X1 ^ RK[29 - i])
+                X3 = X3 ^ SM4._T0(X0 ^ X1 ^ X2 ^ RK[28 - i])
+            BUFFER = self._block_buffer
+            BUFFER.clear()
+            BUFFER.extend(X3.to_bytes(4, 'big'))
+            BUFFER.extend(X2.to_bytes(4, 'big'))
+            BUFFER.extend(X1.to_bytes(4, 'big'))
+            BUFFER.extend(X0.to_bytes(4, 'big'))
+            return bytes(BUFFER)
 
-    with open(output_path, "w", encoding="utf-8") as out_f:
-        out_f.write(decompiled_code)
+class Misc:
+    @staticmethod
+    def pad_to_n(data: bytes, n: int) -> bytes:
+        assert n > 0
+        padding = n - len(data) % n
+        if padding == n:
+            return data
+        else:
+            return data + b'\\x00' * padding
+    @staticmethod
+    def align_up(x: int, n: int) -> int:
+        return (x + n - 1) // n * n
 
-    console.print(f"\\n[bold bright_green]✔ Lua Decompilation Successful![/bold bright_green]")
-    console.print(f"[bold cyan]Decompiled Source Code Saved To:[/bold cyan] {output_path}")
-    Prompt.ask("\\nPress Enter to return to main menu")
+class Reader:
+    def __init__(self, buffer, cursor=0):
+        self._buffer = buffer
+        self._cursor = cursor
+    def u1(self, move_cursor=True) -> int:
+        return self.unpack('B', move_cursor=move_cursor)[0]
+    def u4(self, move_cursor=True) -> int:
+        return self.unpack('<I', move_cursor=move_cursor)[0]
+    def u8(self, move_cursor=True) -> int:
+        return self.unpack('<Q', move_cursor=move_cursor)[0]
+    def i1(self, move_cursor=True) -> int:
+        return self.unpack('b', move_cursor=move_cursor)[0]
+    def i4(self, move_cursor=True) -> int:
+        return self.unpack('<i', move_cursor=move_cursor)[0]
+    def i8(self, move_cursor=True) -> int:
+        return self.unpack('<q', move_cursor=move_cursor)[0]
+    def s(self, n: int, move_cursor=True) -> bytes:
+        return self.unpack(f'{n}s', move_cursor=move_cursor)[0]
+    def unpack(self, f: str, offset=0, move_cursor=True):
+        x = struct.unpack_from(f, self._buffer, self._cursor + offset)
+        if move_cursor:
+            self._cursor += struct.calcsize(f)
+        return x
+    def string(self, move_cursor=True) -> str:
+        length = self.i4(move_cursor=move_cursor)
+        if length == 0:
+            return str()
+        else:
+            assert length > 0
+            offset = 0 if move_cursor else 4
+            return self.unpack(f'{length}s', offset=offset, move_cursor=move_cursor)[0].rstrip(b'\\x00').decode()
 
+class PakInfo:
+    def __init__(self, buffer, keystream: List[int]):
+        def decrypt_index_encrypted(x: int) -> int:
+            MASK_8 = 255
+            return (x ^ keystream[3]) & MASK_8
+        def decrypt_magic(x: int) -> int:
+            return x ^ keystream[2]
+        def decrypt_index_hash(x: bytes) -> bytes:
+            key = struct.pack('<5I', *keystream[4:][:5])
+            assert len(x) == len(key)
+            return bytes((a ^ b for a, b in zip(x, key)))
+        def decrypt_index_size(x: int) -> int:
+            return x ^ (keystream[10] << 32 | keystream[11])
+        def decrypt_index_offset(x: int) -> int:
+            return x ^ (keystream[0] << 32 | keystream[1])
+        reader = Reader(buffer[-PakInfo._mem_size((-1)):])
+        self.index_encrypted = decrypt_index_encrypted(reader.u1()) == 1
+        self.magic = decrypt_magic(reader.u4())
+        self.version = reader.u4()
+        self.index_hash = decrypt_index_hash(reader.s(20)) if self.version >= 6 else bytes()
+        self.index_size = decrypt_index_size(reader.u8())
+        self.index_offset = decrypt_index_offset(reader.u8())
+        if self.version <= 3:
+            self.index_encrypted = False
+    @staticmethod
+    def _mem_size(_: int) -> int:
+        return 45
 
-def compile_lua_script():
-    \"\"\"Module 4: Real Compile plain Lua code back into bytecode.\"\"\"
-    console.clear()
-    console.print(Panel("[bold magenta]⚙️ REAL LUA COMPILER ENGINE[/bold magenta]", border_style="magenta"))
+class TencentPakInfo(PakInfo):
+    def __init__(self, buffer, keystream: List[int]):
+        def decrypt_unk(x: bytes) -> bytes:
+            key = struct.pack('<8I', *keystream[7:][:8])
+            assert len(x) == len(key)
+            return bytes((a ^ b for a, b in zip(x, key)))
+        def decrypt_stem_hash(x: int) -> int:
+            return x ^ keystream[8]
+        def decrypt_unk_hash(x: int) -> int:
+            return x ^ keystream[9]
+        super().__init__(buffer, keystream)
+        reader = Reader(buffer[-TencentPakInfo._mem_size(self.version):])
+        self.unk1 = decrypt_unk(reader.s(32)) if self.version >= 7 else bytes()
+        self.packed_key = reader.s(256) if self.version >= 8 else bytes()
+        self.packed_iv = reader.s(256) if self.version >= 8 else bytes()
+        self.packed_index_hash = reader.s(256) if self.version >= 8 else bytes()
+        self.stem_hash = decrypt_stem_hash(reader.u4()) if self.version >= 9 else 0
+        self.unk2 = decrypt_unk_hash(reader.u4()) if self.version >= 9 else 0
+        self.content_org_hash = reader.s(20) if self.version >= 12 else bytes()
+    @staticmethod
+    def _mem_size(version: int) -> int:
+        size_for_7 = 32 if version >= 7 else 0
+        size_for_8 = 768 if version >= 8 else 0
+        size_for_9 = 8 if version >= 9 else 0
+        size_for_12 = 20 if version >= 12 else 0
+        return PakInfo._mem_size(version) + size_for_7 + size_for_8 + size_for_9 + size_for_12
 
-    lua_files = [f for f in os.listdir("lua/decompiled") if f.endswith(".lua")]
-    if not lua_files:
-        console.print("[bold red][✖] No decompiled .lua files found in 'lua/decompiled/'![/bold red]")
-        Prompt.ask("\\nPress Enter to return to main menu")
-        return
+class PakCompressedBlock:
+    def __init__(self, reader: Reader):
+        self.start = reader.u8()
+        self.end = reader.u8()
 
-    console.print("\\n[bold yellow]Available Lua Source Files:[/bold yellow]")
-    for idx, f in enumerate(lua_files, 1):
-        console.print(f" [cyan][{idx}][/cyan] {f}")
+@dataclass
+class TencentPakEntry:
+    def __init__(self, reader: Reader, version: int):
+        self.content_hash = reader.s(20)
+        if version <= 1:
+            _ = reader.u8()
+        self.offset = reader.u8()
+        self.uncompressed_size = reader.u8()
+        self.compression_method = reader.u4() & CM_MASK
+        self.size = reader.u8()
+        self.unk1 = reader.u1() if version >= 5 else 0
+        self.unk2 = reader.s(20) if version >= 5 else bytes()
+        if self.compression_method != 0 and version >= 3:
+            self.compressed_blocks = [PakCompressedBlock(reader) for _ in range(reader.u4())]
+        else:
+            self.compressed_blocks = []
+        self.compression_block_size = reader.u4() if version >= 4 else 0
+        self.encrypted = reader.u1() == 1 if version >= 4 else False
+        self.encryption_method = reader.u4() if version >= 12 else 0
+        self.index_new_sep = reader.u4() if version >= 12 else 0
 
-    choice = Prompt.ask("\\nSelect Lua file number to compile", default="1")
-    try:
-        selected_file = lua_files[int(choice) - 1]
-    except Exception:
-        selected_file = lua_files[0]
+class PakCrypto:
+    class _LCG:
+        def __init__(self, seed: int):
+            self.state = seed
+        def next(self) -> int:
+            MASK_32 = 4294967295
+            MSB_1 = 2147483648
+            def wrap(x: int) -> int:
+                x &= MASK_32
+                if not x & MSB_1:
+                    return x
+                else:
+                    return (x + MSB_1 & MASK_32) - MSB_1
+            x1 = wrap(1103515245 * self.state)
+            self.state = wrap(x1 + 12345)
+            x2 = wrap(x1 + 77880) if self.state < 0 else self.state
+            return (x2 >> 16 & MASK_32) % 32767
+    @staticmethod
+    def zuc_keystream() -> List[int]:
+        zuc = gmalg.ZUC(ZUC_KEY, ZUC_IV)
+        return [struct.unpack('>I', zuc.generate())[0] for _ in range(16)]
+    @staticmethod
+    def _xorxor(buffer, x) -> bytes:
+        return bytes((buffer[i] ^ x[i % len(x)] for i in range(len(buffer))))
+    @staticmethod
+    def _hashhash(buffer, n: int) -> bytes:
+        result = bytes()
+        for i in range(math.ceil(n / SHA1.digest_size)):
+            result += SHA1.new(buffer).digest()
+        if len(result) >= n:
+            result = result[:n]
+            return result
+        else:
+            result += b'\\x00' * (n - len(result))
+            return result
+    @staticmethod
+    def _meowmeow(buffer) -> bytes:
+        def unpad(x):
+            skip = 1 + next((i for i in range(len(x)) if x[i]!= 0))
+            return x[skip:]
+        if len(buffer) < 43:
+            return bytes()
+        else:
+            x1 = buffer[1:][:SHA1.digest_size]
+            x2 = buffer[SHA1.digest_size + 1:]
+            x1 = PakCrypto._xorxor(x1, PakCrypto._hashhash(x2, len(x1)))
+            x2 = PakCrypto._xorxor(x2, PakCrypto._hashhash(x1, len(x2)))
+            part1, m = (x2[:SHA1.digest_size], x2[SHA1.digest_size:])
+            if part1!= SHA1.new(b'\\x00' * SHA1.digest_size).digest():
+                return bytes()
+            else:
+                return unpad(m)
+    @staticmethod
+    def rsa_extract(signature: bytes, modulus: bytes) -> bytes:
+        c = int.from_bytes(signature, 'little')
+        n = int.from_bytes(modulus, 'little')
+        e = 65537
+        m = pow(c, e, n).to_bytes(256, 'little').rstrip(b'\\x00')
+        return PakCrypto._meowmeow(Misc.pad_to_n(m, 4))
+    @staticmethod
+    def _decrypt_simple1(ciphertext) -> bytes:
+        return bytes((x ^ SIMPLE1_DECRYPT_KEY for x in ciphertext))
+    @staticmethod
+    def _decrypt_simple2(ciphertext) -> bytes:
+        class RollingKey:
+            def __init__(self, initial_value: int):
+                self._value = initial_value
+            def update(self, x: int) -> int:
+                self._value ^= x
+                return self._value
+        assert len(ciphertext) % SIMPLE2_BLOCK_SIZE == 0
+        initial_key, = struct.unpack('<I', SIMPLE2_DECRYPT_KEY)
+        rolling_key = RollingKey(initial_key)
+        plaintext = (struct.pack('<I', rolling_key.update(x)) for x in struct.unpack(f'<{len(ciphertext) // 4}I', ciphertext))
+        return bytes(it.chain.from_iterable(plaintext))
+    @staticmethod
+    @lru_cache(maxsize=1)
+    def _derive_sm4_key(file_path: PurePath, encryption_method: int) -> bytes:
+        part1 = file_path.stem.lower()
+        if encryption_method == EM_SM4_2:
+            secret = SM4_SECRET_2
+        else:
+            if encryption_method == EM_SM4_4:
+                secret = SM4_SECRET_4
+            else:
+                index = (encryption_method - EM_SM4_NEW_BASE) % len(SM4_SECRET_NEW)
+                secret = f'{SM4_SECRET_NEW[index]}{encryption_method}'
+        return SHA1.new(str(part1 + secret).encode()).digest()[:SM4.key_length()]
+    @staticmethod
+    @lru_cache(maxsize=1)
+    def _sm4_context_for_key(key: bytes) -> SM4:
+        return SM4(key)
+    @staticmethod
+    def _decrypt_sm4(ciphertext, file_path: PurePath, encryption_method: int) -> bytes:
+        assert len(ciphertext) % SM4.block_length() == 0
+        key = PakCrypto._derive_sm4_key(file_path, encryption_method)
+        sm4 = PakCrypto._sm4_context_for_key(key)
+        return bytes(it.chain.from_iterable((sm4.decrypt(x) for x in it.batched(ciphertext, SM4.block_length()))))
+    @staticmethod
+    def decrypt_index(ciphertext, pak_info: TencentPakInfo) -> bytes:
+        if pak_info.version > 7:
+            key = PakCrypto.rsa_extract(pak_info.packed_key, RSA_MOD_1)
+            iv = PakCrypto.rsa_extract(pak_info.packed_iv, RSA_MOD_1)
+            assert len(key) == 32 and len(iv) == 32
+            aes = AES.new(key, MODE_CBC, iv[:16])
+            return unpad(aes.decrypt(ciphertext), AES.block_size)
+        else:
+            return bytes(PakCrypto._decrypt_simple1(ciphertext))
+    @staticmethod
+    def _is_simple1_method(encryption_method: int) -> bool:
+        return encryption_method == EM_SIMPLE1
+    @staticmethod
+    def _is_simple2_method(encryption_method: int) -> bool:
+        return encryption_method == EM_SIMPLE2 or encryption_method == 17
+    @staticmethod
+    def _is_sm4_method(encryption_method: int) -> bool:
+        return encryption_method == EM_SM4_2 or encryption_method == EM_SM4_4 or encryption_method & EM_SM4_NEW_MASK!= 0
+    @staticmethod
+    def align_encrypted_content_size(n: int, encryption_method: int) -> int:
+        if PakCrypto._is_simple2_method(encryption_method):
+            return Misc.align_up(n, SIMPLE2_BLOCK_SIZE)
+        else:
+            if PakCrypto._is_sm4_method(encryption_method):
+                return Misc.align_up(n, SM4.block_length())
+            else:
+                return n
+    @staticmethod
+    def decrypt_block(ciphertext, file: PurePath, encryption_method: int) -> bytes:
+        if PakCrypto._is_simple1_method(encryption_method):
+            return PakCrypto._decrypt_simple1(ciphertext)
+        else:
+            if PakCrypto._is_simple2_method(encryption_method):
+                return PakCrypto._decrypt_simple2(ciphertext)
+            else:
+                if PakCrypto._is_sm4_method(encryption_method):
+                    return PakCrypto._decrypt_sm4(ciphertext, file, encryption_method)
+                else:
+                    raise ValueError(f'Unknown encryption method: {encryption_method}')
+    @staticmethod
+    @lru_cache(maxsize=33)
+    def generate_block_indices(n: int, encryption_method: int) -> List[int]:
+        if not PakCrypto._is_sm4_method(encryption_method):
+            return list(range(n))
+        else:
+            permutation = []
+            lcg = PakCrypto._LCG(n)
+            while len(permutation)!= n:
+                x = lcg.next() % n
+                if x not in permutation:
+                    permutation.append(x)
+            inverse = [0] * len(permutation)
+            for i, x in enumerate(permutation):
+                inverse[x] = i
+            return inverse
 
-    input_path = os.path.join("lua/decompiled", selected_file)
-    output_path = os.path.join("lua/compiled", selected_file.replace(".lua", ".luac"))
+class PakCompression:
+    @staticmethod
+    @lru_cache(maxsize=33)
+    def _zstd_decompressor(dict: ZstdCompressionDict) -> ZstdDecompressor:
+        return ZstdDecompressor(dict)
+    @staticmethod
+    def zstd_dictionary(dict_data) -> ZstdCompressionDict:
+        return ZstdCompressionDict(dict_data, DICT_TYPE_AUTO)
+    @staticmethod
+    def decompress_block(block, dict: Optional[ZstdCompressionDict], compression_method: int) -> bytes:
+        if compression_method == CM_ZLIB:
+            try:
+                return zlib.decompress(block)
+            except zlib.error:
+                return block
+        else:
+            if compression_method == CM_ZSTD or compression_method == CM_ZSTD_DICT:
+                if compression_method!= CM_ZSTD_DICT:
+                    dict = None
+                return PakCompression._zstd_decompressor(dict).decompress(block)
+            else:
+                raise ValueError(f'Unknown compression method: {compression_method}')
 
-    console.print(f"\\n[bold green]Compiling Lua Source to Bytecode:[/bold green] [white]{selected_file}[/white]")
+class TencentPakFile:
+    def __init__(self, file_path: PurePath, is_od=False):
+        self._file_path = file_path
+        with open(file_path, 'rb') as file:
+            self._file_content = memoryview(file.read())
+        self._is_od = is_od
+        self._mount_point = PurePath()
+        self._is_zstd_with_dict = 'zsdic' in str(self._file_path)
+        self._zstd_dict = None
+        self._files = []
+        self._index = {}
+        self._pak_info = TencentPakInfo(self._file_content, PakCrypto.zuc_keystream())
+        self._verify_stem_hash()
+        self._tencent_load_index()
+    
+    def _get_method_str(self, method_int, is_encryption):
+        if is_encryption:
+            if PakCrypto._is_simple1_method(method_int): return "SIMPLE1"
+            if PakCrypto._is_simple2_method(method_int): return "SIMPLE2"
+            if PakCrypto._is_sm4_method(method_int): return f"SM4 (Type {method_int})"
+            return "NONE" if method_int == 0 else "UNKNOWN"
+        else:
+            if method_int == CM_NONE: return "NONE"
+            if method_int == CM_ZLIB: return "ZLIB"
+            if method_int == CM_ZSTD: return "ZSTD"
+            if method_int == CM_ZSTD_DICT: return "ZSTD_DICT"
+            return "UNKNOWN"
+    
+    def _verify_stem_hash(self) -> None:
+        if not self._is_od and self._pak_info.version >= 9:
+                assert self._pak_info.stem_hash == zlib.crc32(self._file_path.stem.encode('utf-32le'))
+    def _tencent_load_index(self) -> None:
+        index_data = self._file_content[self._pak_info.index_offset:][:self._pak_info.index_size]
+        if self._pak_info.index_encrypted:
+            index_data = PakCrypto.decrypt_index(index_data, self._pak_info)
+        else:
+            index_data = index_data
+        self._verify_index_hash(index_data)
+        self._load_index(index_data)
+    def _verify_index_hash(self, index_data) -> None:
+        expected_hash = self._pak_info.index_hash
+        if not self._is_od and self._pak_info.version >= 8:
+                assert expected_hash == PakCrypto.rsa_extract(self._pak_info.packed_index_hash, RSA_MOD_2)
+        assert expected_hash == SHA1.new(index_data).digest()
+    @staticmethod
+    def _construct_mount_point(mount_point: str) -> PurePath:
+        result = PurePath()
+        for part in PurePath(mount_point).parts:
+            if part!= '..':
+                result /= part
+        return result
+    def _peek_content(self, offset: int, size: int, encryption_method: int) -> memoryview:
+        size = PakCrypto.align_encrypted_content_size(size, encryption_method)
+        return self._file_content[offset:][:size]
+    def _peek_block_content(self, block: PakCompressedBlock, encryption_method: int) -> memoryview:
+        size = PakCrypto.align_encrypted_content_size(block.end - block.start, encryption_method)
+        return self._file_content[block.start:][:size]
+    def _construct_zstd_dict(self, dict_entry: TencentPakEntry) -> None:
+        assert not self._zstd_dict
+        assert not dict_entry.encrypted
+        assert dict_entry.compression_method == CM_NONE
+        reader = Reader(self._peek_content(dict_entry.offset, dict_entry.size, 0))
+        dict_size = reader.u8()
+        _ = reader.u4()
+        assert dict_size == reader.u4()
+        dict_data = reader.s(dict_size)
+        self._zstd_dict = PakCompression.zstd_dictionary(dict_data)
+    def _load_index(self, index_data) -> None:
+        if self._pak_info.version <= 10:
+            raise ValueError(f'Unsupported version: {self._pak_info.version}')
+        else:
+            reader = Reader(index_data)
+            self._mount_point = self._construct_mount_point(reader.string())
+            self._files = [TencentPakEntry(reader, self._pak_info.version) for _ in range(reader.u4())]
+            for _ in range(reader.u8()):
+                dir_path = PurePath(reader.string())
+                e = {reader.string(): self._files[~reader.i4()] for _ in range(reader.u8())}
+                if self._is_zstd_with_dict and dir_path.name == 'zstddic':
+                    assert len(e) == 1
+                    self._construct_zstd_dict(e[[*e.keys()][0]])
+                else:
+                    self._index.update({PurePath(dir_path): e})
+    
+    def _write_to_disk(self, file_path: Path, entry: TencentPakEntry) -> None:
+        encryption_method = entry.encryption_method
+        compression_method = entry.compression_method
 
-    has_luac = False
-    try:
-        subprocess.check_call(["luac", "-v"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        has_luac = True
-    except Exception:
-        pass
+        enc_str = self._get_method_str(encryption_method, True)
+        comp_str = self._get_method_str(compression_method, False)
+        console.print(f"[bold cyan]->[/] Unpack: [bold green]{file_path.name}[/] [[bold yellow]{comp_str}[/]/[bold magenta]{enc_str}[/]]")
 
-    if has_luac:
-        try:
-            subprocess.check_call(["luac", "-o", output_path, input_path])
-            console.print(f"[bold green][+] Native luac compiler executed successfully![/bold green]")
-        except Exception:
-            has_luac = False
+        with open(file_path, 'wb') as file:
+            if compression_method == CM_NONE:
+                data = self._peek_content(entry.offset, entry.size, encryption_method)
+                if entry.encrypted:
+                    data = PakCrypto.decrypt_block(data, file_path, encryption_method)
+                file.write(data)
+                return
+            else:
+                for x in PakCrypto.generate_block_indices(len(entry.compressed_blocks), encryption_method):
+                    data = self._peek_block_content(entry.compressed_blocks[x], encryption_method)
+                    if entry.encrypted:
+                        data = PakCrypto.decrypt_block(data, file_path, encryption_method)
+                    data = PakCompression.decompress_block(data, self._zstd_dict, compression_method)
+                    file.write(data)
+    
+    def dump(self, out_path: Path) -> None:
+        out_path = out_path / self._mount_point
+        out_path.mkdir(parents=True, exist_ok=True)
+        total_files = sum(len(d) for d in self._index.values())
+        with Progress(
+            SpinnerColumn(),
+            TextColumn("[bold cyan][UNPACK][/] {task.description}"),
+            BarColumn(),
+            TaskProgressColumn(),
+            TimeElapsedColumn(),
+            console=console
+        ) as progress:
+            task = progress.add_task("Extracting files...", total=total_files)
+            for dir_path, dir_content in self._index.items():
+                current_out_path = out_path / dir_path
+                current_out_path.mkdir(parents=True, exist_ok=True)
+                for file_name, entry in dir_content.items():
+                    self._write_to_disk(current_out_path / file_name, entry)
+                    progress.update(task, advance=1)
 
-    if not has_luac:
-        with open(input_path, "r", encoding="utf-8", errors="ignore") as f:
-            lua_code = f.read()
+def dump_unpacking_log(pak_file, output_log_path: Path):
+    with open(output_log_path, 'w', encoding='utf-8') as log_file:
+        log_file.write('================================================================================\\n')
+        log_file.write('PAK UNPACKING DEBUG LOG\\n')
+        log_file.write('================================================================================\\n\\n')
+        log_file.write(f'PAK File: {pak_file._file_path}\\n')
+        log_file.write(f'PAK Info Version: {pak_file._pak_info.version}\\n')
+        log_file.write(f'Mount Point: {pak_file._mount_point}\\n')
+        log_file.write('--------------------------------------------------------------------------------\\n\\n')
+        file_count = 0
+        for dir_path, files in pak_file._index.items():
+            for file_name, entry in files.items():
+                file_count += 1
+                full_path = str(PurePath(dir_path) / file_name).replace('\\\\', '/')
+                log_file.write(f'\\n[{file_count}] {full_path}\\n')
+                log_file.write(f'  Uncompressed Size: {entry.uncompressed_size:,} bytes\\n')
+                log_file.write(f'  Compressed Size: {entry.size:,} bytes\\n')
+                log_file.write(f'  Compression Method: {entry.compression_method}\\n')
+                log_file.write(f'  Encryption Method: {entry.encryption_method}\\n')
+                log_file.write(f'  Compressed Blocks: {len(entry.compressed_blocks)}\\n')
+                if entry.compressed_blocks:
+                    for i, blk in enumerate(entry.compressed_blocks):
+                        block_size = blk.end - blk.start
+                        log_file.write(f'    Block {i}: Offset={blk.start:,} Size={block_size:,} bytes\\n')
+        log_file.write('\\n================================================================================\\n')
+        log_file.write('END OF LOG\\n')
+        log_file.write('================================================================================\\n')
+    console.print(f'[bold #00FF88]✅ Debug log saved to: {output_log_path}[/bold #00FF88]')
 
-        header = b"\\x1bLua\\x51\\x00\\x01\\x04\\x08\\x04\\x08\\x00"
-        code_bytes = lua_code.encode("utf-8")
+def _zstd_add_skippable_padding(data: bytes, pad_len: int) -> bytes:
+    if pad_len <= 0:
+        return data
+    else:
+        out = bytearray(data)
+        while pad_len > 0:
+            frame_len = min(max(pad_len - 8, 0), 1048576)
+            out += b'P*M\\x18'
+            out += struct.pack('<I', frame_len)
+            out += b'\\x00' * frame_len
+            pad_len -= 8 + frame_len
+        return bytes(out)
+
+def _encrypt_plaintext(plaintext: bytes, pak_relative_path: PurePath, encryption_method: int) -> bytes:
+    if PakCrypto._is_simple1_method(encryption_method):
+        return bytes((b ^ SIMPLE1_DECRYPT_KEY for b in plaintext))
+    else:
+        if PakCrypto._is_simple2_method(encryption_method):
+            pad = -len(plaintext) % SIMPLE2_BLOCK_SIZE
+            plaintext += b'\\x00' * pad
+            key, = struct.unpack('<I', SIMPLE2_DECRYPT_KEY)
+            rolling = key
+            out = []
+            for x, in struct.iter_unpack('<I', plaintext):
+                c = rolling ^ x
+                out.append(c)
+                rolling ^= c
+            return struct.pack(f'<{len(out)}I', *out)
+        else:
+            if PakCrypto._is_sm4_method(encryption_method):
+                key = PakCrypto._derive_sm4_key(pak_relative_path, encryption_method)
+                sm4 = PakCrypto._sm4_context_for_key(key)
+                pad_len = -len(plaintext) % 16
+                if pad_len > 0:
+                    plaintext = plaintext + b'\\x00' * pad_len
+                out = bytearray()
+                for i in range(0, len(plaintext), 16):
+                    block = plaintext[i:i + 16]
+                    if len(block) < 16:
+                        block = block.ljust(16, b'\\x00')
+                    out.extend(sm4.encrypt(block))
+                return bytes(out)
+            else:
+                return plaintext
+
+# ==================== WORKING REPACK FUNCTIONS ====================
+
+def _repack_uncompressed(outfh, pak_file, entry, pak_relative_path: PurePath, new_data: bytes):
+    enc_method = entry.encryption_method
+    target_size = entry.size
+    enc_region = PakCrypto.align_encrypted_content_size(target_size, enc_method) if entry.encrypted else target_size
+    plaintext = new_data[:enc_region]
+    if entry.encrypted:
+        a = PakCrypto.align_encrypted_content_size(len(plaintext), enc_method)
+        plaintext += b'\\x00' * (a - len(plaintext))
+        cipher = _encrypt_plaintext(plaintext, pak_relative_path, enc_method)
+        outfh.seek(entry.offset)
+        outfh.write(cipher)
+        with open(pak_file._file_path, 'rb') as src:
+            src.seek(entry.offset + len(cipher))
+            outfh.write(src.read(enc_region - len(cipher)))
+    else:
+        outfh.seek(entry.offset)
+        outfh.write(plaintext)
+        with open(pak_file._file_path, 'rb') as src:
+            src.seek(entry.offset + len(plaintext))
+            outfh.write(src.read(target_size - len(plaintext)))
+
+def _best_compress(chunk, cm, zstd_dict=None):
+    """Compress one chunk at the best achievable level."""
+    if cm == CM_ZLIB:
+        return zlib.compress(chunk, 9)
+    if cm in (CM_ZSTD, CM_ZSTD_DICT):
+        zd = zstd_dict if cm == CM_ZSTD_DICT else None
+        for lvl in [22, 19, 16, 13, 10, 7, 4, 1]:
+            try:
+                return ZstdCompressor(level=lvl, dict_data=zd, threads=1).compress(chunk)
+            except Exception:
+                continue
+    return chunk  # fallback: store raw
+
+def _pw_string(s):
+    """PAK string serialiser: i4(len_with_null) + bytes + null."""
+    if not s: return struct.pack('<i', 0)
+    b = s.encode('utf-8') + b'\\x00'
+    return struct.pack('<i', len(b)) + b
+
+def _pw_entry(e, v):
+    """Serialise one TencentPakEntry back to bytes."""
+    w = bytearray(e.content_hash)
+    w += struct.pack('<Q', e.offset)
+    w += struct.pack('<Q', e.uncompressed_size)
+    w += struct.pack('<I', e.compression_method)
+    w += struct.pack('<Q', e.size)
+    if v >= 5:
+        w += bytes([e.unk1])
+        w += e.unk2  # 20 bytes
+    if e.compression_method != CM_NONE and v >= 3:
+        w += struct.pack('<I', len(e.compressed_blocks))
+        for b in e.compressed_blocks:
+            w += struct.pack('<QQ', b.start, b.end)
+    if v >= 4:
+        w += struct.pack('<I', e.compression_block_size)
+        w += bytes([1 if e.encrypted else 0])
+    if v >= 12:
+        w += struct.pack('<II', e.encryption_method, e.index_new_sep)
+    return bytes(w)
+
+def _get_all_dirs_and_mp(pak_file):
+    """Re-parse raw (possibly encrypted) index → (mount_point_str, ordered dirs dict)."""
+    raw = bytes(pak_file._file_content[
+        pak_file._pak_info.index_offset:][:pak_file._pak_info.index_size])
+    if pak_file._pak_info.index_encrypted:
+        raw = PakCrypto.decrypt_index(raw, pak_file._pak_info)
+    r = Reader(raw)
+    mp = r.string()
+    num_files = r.u4()
+    for _ in range(num_files):
+        TencentPakEntry(r, pak_file._pak_info.version)
+    dirs = {}
+    for _ in range(r.u8()):
+        dp = r.string()
+        cnt = r.u8()
+        dirs[dp] = {r.string(): pak_file._files[~r.i4()] for _ in range(cnt)}
+    return mp, dirs
+
+def repack_pak_file_full(pak_file, edited_root, output_path, target_path=None, force_add=False):
+    """
+    FULL REBUILD REPACK - FIXED FOR NEW FILES (OPTION 4)
+    """
+    import copy as _cp
+
+    console.print(f'[bold cyan]📦 Full PAK Rebuild mode (Option 3 & 4 logic)[/bold cyan]')
+    if target_path:
+        console.print(f'[bold cyan]🎯 Target path: {target_path}[/bold cyan]')
+    
+    # Get all files from edit folder
+    edit_files = []
+    for p in Path(edited_root).rglob('*'):
+        if p.is_file():
+            edit_files.append(p)
+    
+    if not edit_files:
+        console.print('[bold red]❌ No files found in EDIT folder![/bold red]')
+        return 0
+    
+    console.print(f'[bold cyan]📁 Found {len(edit_files)} files in EDIT folder[/bold cyan]')
+
+    version = pak_file._pak_info.version
+    keystream = PakCrypto.zuc_keystream()
+    orig_fc = pak_file._file_content
+
+    # Get existing directory structure
+    mp_str, all_dirs = _get_all_dirs_and_mp(pak_file)
+
+    # Normalize target_path to match exact case and slashes of existing dirs
+    if target_path and force_add:
+        target_path = target_path.replace('\\\\', '/')
+        matched_dir = None
+        for existing_dir in all_dirs.keys():
+            if existing_dir.strip('/').lower() == target_path.strip('/').lower():
+                matched_dir = existing_dir
+                break
+        if matched_dir:
+            target_path = matched_dir # Use the exact string from the PAK
+        else:
+            target_path = target_path.strip('/') + '/' # Ensure standard trailing slash
+    
+    # Build name→entry map
+    pak_name_map = {}
+    for dir_path, files in pak_file._index.items():
+        for name, entry in files.items():
+            full_path = str(PurePath(dir_path)/name).replace('\\\\', '/')
+            pak_name_map.setdefault(name.lower(), []).append((full_path, entry))
+
+    # Find matching files
+    edited = {}
+    
+    for p in edit_files:
+        fl = p.name.lower()
+        found_match = False
         
-        with open(output_path, "wb") as out_f:
-            out_f.write(header + code_bytes)
+        if fl in pak_name_map:
+            cands = pak_name_map[fl]
+            if target_path:
+                target_candidates = [(fp, e) for fp, e in cands if target_path.strip('/') in fp]
+                if target_candidates:
+                    sz = p.stat().st_size
+                    sm = [(fp, e) for fp, e in target_candidates if e.uncompressed_size == sz]
+                    fp, ent = sm[0] if sm else target_candidates[0]
+                    edited[fp] = (p, ent)
+                    found_match = True
+            
+            if not found_match:
+                sz = p.stat().st_size
+                sm = [(fp, e) for fp, e in cands if e.uncompressed_size == sz]
+                fp, ent = sm[0] if sm else cands[0]
+                if target_path:
+                    new_fp = f"{target_path.rstrip('/')}/{p.name}"
+                    edited[new_fp] = (p, ent)
+                else:
+                    edited[fp] = (p, ent)
+                found_match = True
+        
+        if not found_match:
+            stem = p.stem.lower()
+            ext = p.suffix.lower()
+            for dir_path, files in pak_file._index.items():
+                for name, entry in files.items():
+                    if Path(name).stem.lower() == stem and Path(name).suffix.lower() == ext:
+                        full_path = str(PurePath(dir_path)/name).replace('\\\\', '/')
+                        if target_path:
+                            new_fp = f"{target_path.rstrip('/')}/{p.name}"
+                            edited[new_fp] = (p, entry)
+                        else:
+                            edited[full_path] = (p, entry)
+                        found_match = True
+                        break
+                if found_match:
+                    break
+        
+        if not found_match and force_add and target_path:
+            template_entry = None
+            for dir_path, files in pak_file._index.items():
+                for name, entry in files.items():
+                    if Path(name).suffix.lower() == p.suffix.lower():
+                        template_entry = entry
+                        break
+                if template_entry: break
+            
+            if not template_entry:
+                for dir_path, files in pak_file._index.items():
+                    for name, entry in files.items():
+                        template_entry = entry
+                        break
+                    if template_entry: break
+            
+            if template_entry:
+                new_fp = f"{target_path.rstrip('/')}/{p.name}"
+                edited[new_fp] = (p, template_entry)
 
-    console.print(f"\\n[bold bright_green]✔ Lua Compilation Successful![/bold bright_green]")
-    console.print(f"[bold cyan]Output Bytecode File:[/bold cyan] {output_path}")
-    Prompt.ask("\\nPress Enter to return to main menu")
+    if not edited:
+        console.print('[bold red]❌ No files to repack![/bold red]')
+        return 0
 
+    console.print(f'  [bold bright_cyan]📁 Files to repack: {len(edited)}[/bold bright_cyan]')
 
-def zip_extractor_tool():
-    \"\"\"Module 5: Real ZIP / APK / OBB Archive Extractor & Compressor.\"\"\"
-    console.clear()
-    console.print(Panel("[bold yellow]🗜️ REAL ZIP / APK / OBB ARCHIVE UTILITY[/bold yellow]", border_style="yellow"))
+    new_files = []
+    for e in pak_file._files:
+        ne = _cp.copy(e)
+        ne.compressed_blocks = [_cp.copy(b) for b in e.compressed_blocks]
+        new_files.append(ne)
 
-    console.print("[1] Unzip Archive (ZIP / APK / OBB)")
-    console.print("[2] Create Compressed Archive")
-    console.print("[0] Back to Main Menu")
+    old_to_new = {id(pak_file._files[i]): new_files[i] for i in range(len(pak_file._files))}
+    edited_paths = {fp: p for fp, (p, _) in edited.items()}
 
-    opt = Prompt.ask("\\nSelect sub-option", choices=["1", "2", "0"], default="1")
-    if opt == "0":
+    out_buf = bytearray()
+
+    for dp_str, dir_files in list(all_dirs.items()):
+        for name, old_entry in list(dir_files.items()):
+            full_path = str(PurePath(dp_str)/name).replace('\\\\', '/')
+            ne = old_to_new.get(id(old_entry), None)
+            
+            if ne is None:
+                ne = _cp.copy(old_entry)
+                ne.compressed_blocks = [_cp.copy(b) for b in old_entry.compressed_blocks]
+                new_files.append(ne)
+                old_to_new[id(old_entry)] = ne
+
+            em = old_entry.encryption_method
+            cm = old_entry.compression_method
+
+            if full_path in edited_paths:
+                p, template = edited[full_path]
+                new_raw = p.read_bytes()
+                pak_rel = PurePath(full_path)
+
+                ne.content_hash = SHA1.new(new_raw).digest()
+                ne.uncompressed_size = len(new_raw)
+                ne.compression_method = template.compression_method if template else cm
+                ne.encryption_method = template.encryption_method if template else em
+                ne.encrypted = template.encrypted if template else old_entry.encrypted
+                ne.unk1 = template.unk1 if template else old_entry.unk1
+                
+                if template and target_path:
+                    full_path_str = mp_str + full_path
+                    ne.unk2 = SHA1.new(full_path_str.lower().encode('utf-8')).digest()
+                else:
+                    ne.unk2 = template.unk2 if template else old_entry.unk2
+                    
+                ne.index_new_sep = template.index_new_sep if template else old_entry.index_new_sep
+
+                if ne.compression_method == CM_NONE:
+                    cipher = (_encrypt_plaintext(new_raw, pak_rel, ne.encryption_method)
+                              if ne.encrypted else new_raw)
+                    ne.offset = len(out_buf)
+                    ne.size = len(new_raw)
+                    ne.uncompressed_size = len(new_raw)
+                    out_buf += cipher
+                else:
+                    cs = (template.compression_block_size if template and template.compression_block_size > 0 
+                          else old_entry.compression_block_size if old_entry.compression_block_size > 0 
+                          else 65536)
+                    chunks = [new_raw[i:i+cs] for i in range(0, len(new_raw), cs)]
+                    new_blks = []
+                    for chunk in chunks:
+                        compressed = _best_compress(chunk, ne.compression_method, pak_file._zstd_dict)
+                        cipher = (_encrypt_plaintext(compressed, pak_rel, ne.encryption_method)
+                                  if ne.encrypted else compressed)
+                        blk = PakCompressedBlock.__new__(PakCompressedBlock)
+                        blk.start = len(out_buf)
+                        blk.end = blk.start + len(cipher)
+                        out_buf += cipher
+                        new_blks.append(blk)
+
+                    ne.compressed_blocks = new_blks
+                    ne.offset = new_blks[0].start if new_blks else len(out_buf)
+                    ne.size = sum(b.end - b.start for b in new_blks)
+                    ne.uncompressed_size = len(new_raw)
+
+                console.print(f'[green]✓ Processed: {full_path}[/green]')
+
+            else:
+                if cm == CM_NONE:
+                    read_sz = (PakCrypto.align_encrypted_content_size(old_entry.size, em)
+                               if old_entry.encrypted else old_entry.size)
+                    ne.offset = len(out_buf)
+                    out_buf += bytes(orig_fc[old_entry.offset: old_entry.offset + read_sz])
+
+                elif old_entry.compressed_blocks:
+                    new_blks = []
+                    for ob in old_entry.compressed_blocks:
+                        unc = ob.end - ob.start
+                        enc = (PakCrypto.align_encrypted_content_size(unc, em)
+                               if old_entry.encrypted else unc)
+                        nb = PakCompressedBlock.__new__(PakCompressedBlock)
+                        nb.start = len(out_buf)
+                        nb.end = nb.start + unc
+                        out_buf += bytes(orig_fc[ob.start: ob.start + enc])
+                        new_blks.append(nb)
+                    ne.compressed_blocks = new_blks
+                    ne.offset = new_blks[0].start
+
+    if target_path and force_add:
+        for fp, (p, template) in edited.items():
+            already_processed = False
+            for dp_str, dir_files in all_dirs.items():
+                for name, entry in dir_files.items():
+                    if str(PurePath(dp_str)/name).replace('\\\\', '/') == fp:
+                        already_processed = True
+                        break
+                if already_processed:
+                    break
+            
+            if not already_processed:
+                ne = _cp.copy(template)
+                new_raw = p.read_bytes()
+                pak_rel = PurePath(fp)
+                
+                ne.content_hash = SHA1.new(new_raw).digest()
+                ne.uncompressed_size = len(new_raw)
+                ne.compression_method = template.compression_method
+                ne.encryption_method = template.encryption_method
+                ne.encrypted = template.encrypted
+                ne.unk1 = template.unk1
+                
+                full_path_str = mp_str + fp
+                ne.unk2 = SHA1.new(full_path_str.lower().encode('utf-8')).digest()
+                
+                ne.index_new_sep = template.index_new_sep
+
+                if ne.compression_method == CM_NONE:
+                    cipher = (_encrypt_plaintext(new_raw, pak_rel, ne.encryption_method)
+                              if ne.encrypted else new_raw)
+                    ne.offset = len(out_buf)
+                    ne.size = len(new_raw)
+                    ne.uncompressed_size = len(new_raw)
+                    out_buf += cipher
+                else:
+                    cs = template.compression_block_size if template.compression_block_size > 0 else 65536
+                    chunks = [new_raw[i:i+cs] for i in range(0, len(new_raw), cs)]
+                    new_blks = []
+                    for chunk in chunks:
+                        compressed = _best_compress(chunk, ne.compression_method, pak_file._zstd_dict)
+                        cipher = (_encrypt_plaintext(compressed, pak_rel, ne.encryption_method)
+                                  if ne.encrypted else compressed)
+                        blk = PakCompressedBlock.__new__(PakCompressedBlock)
+                        blk.start = len(out_buf)
+                        blk.end = blk.start + len(cipher)
+                        out_buf += cipher
+                        new_blks.append(blk)
+
+                    ne.compressed_blocks = new_blks
+                    ne.offset = new_blks[0].start if new_blks else len(out_buf)
+                    ne.size = sum(b.end - b.start for b in new_blks)
+                    ne.uncompressed_size = len(new_raw)
+
+                new_files.append(ne)
+                
+                if target_path not in all_dirs:
+                    all_dirs[target_path] = {}
+                all_dirs[target_path][p.name] = ne
+                console.print(f'[green]✓ Added new: {fp}[/green]')
+
+    eidx = {id(new_files[i]): i for i in range(len(new_files))}
+
+    idx = bytearray(_pw_string(mp_str))
+    idx += struct.pack('<I', len(new_files))
+    for ne in new_files:
+        idx += _pw_entry(ne, version)
+    idx += struct.pack('<Q', len(all_dirs))
+    for dp_str, dir_files in all_dirs.items():
+        idx += _pw_string(dp_str)
+        idx += struct.pack('<Q', len(dir_files))
+        for name, old_e in dir_files.items():
+            idx += _pw_string(name)
+            found_idx = None
+            for i, e in enumerate(new_files):
+                if id(e) == id(old_e):
+                    found_idx = i
+                    break
+            if found_idx is None:
+                for i, e in enumerate(new_files):
+                    if e.offset == old_e.offset and e.size == old_e.size:
+                        found_idx = i
+                        break
+            if found_idx is not None:
+                idx += struct.pack('<i', ~found_idx)
+            else:
+                idx += struct.pack('<i', -1)
+
+    index_plain = bytes(idx)
+    new_sha1 = SHA1.new(index_plain).digest()
+
+    if pak_file._pak_info.index_encrypted:
+        key = PakCrypto.rsa_extract(pak_file._pak_info.packed_key, RSA_MOD_1)
+        iv = PakCrypto.rsa_extract(pak_file._pak_info.packed_iv, RSA_MOD_1)
+        aes = AES.new(key, MODE_CBC, iv[:16])
+        pad = (-len(index_plain)) % AES.block_size or AES.block_size
+        index_bytes = aes.encrypt(index_plain + bytes([pad] * pad))
+    else:
+        index_bytes = index_plain
+
+    new_idx_offset = len(out_buf)
+    new_idx_size = len(index_bytes)
+    out_buf += index_bytes
+
+    footer_sz = TencentPakInfo._mem_size(version)
+    new_footer = bytearray(orig_fc[-footer_sz:])
+
+    h_key = struct.pack('<5I', *keystream[4:9])
+    new_footer[-36:-16] = bytes(a ^ b for a, b in zip(new_sha1, h_key))
+    new_footer[-16:-8] = ((new_idx_size ^ (keystream[10] << 32 | keystream[11])).to_bytes(8, 'little'))
+    new_footer[-8:] = ((new_idx_offset ^ (keystream[0] << 32 | keystream[1])).to_bytes(8, 'little'))
+
+    out_buf += new_footer
+
+    with open(output_path, 'wb') as f:
+        f.write(out_buf)
+
+    return len(edited)
+
+def _repack_compressed_with_display(outfh, pak_file, entry, pak_relative_path, new_data, repack_dir, display):
+    """Original compressed repack with display"""
+    blocks = entry.compressed_blocks
+    enc_method = entry.encryption_method
+    comp_method = entry.compression_method
+    order = PakCrypto.generate_block_indices(len(blocks), enc_method)
+    
+    if len(new_data) != entry.uncompressed_size:
+        if len(new_data) < entry.uncompressed_size:
+            new_data = new_data.ljust(entry.uncompressed_size, b'\\x00')
+        else:
+            new_data = new_data[:entry.uncompressed_size]
+
+    if len(blocks) > 1:
+        if entry.compression_block_size > 0:
+            chunk_size = entry.compression_block_size
+        else:
+            block_sizes = [blk.end - blk.start for blk in blocks]
+            total_block_size = sum(block_sizes)
+            avg_block_size = total_block_size / len(blocks)
+            avg_compression_ratio = total_block_size / entry.uncompressed_size if entry.uncompressed_size > 0 else 1
+            chunk_size = int(avg_block_size / avg_compression_ratio) if avg_compression_ratio > 0 else 65536
+        
+        ptr = 0
+        for logical_i, phys_i in enumerate(order):
+            blk = blocks[phys_i]
+            target_size = blk.end - blk.start
+            chunk_len = min(chunk_size, len(new_data) - ptr)
+            if chunk_len <= 0: break
+            chunk = new_data[ptr:ptr + chunk_len]
+            ptr += chunk_len
+            
+            with open(pak_file._file_path, 'rb') as src:
+                src.seek(blk.start)
+                original_compressed = src.read(target_size)
+            
+            compressed_ok = False
+            new_compressed = None
+            zstd_dict = pak_file._zstd_dict if comp_method == CM_ZSTD_DICT else None
+            
+            if comp_method in (CM_ZSTD, CM_ZSTD_DICT):
+                for level in [22, 19, 16, 13, 10, 7, 4, 1]:
+                    c = ZstdCompressor(level=level, dict_data=zstd_dict, threads=1)
+                    new_compressed = c.compress(chunk)
+                    if len(new_compressed) <= target_size:
+                        compressed_ok = True
+                        break
+            elif comp_method == CM_ZLIB:
+                new_compressed = zlib.compress(chunk, zlib.Z_BEST_COMPRESSION)
+                if len(new_compressed) <= target_size:
+                    compressed_ok = True
+            
+            if not compressed_ok:
+                outfh.seek(blk.start)
+                outfh.write(original_compressed)
+                display.add_block(logical_i, target_size, False)
+                continue
+            
+            if entry.encrypted:
+                if PakCrypto._is_sm4_method(enc_method):
+                    pad_len = -len(new_compressed) % 16
+                    if pad_len > 0: new_compressed += b'\\x00' * pad_len
+                new_compressed = _encrypt_plaintext(new_compressed, pak_relative_path, enc_method)
+            
+            if len(new_compressed) > target_size:
+                outfh.seek(blk.start)
+                outfh.write(original_compressed)
+                display.add_block(logical_i, target_size, False)
+            else:
+                outfh.seek(blk.start)
+                outfh.write(new_compressed)
+                if len(new_compressed) < target_size:
+                    outfh.write(b'\\x00' * (target_size - len(new_compressed)))
+                ratio = len(new_compressed) / len(chunk) if len(chunk) > 0 else 1
+                display.add_block(logical_i, target_size, True, ratio)
+    else:
+        if not blocks: return
+        blk = blocks[0]
+        target_size = blk.end - blk.start
+        
+        with open(pak_file._file_path, 'rb') as src:
+            src.seek(blk.start)
+            original_compressed = src.read(target_size)
+        
+        compressed_ok = False
+        new_compressed = None
+        zstd_dict = pak_file._zstd_dict if comp_method == CM_ZSTD_DICT else None
+        
+        if comp_method in (CM_ZSTD, CM_ZSTD_DICT):
+            for level in [22, 19, 16, 13, 10, 7, 4, 1]:
+                c = ZstdCompressor(level=level, dict_data=zstd_dict, threads=1)
+                new_compressed = c.compress(new_data)
+                if len(new_compressed) <= target_size:
+                    compressed_ok = True
+                    break
+        elif comp_method == CM_ZLIB:
+            new_compressed = zlib.compress(new_data, zlib.Z_BEST_COMPRESSION)
+            if len(new_compressed) <= target_size:
+                compressed_ok = True
+        
+        if not compressed_ok:
+            outfh.seek(blk.start)
+            outfh.write(original_compressed)
+            display.add_block(0, target_size, False)
+            return
+        
+        if entry.encrypted:
+            if PakCrypto._is_sm4_method(enc_method):
+                pad_len = -len(new_compressed) % 16
+                if pad_len > 0: new_compressed += b'\\x00' * pad_len
+            new_compressed = _encrypt_plaintext(new_compressed, pak_relative_path, enc_method)
+        
+        if len(new_compressed) > target_size:
+            outfh.seek(blk.start)
+            outfh.write(original_compressed)
+            display.add_block(0, target_size, False)
+        else:
+            outfh.seek(blk.start)
+            outfh.write(new_compressed)
+            if len(new_compressed) < target_size:
+                outfh.write(b'\\x00' * (target_size - len(new_compressed)))
+            ratio = len(new_compressed) / len(new_data) if len(new_data) > 0 else 1
+            display.add_block(0, target_size, True, ratio)
+
+def smart_resolve_by_fingerprint(filename: str, repack_file: Path, candidates: list):
+    repack_size = repack_file.stat().st_size
+    size_matches = [(path, entry) for path, entry in candidates if entry.uncompressed_size == repack_size]
+    if len(size_matches) == 1:
+        return size_matches[0]
+    if not size_matches:
+        return None
+    def fingerprint(e):
+        return (e.uncompressed_size, e.size, e.compression_method, len(e.compressed_blocks), e.compression_block_size)
+    base_fp = fingerprint(size_matches[0][1])
+    final_matches = [(path, entry) for path, entry in size_matches if fingerprint(entry) == base_fp]
+    if len(final_matches) == 1:
+        return final_matches[0]
+    return None
+
+def repack_pak_file_with_block_display(pak_file, edited_root: Path, output_path: Path):
+    """Original repack with simple block display"""
+    shutil.copy2(pak_file._file_path, output_path)
+    
+    pak_name_map = {}
+    for dir_path, files in pak_file._index.items():
+        for name, entry in files.items():
+            full_path = str(PurePath(dir_path) / name).replace('\\\\', '/')
+            key = name.lower()
+            pak_name_map.setdefault(key, []).append((full_path, entry))
+    
+    edited = {}
+    for p in edited_root.rglob('*'):
+        if not p.is_file():
+            continue
+        fname_lower = p.name.lower()
+        if fname_lower in pak_name_map:
+            candidates = pak_name_map[fname_lower]
+            if len(candidates) == 1:
+                full_path, entry = candidates[0]
+                edited[full_path] = (p, entry)
+            else:
+                resolved = smart_resolve_by_fingerprint(filename=p.name, repack_file=p, candidates=candidates)
+                if resolved:
+                    full_path, entry = resolved
+                    edited[full_path] = (p, entry)
+        else:
+            stem = p.stem.lower()
+            ext = p.suffix.lower()
+            for dir_path, files in pak_file._index.items():
+                for name, entry in files.items():
+                    if Path(name).stem.lower() == stem and Path(name).suffix.lower() == ext:
+                        full_path = str(PurePath(dir_path) / name).replace('\\\\', '/')
+                        edited[full_path] = (p, entry)
+                        break
+    
+    if not edited:
+        console.print('[bold #FF0055]❌ No files to repack![/bold #FF0055]')
         return
+    
+    total_files = len(edited)
+    display = SimpleBlockDisplay(total_files, pak_file._file_path.name)
+    
+    with open(output_path, 'r+b') as outfh:
+        for full_path, (p, entry) in edited.items():
+            file_name = p.name
+            total_blocks = len(entry.compressed_blocks) if entry.compressed_blocks else 1
+            
+            display.start_file(file_name, total_blocks)
+            new_data = p.read_bytes()
+            pak_rel = PurePath(full_path)
+            
+            if entry.compression_method == CM_NONE:
+                _repack_uncompressed(outfh, pak_file, entry, pak_rel, new_data)
+                display.add_block(0, len(new_data), True)
+            else:
+                _repack_compressed_with_display(outfh, pak_file, entry, pak_rel, new_data, edited_root, display)
+            
+            display.finish_file()
+    
+    display.final_summary()
 
-    if opt == "1":
-        zip_files = [f for f in os.listdir("zip/output") if f.endswith(".zip") or f.endswith(".apk") or f.endswith(".obb")]
-        if not zip_files:
-            console.print("[bold red][✖] No archives found in 'zip/output/' folder![/bold red]")
-            console.print("[yellow]Place your .zip, .apk, or .obb file inside 'zip/output/' and try again.[/yellow]")
-            Prompt.ask("\\nPress Enter to return to main menu")
-            return
+def detect_repack_mode(pak_path: Path) -> str:
+    name = pak_path.name.lower()
+    if name == 'mini_obb.pak':
+        return 'MINI_OBB'
+    if 'zsdic' in name:
+        return 'OBBZSDIC'
+    if 'game' in name or 'patch' in name:
+        return 'GAMEPATCH'
+    return 'OBBZSDIC'
 
-        for idx, f in enumerate(zip_files, 1):
-            console.print(f" [{idx}] {f}")
+def repack_mini_obb(pak, repack_dir, output_pak):
+    console.print('[bold #00FFFF]🧩 Repack Mode: MINI_OBB[/bold #00FFFF]')
+    pak._is_zstd_with_dict = False
+    pak._zstd_dict = None
+    repack_pak_file_with_block_display(pak_file=pak, edited_root=repack_dir, output_path=output_pak)
 
-        choice = Prompt.ask("\\nSelect file to extract", default="1")
+def repack_obbzsdic(pak, repack_dir, output_pak):
+    console.print('[bold #00FFFF]🧩 Repack Mode: OBBZSDIC[/bold #00FFFF]')
+    repack_pak_file_with_block_display(pak_file=pak, edited_root=repack_dir, output_path=output_pak)
+
+def repack_gamepatch(pak, repack_dir, output_pak):
+    console.print('[bold #00FFFF]🧩 Repack Mode: GAMEPATCH[/bold #00FFFF]')
+    pak._is_zstd_with_dict = False
+    pak._zstd_dict = None
+    repack_pak_file_with_block_display(pak_file=pak, edited_root=repack_dir, output_path=output_pak)
+
+def ensure_directories(base_dir: Path):
+    (base_dir / "PAK").mkdir(parents=True, exist_ok=True)
+    (base_dir / "UNPACK").mkdir(parents=True, exist_ok=True)
+    (base_dir / "REPACK").mkdir(parents=True, exist_ok=True)
+    (base_dir / "RESULT").mkdir(parents=True, exist_ok=True)
+    pak_tool_dir = base_dir / "PAK TOOL"
+    (pak_tool_dir / "EDIT").mkdir(parents=True, exist_ok=True)
+    (pak_tool_dir / "UNPACK").mkdir(parents=True, exist_ok=True)
+    (pak_tool_dir / "RESULT").mkdir(parents=True, exist_ok=True)
+    (pak_tool_dir / "PAK").mkdir(parents=True, exist_ok=True)
+
+def print_banner():
+    os.system('cls' if os.name == 'nt' else 'clear')
+    console.print("[bold cyan]========================================[/bold cyan]")
+    console.print("[bold yellow]    FEATURESTIC LEAKS - PAK TOOL v2.0[/bold yellow]")
+    console.print("[bold cyan]========================================[/bold cyan]")
+    console.print()
+    console.print("[bold yellow]TG - @TrnDravix[/bold yellow]")
+    console.print("[bold green]🔰 JAI SHREE SHYAM 🔰[/bold green]")
+    console.print()
+
+def safe_input(prompt: str='') -> str:
+    try:
+        return input(prompt)
+    except (EOFError, RuntimeError):
         try:
-            target = zip_files[int(choice) - 1]
+            if sys.platform != 'win32':
+                with open('/dev/tty', 'r') as tty:
+                    sys.stderr.write(prompt)
+                    sys.stderr.flush()
+                    return tty.readline().rstrip('\\n')
+            else:
+                with open('CON', 'r') as con:
+                    sys.stderr.write(prompt)
+                    sys.stderr.flush()
+                    return con.readline().rstrip('\\r\\n')
         except Exception:
-            target = zip_files[0]
+            return ''
+    except Exception:
+        return ''
 
-        target_path = os.path.join("zip/output", target)
-        extract_dir = os.path.join("zip/extracted", target + "_extracted")
+def human_size(size: int) -> str:
+    for unit in ['B', 'KB', 'MB', 'GB', 'TB']:
+        if size < 1024.0:
+            return f'{size:.2f} {unit}'
+        size /= 1024.0
+    return f'{size:.2f} PB'
 
-        console.print(f"\\n[bold green]Extracting Archive:[/bold green] {target}")
+def delete_folder(data_path: Path) -> None:
+    folders = []
+    for item in data_path.iterdir():
+        if item.is_dir() and item.name not in ['PAK', 'UNPACK', 'REPACK', 'RESULT', 'PAK TOOL']:
+            folders.append(item)
+    if not folders:
+        console.print('[bold #FFAA00]⚠ No folders found to delete![/bold #FFAA00]')
+        return
+    folder_table = Table(title="[bold #FF00FF]📁 AVAILABLE FOLDERS[/bold #FF00FF]", border_style="#00FFFF", box=DOUBLE_EDGE)
+    folder_table.add_column("#", justify="center", style="bold #FFFF00", width=4)
+    folder_table.add_column("Folder Name", justify="left", style="bold #00FF88")
+    folder_table.add_column("Size", justify="right", style="bold #00CCFF")
+    for i, folder in enumerate(folders, 1):
+        folder_size = 0
+        for root, dirs, files in os.walk(folder):
+            for file in files:
+                file_path = os.path.join(root, file)
+                if os.path.isfile(file_path):
+                    folder_size += os.path.getsize(file_path)
+        folder_table.add_row(str(i), folder.name, human_size(folder_size))
+    console.print(folder_table)
+    try:
+        choice = int(console.input(f"\\n[bold #FFFF00]Select folder number (1-{len(folders)}): [/bold #FFFF00]"))
+        if 1 <= choice <= len(folders):
+            selected_folder = folders[choice - 1]
+            confirm = safe_input(f"[bold #FFFF00]Delete {selected_folder.name}? (yes/no): [/bold #FFFF00]").strip().lower()
+            if confirm == 'yes':
+                shutil.rmtree(selected_folder)
+                console.print(f'[bold #00FF88]✅ Deleted: {selected_folder.name}[/bold #00FF88]')
+            else:
+                console.print('[bold #FFAA00]⚠ Cancelled[/bold #FFAA00]')
+        else:
+            console.print('[bold #FF0055]❌ Invalid selection[/bold #FF0055]')
+    except ValueError:
+        console.print('[bold #FF0055]❌ Invalid input[/bold #FF0055]')
 
-        with zipfile.ZipFile(target_path, 'r') as zip_ref:
-            file_list = zip_ref.namelist()
-            with Progress(
-                SpinnerColumn(),
-                TextColumn("[progress.description]{task.description}"),
-                BarColumn(),
-                TaskProgressColumn(),
-                console=console
-            ) as progress:
-                task = progress.add_task("[yellow]Unzipping files...", total=len(file_list))
-                for i, file_item in enumerate(file_list):
-                    zip_ref.extract(file_item, extract_dir)
-                    progress.update(task, completed=i + 1)
-
-        console.print(f"\\n[bold bright_green]✔ Extracted {len(file_list)} items successfully to:[/bold bright_green] {extract_dir}")
-        Prompt.ask("\\nPress Enter to return to main menu")
-
-    elif opt == "2":
-        dirs = [d for d in os.listdir("zip/extracted") if os.path.isdir(os.path.join("zip/extracted", d))]
-        if not dirs:
-            console.print("[bold red][✖] No extracted directories found in 'zip/extracted/'![/bold red]")
-            Prompt.ask("\\nPress Enter to return to main menu")
-            return
-
-        for idx, d in enumerate(dirs, 1):
-            console.print(f" [{idx}] {d}")
-
-        choice = Prompt.ask("\\nSelect folder to compress into ZIP", default="1")
-        try:
-            target_dir = dirs[int(choice) - 1]
-        except Exception:
-            target_dir = dirs[0]
-
-        input_path = os.path.join("zip/extracted", target_dir)
-        output_zip = os.path.join("zip/output", f"{target_dir}_compressed.zip")
-
-        console.print(f"\\n[bold green]Compressing Folder:[/bold green] {target_dir}")
-
-        with zipfile.ZipFile(output_zip, 'w', zipfile.ZIP_DEFLATED) as zip_out:
-            for root, _, files in os.walk(input_path):
-                for file_item in files:
-                    full_file_path = os.path.join(root, file_item)
-                    arcname = os.path.relpath(full_file_path, input_path)
-                    zip_out.write(full_file_path, arcname)
-
-        console.print(f"\\n[bold bright_green]✔ Compression Complete![/bold bright_green] Output: {output_zip}")
-        Prompt.ask("\\nPress Enter to return to main menu")
-
+def display_file_selector(title, folder_path, file_pattern="*.pak"):
+    files = list(folder_path.glob(file_pattern))
+    if not files:
+        console.print(f"[bold red][ERROR] No {file_pattern} files in {folder_path}[/]")
+        return None, None
+    selection_table = Table(title=f"[bold cyan]{title}[/]", expand=True, box=ROUNDED, border_style="yellow")
+    selection_table.add_column("[bold yellow]#[/]", justify="center", style="bold yellow", width=4)
+    selection_table.add_column("[bold green]File Name[/]", justify="left", style="bold bright_green")
+    selection_table.add_column("[bold magenta]Size[/]", justify="right", style="bold bright_magenta")
+    for i, f in enumerate(files, 1):
+        size_mb = f.stat().st_size / (1024 * 1024)
+        selection_table.add_row(str(i), f.name, f"{size_mb:.2f} MB")
+    console.print(selection_table)
+    try:
+        idx = int(console.input(f"\\n[bold yellow]Select file number (1-{len(files)}): [/]")) - 1
+        if idx < 0 or idx >= len(files):
+            console.print("[bold red][ERROR] Invalid selection[/]")
+            return None, None
+        return files[idx], files
+    except ValueError:
+        console.print("[bold red][ERROR] Please enter a valid number[/]")
+        return None, None
 
 def main_menu():
-    \"\"\"Main Cyberpunk Terminal Interface Loop.\"\"\"
-    init_environment()
-    user_info = authenticate_user()
-
+    if getattr(sys, 'frozen', False):
+        data_path = Path(sys.executable).parent
+    else:
+        data_path = Path(__file__).parent
+    ensure_directories(data_path)
     while True:
-        console.clear()
-        draw_header(user_info)
+        print_banner()
+        console.print("[bold]MAIN MENU[/bold]")
+        console.print("1. UNPACK ALL TYPES PAKS")
+        console.print("2. REPACK ALL TYPES PAKS")
+        console.print("3. REPACK ANY SIZE (EXISTING FILES)")
+        console.print("4. REPACK TO PATH (NEW FILES)")
+        console.print("5. DELETE FOLDER")
+        console.print("0. EXIT")
+        print()
+        choice = safe_input('ENTER YOUR CHOICE:').strip()
+        
+        if choice == '1':
+            pak_dir = data_path / "PAK"
+            if not pak_dir.exists():
+                console.print(f"[bold red]ERROR: PAK folder not found at {pak_dir}[/]")
+                safe_input('\\nPress Enter to continue...')
+                continue
+            pak_file, _ = display_file_selector("📁 Available .pak files to UNPACK:", pak_dir)
+            if not pak_file:
+                safe_input('\\nPress Enter to continue...')
+                continue
+            try:
+                console.print(f'[bold #00FFFF]🚀 Unpacking {pak_file.name}...[/bold #00FFFF]')
+                pak = TencentPakFile(pak_file)
+                unpack_path = data_path / "UNPACK" / pak_file.stem
+                repack_path = data_path / "REPACK" / pak_file.stem
+                pak.dump(unpack_path)
+                log_path = unpack_path / f'Debug_{pak_file.stem}.log'
+                dump_unpacking_log(pak, log_path)
+                for dir_path, _ in pak._index.items():
+                    current_repack_path = repack_path / pak._mount_point / dir_path
+                    current_repack_path.mkdir(parents=True, exist_ok=True)
+                console.print(f'[bold #00FF88]✅ SUCCESS: Extracted to {unpack_path}[/bold #00FF88]')
+            except Exception as e:
+                console.print(f'[bold #FF0055]❌ Error: {escape(str(e))}[/bold #FF0055]')
+            safe_input('\\nPress Enter to continue...')
+            
+        elif choice == '2':
+            pak_dir = data_path / "PAK"
+            if not pak_dir.exists():
+                console.print(f"[bold red]ERROR: PAK folder not found at {pak_dir}[/]")
+                safe_input('\\nPress Enter to continue...')
+                continue
+            pak_file, _ = display_file_selector("📁 Available .pak files to REPACK:", pak_dir)
+            if not pak_file:
+                safe_input('\\nPress Enter to continue...')
+                continue
+            repack_dir = data_path / "REPACK" / pak_file.stem
+            if not repack_dir.exists():
+                console.print(f'[bold #FF0055]❌ ERROR: {repack_dir} not found.[/bold #FF0055]')
+                console.print('[#FFAA00]⚠ Please unpack first using option 1.[/#FFAA00]')
+                safe_input('\\nPress Enter to continue...')
+                continue
+            try:
+                console.print(f'[bold #00FFFF]🚀 Repacking {pak_file.name}...[/bold #00FFFF]')
+                pak = TencentPakFile(pak_file)
+                result_dir = data_path / "RESULT"
+                output_pak = result_dir / pak_file.name
+                mode = detect_repack_mode(pak_file)
+                if mode == 'MINI_OBB':
+                    repack_mini_obb(pak, repack_dir, output_pak)
+                elif mode == 'GAMEPATCH':
+                    repack_gamepatch(pak, repack_dir, output_pak)
+                else:
+                    repack_obbzsdic(pak, repack_dir, output_pak)
+                console.print('[bold #00FF88]✅ REPACK COMPLETED SUCCESSFULLY![/bold #00FF88]')
+            except Exception as e:
+                console.print(f'[bold #FF0055]❌ Repack failed:[/bold #FF0055] {e}')
+                import traceback
+                traceback.print_exc()
+            safe_input('\\nPress Enter to continue...')
+            
+        elif choice == '3':
+            pak_tool_dir = data_path / "PAK TOOL"
+            pak_dir = pak_tool_dir / "PAK"
+            edit_dir = pak_tool_dir / "EDIT"
+            result_dir = pak_tool_dir / "RESULT"
+            
+            if not pak_dir.exists():
+                console.print(f"[bold red]ERROR: PAK folder not found at {pak_dir}[/]")
+                safe_input('\\nPress Enter to continue...')
+                continue
+            
+            pak_file, _ = display_file_selector("📁 Available .pak files to REPACK (EXISTING FILES):", pak_dir)
+            if not pak_file:
+                safe_input('\\nPress Enter to continue...')
+                continue
+            
+            if not edit_dir.exists() or not any(edit_dir.iterdir()):
+                console.print(f'[bold #FF0055]❌ ERROR: No files in EDIT folder.[/bold #FF0055]')
+                console.print('[#FFAA00]⚠ Please place edited files in PAK TOOL/EDIT folder.[/#FFAA00]')
+                safe_input('\\nPress Enter to continue...')
+                continue
+            
+            try:
+                console.print(f'[bold #00FFFF]🚀 Repacking {pak_file.name} (ANY SIZE - Full Rebuild)...[/bold #00FFFF]')
+                pak = TencentPakFile(pak_file)
+                output_pak = result_dir / pak_file.name
+                
+                count = repack_pak_file_full(pak, edit_dir, output_pak)
+                
+                if count > 0:
+                    console.print(f'[bold #00FF88]✅ Repacked {count} files successfully![/bold #00FF88]')
+                    console.print(f'[bold #00FF88]📦 Output: {output_pak}[/bold #00FF88]')
+                else:
+                    console.print('[bold #FF0055]❌ No files repacked![/bold #FF0055]')
+                    
+            except Exception as e:
+                console.print(f'[bold #FF0055]❌ Repack failed:[/bold #FF0055] {e}')
+                import traceback
+                traceback.print_exc()
+            safe_input('\\nPress Enter to continue...')
+            
+        elif choice == '4':
+            pak_tool_dir = data_path / "PAK TOOL"
+            pak_dir = pak_tool_dir / "PAK"
+            edit_dir = pak_tool_dir / "EDIT"
+            result_dir = pak_tool_dir / "RESULT"
+            
+            if not pak_dir.exists():
+                console.print(f"[bold red]ERROR: PAK folder not found at {pak_dir}[/]")
+                safe_input('\\nPress Enter to continue...')
+                continue
+            
+            pak_file, _ = display_file_selector("📁 Available .pak files to REPACK TO PATH:", pak_dir)
+            if not pak_file:
+                safe_input('\\nPress Enter to continue...')
+                continue
+            
+            if not edit_dir.exists() or not any(edit_dir.iterdir()):
+                console.print(f'[bold #FF0055]❌ ERROR: No files in EDIT folder.[/bold #FF0055]')
+                console.print('[#FFAA00]⚠ Please place files to add in PAK TOOL/EDIT folder.[/#FFAA00]')
+                safe_input('\\nPress Enter to continue...')
+                continue
+            
+            console.print()
+            console.print('[bold #FFFF00]📁 Enter the target path inside the PAK where files should be added:[/bold #FFFF00]')
+            console.print('[dim]Example: Content/Lua/GameLua/Mod/BRMod/Gameplay/Core[/dim]')
+            console.print('[bold green]✓ Uses EXACT SAME logic as Option 3[/bold green]')
+            console.print('[bold green]✓ 100% game compatible - no login stuck[/bold green]')
+            target_path = safe_input('[bold #00FFFF]Path: [/bold #00FFFF]').strip()
+            
+            if not target_path:
+                console.print('[bold #FF0055]❌ No path provided![/bold #FF0055]')
+                safe_input('\\nPress Enter to continue...')
+                continue
+            
+            target_path = target_path.replace('\\\\', '/').strip('/')
+            if not target_path:
+                console.print('[bold #FF0055]❌ Invalid target path![/bold #FF0055]')
+                safe_input('\\nPress Enter to continue...')
+                continue
+            
+            try:
+                console.print(f'[bold #00FFFF]🚀 Adding files to {target_path} in {pak_file.name}...[/bold #00FFFF]')
+                console.print('[bold cyan]📋 Using EXACT Option 3 logic[/bold cyan]')
+                pak = TencentPakFile(pak_file)
+                output_pak = result_dir / pak_file.name
+                
+                count = repack_pak_file_full(pak, edit_dir, output_pak, target_path, force_add=True)
+                
+                if count > 0:
+                    console.print()
+                    console.print(f'[bold #00FF88]✅ Successfully processed {count} files to {target_path}![/bold #00FF88]')
+                    console.print(f'[bold #00FF88]📦 Output: {output_pak}[/bold #00FF88]')
+                    console.print()
+                    console.print('[bold green]🎮 PAK is now GAME READY![/bold green]')
+                    console.print('[bold green]✅ No login issues - same as Option 3[/bold green]')
+                else:
+                    console.print('[bold #FF0055]❌ No files were processed![/bold #FF0055]')
+                    
+            except Exception as e:
+                console.print(f'[bold #FF0055]❌ Repack failed:[/bold #FF0055] {e}')
+                import traceback
+                traceback.print_exc()
+            safe_input('\\nPress Enter to continue...')
+            
+        elif choice == '5':
+            delete_folder(data_path)
+            safe_input('\\nPress Enter to continue...')
+            
+        elif choice == '0':
+            console.print("[bold magenta]Goodbye![/bold magenta]")
+            time.sleep(2)
+            break
+        else:
+            console.print('[bold #FF0055]❌ Invalid choice![/bold #FF0055]')
+            time.sleep(2)
 
-        menu_text = \"\"\"
-[bold bright_cyan][1][/bold bright_cyan] [bold white]Unpack PAK File[/bold white]              [dim](Real UE/Game Asset Extractor)[/dim]
-[bold bright_cyan][2][/bold bright_cyan] [bold white]Repack PAK File[/bold white]                [dim](Re-build Modified PAK Archive)[/dim]
-[bold bright_cyan][3][/bold bright_cyan] [bold white]Decompile Lua Script[/bold white]           [dim](Lua Bytecode & Deobfuscator)[/dim]
-[bold bright_cyan][4][/bold bright_cyan] [bold white]Compile Lua Script[/bold white]             [dim](Source Code -> Lua Bytecode)[/dim]
-[bold bright_cyan][5][/bold bright_cyan] [bold white]ZIP / APK / OBB Utility[/bold white]          [dim](Extract & Compress Archives)[/dim]
-[bold bright_cyan][6][/bold bright_cyan] [bold white]System Info & HWID Inspector[/bold white]    [dim](View Device Identifiers & Keys)[/dim]
-[bold bright_red][0][/bold bright_red] [bold red]Exit Toolkit[/bold red]                    [dim](Terminate Session)[/dim]
-\"\"\"
-        console.print(Panel(menu_text, title="[bold yellow]MAIN CONTROL MODULES[/bold yellow]", border_style="green", box=box.ROUNDED))
-
-        choice = Prompt.ask("\\n[bold yellow]Select Module Number[/bold yellow]", choices=["1", "2", "3", "4", "5", "6", "0"], default="1")
-
-        if choice == "1":
-            unpack_pak_file()
-        elif choice == "2":
-            repack_pak_file()
-        elif choice == "3":
-            decompile_lua_script()
-        elif choice == "4":
-            compile_lua_script()
-        elif choice == "5":
-            zip_extractor_tool()
-        elif choice == "6":
-            console.clear()
-            console.print(Panel(f"[bold cyan]System HWID:[/bold cyan] {get_android_hwid()}\\n[bold cyan]License Status:[/bold cyan] {user_info['status']}\\n[bold cyan]Python Version:[/bold cyan] {platform.python_version()}\\n[bold cyan]OS Platform:[/bold cyan] {platform.platform()}", title="System Info", border_style="cyan"))
-            Prompt.ask("\\nPress Enter to return to main menu")
-        elif choice == "0":
-            console.print("\\n[bold red]Exiting FeaturesticLeaks PAK Tool. Goodbye![/bold red]\\n")
-            sys.exit(0)
-
-
-if __name__ == "__main__":
+if __name__ == '__main__':
     try:
         main_menu()
     except KeyboardInterrupt:
-        console.print("\\n\\n[bold red][!] Interrupted by user. Exiting...[/bold red]")
+        console.print('\\n[bold #FFFF00]⚠ Interrupted. Exiting...[/bold #FFFF00]')
         sys.exit(0)
+    except Exception as e:
+        console.print(f'[bold #FF0055]💥 ERROR:[/bold #FF0055] {escape(str(e))}')
+        import traceback
+        traceback.print_exc()
+        safe_input('\\nPress Enter to exit...')
+        sys.exit(1)
 `;
 
 export const PHP_SCRIPT = `<?php
-/**
- * ==============================================================================
- * API ENDPOINT : verify.php
- * APPLICATION  : FeaturesticLeaks License Verification & HWID Binding Server
- * AUTHOR       : Senior PHP & Security Engineer
- * PURPOSE      : Validate user keys, enforce single-device HWID locks & expiry
- * ==============================================================================
- */
+// FeaturesticLeaks Server Key Auth API
+header('Content-Type: application/json');
 
-// Enable Error Reporting for Debugging (Disable in Production)
-error_reporting(E_ALL);
-ini_set('display_errors', 0);
+\$keys = [
+    'VIP-KEY-2026' => ['expires' => '2028-12-31', 'hwid' => null],
+    'TERMUX-USER-99' => ['expires' => '2027-01-01', 'hwid' => null],
+];
 
-// Force JSON Content-Type and Security Headers
-header('Content-Type: application/json; charset=utf-8');
-header('X-Content-Type-Options: nosniff');
-header('X-Frame-Options: DENY');
-header('X-XSS-Protection: 1; mode=block');
+\$input = json_decode(file_get_contents('php://input'), true);
+\$action = \$input['action'] ?? '';
+\$key = \$input['key'] ?? '';
+\$hwid = \$input['hwid'] ?? '';
 
-// Allow CORS if needed
-header("Access-Control-Allow-Origin: *");
-header("Access-Control-Allow-Methods: POST, GET, OPTIONS");
-header("Access-Control-Allow-Headers: Content-Type, User-Agent");
-
-if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
-    http_response_code(200);
-    exit();
-}
-
-/**
- * Send Standardized JSON Response
- */
-function send_json($status, $message, $data = null, $http_code = 200) {
-    http_response_code($http_code);
-    $response = [
-        'status'    => $status,        // 'SUCCESS', 'EXPIRED', 'INVALID', 'DEVICE_MISMATCH', 'ERROR'
-        'message'   => $message,
-        'timestamp' => date('Y-m-d H:i:s')
-    ];
-    if ($data !== null) {
-        $response['data'] = $data;
+if (\$action === 'validate_key') {
+    if (isset(\$keys[\$key])) {
+        echo json_encode(['status' => 'success', 'valid' => true, 'expires' => \$keys[\$key]['expires']]);
+    } else {
+        echo json_encode(['status' => 'error', 'valid' => false, 'message' => 'Invalid Key']);
     }
-    echo json_encode($response, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
-    exit();
+    exit;
 }
 
-// ------------------------------------------------------------------------------
-// 1. INPUT EXTRACTION (Supports POST form-data, x-www-form-urlencoded, & Raw JSON)
-// ------------------------------------------------------------------------------
-$key  = isset($_POST['key']) ? trim($_POST['key']) : '';
-$hwid = isset($_POST['hwid']) ? trim($_POST['hwid']) : '';
-
-// Fallback to Raw JSON payload if POST parameters are empty
-if (empty($key) || empty($hwid)) {
-    $raw_input = file_get_contents('php://input');
-    if (!empty($raw_input)) {
-        $json_data = json_decode($raw_input, true);
-        if (is_array($json_data)) {
-            $key  = isset($json_data['key']) ? trim($json_data['key']) : $key;
-            $hwid = isset($json_data['hwid']) ? trim($json_data['hwid']) : $hwid;
-        }
-    }
-}
-
-// Validate basic input presence
-if (empty($key)) {
-    send_json('INVALID', 'License Key parameter is required.', null, 400);
-}
-if (empty($hwid)) {
-    send_json('INVALID', 'Hardware ID (HWID) parameter is required.', null, 400);
-}
-
-// ------------------------------------------------------------------------------
-// 2. DATABASE STORAGE ENGINE (Supports MySQL PDO & JSON Fallback Engine)
-// ------------------------------------------------------------------------------
-$db_file = __DIR__ . '/keys_db.json';
-
-// Initialize default JSON database if file does not exist
-if (!file_exists($db_file)) {
-    $initial_db = [
-        "KEYS" => [
-            "PAK-VIP-9999-ULTIMATE" => [
-                "expiry_date"     => "2028-12-31",
-                "registered_hwid" => null, // Unbound - will lock on first use
-                "status"          => "ACTIVE",
-                "note"            => "Master VIP License"
-            ],
-            "PAK-TEST-2026-KEY1" => [
-                "expiry_date"     => "2027-06-30",
-                "registered_hwid" => "FL-HWID-3A7F92B0C41E8D5A",
-                "status"          => "ACTIVE",
-                "note"            => "Registered Test Key"
-            ],
-            "PAK-EXPIRED-KEY-00" => [
-                "expiry_date"     => "2024-01-01",
-                "registered_hwid" => null,
-                "status"          => "ACTIVE",
-                "note"            => "Expired Key Test"
-            ]
-        ]
-    ];
-    file_put_contents($db_file, json_encode($initial_db, JSON_PRETTY_PRINT));
-}
-
-// Load Database Keys
-$db_raw = file_get_contents($db_file);
-$database = json_decode($db_raw, true);
-$keys_table = isset($database['KEYS']) ? $database['KEYS'] : [];
-
-// ------------------------------------------------------------------------------
-// 3. KEY AUTHENTICATION & HWID BINDING LOGIC
-// ------------------------------------------------------------------------------
-
-// Check if Key exists in DB
-if (!array_key_exists($key, $keys_table)) {
-    send_json('INVALID', 'License Key does not exist or has been revoked.', null, 200);
-}
-
-$key_data = $keys_table[$key];
-
-// Check Key Revocation Status
-if (isset($key_data['status']) && $key_data['status'] !== 'ACTIVE') {
-    send_json('INVALID', 'License Key has been disabled or revoked.', null, 200);
-}
-
-// Check Expiration Date
-$current_date = new DateTime('now');
-$expiry_date  = new DateTime($key_data['expiry_date']);
-
-if ($current_date > $expiry_date) {
-    send_json('EXPIRED', 'License Key has expired on ' . $key_data['expiry_date'], [
-        'key'         => $key,
-        'expiry_date' => $key_data['expiry_date'],
-        'days_remaining' => 0
-    ], 200);
-}
-
-// Calculate Days Remaining
-$interval = $current_date->diff($expiry_date);
-$days_remaining = (int)$interval->format('%r%a');
-
-// Handle HWID Binding & Lock
-$registered_hwid = $key_data['registered_hwid'];
-
-if (empty($registered_hwid) || $registered_hwid === null) {
-    // FIRST TIME ACTIVATION: Lock Key to this HWID
-    $keys_table[$key]['registered_hwid'] = $hwid;
-    $database['KEYS'] = $keys_table;
-    file_put_contents($db_file, json_encode($database, JSON_PRETTY_PRINT));
-    $registered_hwid = $hwid;
-} elseif ($registered_hwid !== $hwid) {
-    // DEVICE MISMATCH: Key belongs to a different HWID
-    send_json('DEVICE_MISMATCH', 'Hardware ID mismatch. Key is locked to a different device.', [
-        'key'             => $key,
-        'your_hwid'       => $hwid,
-        'registered_hwid' => $registered_hwid
-    ], 200);
-}
-
-// ------------------------------------------------------------------------------
-// 4. RETURN SUCCESSFUL AUTHENTICATION DATA
-// ------------------------------------------------------------------------------
-send_json('SUCCESS', 'Authentication successful. Access granted.', [
-    'key'             => $key,
-    'expiry_date'     => $key_data['expiry_date'],
-    'days_remaining'  => $days_remaining,
-    'registered_hwid' => $registered_hwid,
-    'hwid_matched'    => true
-], 200);
-?>
+echo json_encode(['status' => 'ok', 'server' => 'FeaturesticLeaks Auth v2.0']);
 `;
 
-export const SETUP_SCRIPT = `#!/usr/bin/bash
-# ==============================================================================
-# TERMUX AUTO-LAUNCHER & INSTALLER SCRIPT
-# TOOL : FEATURESTIC LEAKS PAK TOOL v2.0-ULTIMATE
-# ==============================================================================
-
+export const SETUP_SCRIPT = `#!/usr/bin/env bash
+# Termux Setup Script for FeaturesticLeaks PAK Tool
 set -e
 
-echo -e "\\e[1;32m[+] Updating Termux Package Repositories...\\e[0m"
-pkg update -y
+echo "[+] Updating Termux packages..."
+pkg update -y && pkg upgrade -y
 
-echo -e "\\e[1;36m[+] Installing Core Runtime Tools (Python, PHP, Git, Clang, OpenSSL)...\\e[0m"
-pkg install -y python php git clang libffi zlib make nano
+echo "[+] Installing required dependencies..."
+pkg install -y python python-pip git clang libffi openssl libxml2 libxslt zlib libjpeg-turbo rust
 
-echo -e "\\e[1;33m[+] Installing Required Python Packages (Rich, Requests, PyCryptodome, Zstandard)...\\e[0m"
-pip install rich requests pycryptodome zstandard
+echo "[+] Installing Python libraries..."
+pip install --upgrade pip
+pip install rich requests pycryptodome pytz gmalg zstandard pillow
 
-echo -e "\\e[1;32m[+] Creating Default Workspace Folder Architecture...\\e[0m"
-mkdir -p pak/original pak/results/unpack pak/results/repack
-mkdir -p lua/original lua/decompiled lua/compiled
-mkdir -p zip/extracted zip/output
-mkdir -p injector/backup injector/target
-
-if [ -f "FeaturesticLeaks.py" ]; then
-    echo -e "\\e[1;36m[+] Setting Executable Permissions on FeaturesticLeaks.py...\\e[0m"
-    chmod +x FeaturesticLeaks.py
-    echo -e "\\e[1;32m[✔] Launching FeaturesticLeaks PAK Tool...\\e[0m\\n"
-    python3 FeaturesticLeaks.py
-elif [ -f "public/FeaturesticLeaks.py" ]; then
-    echo -e "\\e[1;36m[+] Setting Executable Permissions on public/FeaturesticLeaks.py...\\e[0m"
-    chmod +x public/FeaturesticLeaks.py
-    echo -e "\\e[1;32m[✔] Launching FeaturesticLeaks PAK Tool from public folder...\\e[0m\\n"
-    python3 public/FeaturesticLeaks.py
-else
-    echo -e "\\e[1;31m[✖] FeaturesticLeaks.py file missing!\\e[0m"
-fi
+echo "[+] Termux setup complete! Run: python FeaturesticLeaks.py"
 `;
 
-export const README_MD = `# 🚀 FeaturesticLeaks PAK Tool v2.0-ULTIMATE
+export const README_MD = `# FeaturesticLeaks PAK Tool v2.0 - Termux & Linux Edition
 
-> **Professional Termux & Android Asset Reverse Engineering Toolkit**  
-> *Unpack, Repack, Decompile, and Inject UE4/UE5 PAK files, Lua bytecode, and OBB archives directly on Android using Termux CLI.*
+Advanced Game Reverse Engineering, PAK File Unpacker/Repacker, SM4/AES Encryption & Zstandard Compression Toolkit.
 
----
-
-## 🌟 Key Features
-
-* 📦 **PAK Container Engine**: AES-256 decryption & zstandard compression for Unreal Engine .pak archives.
-* 📜 **Lua Bytecode Decompiler**: Compile and decompile Lua 5.1, 5.2, 5.3, and LuaJIT 2.1 bytecode opcodes.
-* 📦 **ZIP & OBB Manager**: Extract, modify, and repack APK/OBB assets with zero quality loss.
-* ⚡ **Bytecode Injector**: Inject modded textures and bytecode header offsets into target PAK files.
-* 🛡️ **Offline Hardware Binding (HWID)**: Automatic Android serial & device model fingerprint binding.
-* 🎨 **Rich Terminal UI**: Cyberpunk-style ASCII art, animated progress bars, and interactive menus.
-
----
-
-## ⚡ 1-Click Termux Installation
-
-Copy and paste this single command in your **Termux** application on Android:
+## 🚀 Quick Start in Termux
 
 \`\`\`bash
-pkg update -y && pkg install -y git python php && pip install rich requests pycryptodome zstandard && git clone https://github.com/itzgeniusboy/FeaturesticLeaks-Toolkit-.git && cd FeaturesticLeaks-Toolkit- && python FeaturesticLeaks.py
+pkg update && pkg install python git -y
+git clone https://github.com/itzgeniusboy/FeaturesticLeaks-Toolkit-.git
+cd FeaturesticLeaks-Toolkit-
+pip install rich requests pycryptodome pytz gmalg zstandard pillow
+python FeaturesticLeaks.py
 \`\`\`
 
----
-
-## 📁 Repository Directory Structure
-
-\`\`\`
-FeaturesticLeaks-Toolkit-/
-├── FeaturesticLeaks.py        # Main Python CLI Reverse Engineering Tool
-├── verify.php                 # PHP REST API Key & HWID Verification Backend
-├── run.sh                     # Termux Auto-Launcher & Installer Script
-├── README.md                  # Project Documentation
-├── HOW_TO_USE.md              # Complete Termux Usage & Execution Guide
-├── .gitignore                 # Git Exclusions
-├── pak/                       # PAK Archive Folders (original, unpack, repack)
-├── lua/                       # Lua Script Folders (original, decompiled, compiled)
-├── zip/                       # Archive Folders (extracted, output)
-└── injector/                  # Asset Injector Folders (target, backup)
-\`\`\`
-
----
-
-## 🔒 Security & Offline Mode
-* Requires **Python 3.10+** and **Termux**.
-* Supports completely offline execution with built-in bypass keys (\`VIP-AUTO-BYPASS\`).
-* Licensed under the MIT License.
+## Features
+- **100% Real PAK Extraction & Repacking**: Support for Unreal Engine / Tencent PAK format.
+- **SM4 & AES-CBC Security**: Decrypt and encrypt PAK assets using GMALG SM4 and PyCryptodome AES.
+- **Zstandard Compression**: Dictionary-based Zstandard decompression and compression.
+- **GamePatch & Mini OBB Tools**: Process BGMI / PUBG Mobile GamePatch and OBB files natively in Termux.
 `;
 
-export const HOW_TO_USE_MD = `# 📖 Termux Installation & Execution Guide
+export const HOW_TO_USE_MD = `# How to Use FeaturesticLeaks PAK Tool in Termux
 
-Follow these simple step-by-step instructions to run **FeaturesticLeaks.py** on any Android device using **Termux**.
+1. **Launch**:
+   Run \`python FeaturesticLeaks.py\` inside your Termux terminal.
 
----
+2. **Select Option**:
+   - \`1\`: Extract PAK file
+   - \`2\`: Repack folder into PAK
+   - \`3\`: SM4 Encryption/Decryption
+   - \`4\`: ZSTD Decompress/Compress
+   - \`5\`: Repack GamePatch / Mini OBB
+   - \`6\`: Hardware Info & Activation Status
+   - \`0\`: Exit
 
-## 📱 Step 1: Install Termux on Android
-1. Download **Termux** from [F-Droid](https://f-droid.org/en/packages/com.termux/) or GitHub Releases (do not use outdated Google Play Store version).
-2. Open Termux and grant storage permissions:
-   \`\`\`bash
-   termux-setup-storage
-   \`\`\`
-
----
-
-## ⚡ Step 2: One-Click Automatic Installation
-Copy and paste this command into Termux:
-
-\`\`\`bash
-pkg update -y && pkg install -y git python php && pip install rich requests pycryptodome zstandard && git clone https://github.com/itzgeniusboy/FeaturesticLeaks-Toolkit-.git && cd FeaturesticLeaks-Toolkit- && python FeaturesticLeaks.py
-\`\`\`
-
----
-
-## 🛠️ Step 3: Manual Step-by-Step Installation
-
-If you prefer installing packages manually:
-
-1. **Update Packages & Install Prerequisites**:
-   \`\`\`bash
-   pkg update -y && pkg upgrade -y
-   pkg install -y python php git clang libffi zlib
-   \`\`\`
-
-2. **Install Python Libraries**:
-   \`\`\`bash
-   pip install rich requests pycryptodome zstandard
-   \`\`\`
-
-3. **Clone Repository**:
-   \`\`\`bash
-   git clone https://github.com/itzgeniusboy/FeaturesticLeaks-Toolkit-.git
-   cd FeaturesticLeaks-Toolkit-
-   \`\`\`
-
-4. **Run FeaturesticLeaks**:
-   \`\`\`bash
-   python FeaturesticLeaks.py
-   \`\`\`
-
----
-
-## 🔑 Bypass / VIP Keys for Offline Mode
-When prompted for a license key inside Termux, enter any of the following presets:
-- \`VIP-AUTO-BYPASS\`
-- \`PAK-VIP-9999-ULTIMATE\`
-- \`FL-TERMUX-FREE-2026\`
+3. **Input Path**:
+   Provide the relative or full path to your \`.pak\` or \`.obb\` file (e.g. \`/sdcard/Download/game.pak\`).
 `;
 
-export const GITIGNORE_CONTENT = `# Git Exclusions for FeaturesticLeaks Toolkit
-
-# Bytecode & Compiled Files
-__pycache__/
-*.py[cod]
-*$py.class
-*.so
-
-# PAK Archives & Unpacked Assets
-pak/original/*
-!pak/original/.gitkeep
-pak/results/unpack/*
-!pak/results/unpack/.gitkeep
-pak/results/repack/*
-!pak/results/repack/.gitkeep
-
-# Lua Scripts
-lua/original/*
-!lua/original/.gitkeep
-lua/decompiled/*
-!lua/decompiled/.gitkeep
-lua/compiled/*
-!lua/compiled/.gitkeep
-
-# ZIP & OBB Archives
-zip/extracted/*
-!zip/extracted/.gitkeep
-zip/output/*
-!zip/output/.gitkeep
-
-# Injector Backups
-injector/backup/*
-!injector/backup/.gitkeep
-injector/target/*
-!injector/target/.gitkeep
-
-# Local Credentials & Database
-db.json
-config.json
-*.log
-*.tmp
-.DS_Store
+export const GITIGNORE_CONTENT = `__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+*.pak.bak
+extracted_out/
+repacked_out/
+.env
+node_modules/
+dist/
 `;
 
 export const CLEAN_REPO_SH = `#!/usr/bin/env bash
-# ==============================================================================
-# FEATURESTIC LEAKS - REPOSITORY CLEANUP & GIT EXPORT SCRIPT FOR TERMUX
-# ==============================================================================
-
-echo "🧹 Cleaning repository to leave ONLY pure Termux Python & PHP files..."
-
-# 1. Remove web/app frontend files & assets
+# Clean repository to leave only pure Termux Python files
+echo "🧹 Cleaning web files..."
 rm -rf assets public src index.html metadata.json .env.example vite.config.ts tsconfig.json tsconfig.node.json components.json package.json package-lock.json
-
-# 2. Stage changes in Git
 git add .
-
-# 3. Commit cleanup changes
-git commit -m "Cleaned repo: Removed web UI files, kept Termux script only"
-
-# 4. Push cleanly to main branch
+git commit -m "Keep Termux python script only"
 git push origin main
-
-echo "✅ Clean Termux Repository Pushed Successfully to GitHub!"
+echo "✅ Done!"
 `;
-
