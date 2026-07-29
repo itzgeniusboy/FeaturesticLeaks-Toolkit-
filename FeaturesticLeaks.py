@@ -1505,22 +1505,101 @@ def ensure_directories(base_dir: Path):
 
 def print_banner():
     os.system('cls' if os.name == 'nt' else 'clear')
-    now = datetime.now()
-    date_str = now.strftime("%d/%b/%Y")
     
-    banner_text = (
-        "[bold cyan]⚡ FEATURESTIC LEAKS ⚡[/bold cyan]\n"
-        "[dim]Termux Game Reverse Engineering Suite v2.0[/dim]\n"
-        "[dim white]Telegram: https://t.me/FeaturesticLeaks[/dim white]"
+    banner_content = (
+        "[bold cyan]███████╗███████╗██████╗ ████████╗██╗   ██╗██████╗ ███████╗████████╗██╗ ██████╗[/bold cyan]\n"
+        "[bold cyan]██╔════╝██╔════╝██╔══██╗╚══██╔══╝██║   ██║██╔══██╗██╔════╝╚══██╔══╝██║██╔════╝[/bold cyan]\n"
+        "[bold cyan]█████╗  █████╗  ██████╔╝   ██║   ██║   ██║██████╔╝███████╗   ██║   ██║██║     [/bold cyan]\n"
+        "[bold cyan]██╔══╝  ██╔══╝  ██╔══██╗   ██║   ██║   ██║██╔══██╗╚════██║   ██║   ██║██║     [/bold cyan]\n"
+        "[bold cyan]██║     ███████╗██║  ██║   ██║   ╚██████╔╝██║  ██║███████║   ██║   ██║╚██████╗[/bold cyan]\n"
+        "[bold cyan]╚═╝     ╚══════╝╚═╝  ╚═╝   ╚═╝    ╚═════╝ ╚═╝  ╚═╝╚══════╝   ╚═╝   ╚═╝ ╚═════╝[/bold cyan]\n"
+        "[bold bright_white]          ⚡ LEAKS PAK TOOL v2.0 — TERMUX SUITE ⚡          [/bold bright_white]\n"
+        "[dim white]📢 Telegram: https://t.me/FeaturesticLeaks[/dim white]"
     )
     
     banner_panel = Panel(
-        Align.center(banner_text),
-        border_style="cyan",
+        Align.center(banner_content),
+        border_style="bold cyan",
         box=ROUNDED,
-        padding=(0, 2)
+        padding=(0, 1)
     )
     console.print(banner_panel)
+
+def check_and_auto_update():
+    """
+    Silent background auto-updater:
+    - Checks GitHub API for latest commit hash of itzgeniusboy/FeaturesticLeaks-Toolkit-
+    - Auto-pulls via git or downloads raw updated FeaturesticLeaks.py
+    - Restarts tool if updated
+    - Silently skips on network failures or offline mode
+    """
+    try:
+        if getattr(sys, 'frozen', False):
+            script_path = Path(sys.executable)
+            script_dir = script_path.parent
+        else:
+            script_path = Path(__file__).resolve()
+            script_dir = script_path.parent
+
+        hash_file = script_dir / ".commit_hash"
+        local_hash = ""
+        if hash_file.exists():
+            local_hash = hash_file.read_text(encoding='utf-8').strip()
+        else:
+            if (script_dir / ".git").exists():
+                try:
+                    res = subprocess.run(["git", "rev-parse", "HEAD"], cwd=script_dir, capture_output=True, text=True, timeout=2)
+                    if res.returncode == 0:
+                        local_hash = res.stdout.strip()
+                except Exception:
+                    pass
+
+        url = "https://api.github.com/repos/itzgeniusboy/FeaturesticLeaks-Toolkit-/commits/main"
+        headers = {"User-Agent": "FeaturesticLeaks-Termux/2.0"}
+        
+        resp = requests.get(url, headers=headers, timeout=3)
+        if resp.status_code != 200:
+            return
+        
+        data = resp.json()
+        remote_hash = data.get("sha", "").strip()
+        
+        if not remote_hash:
+            return
+            
+        if not local_hash:
+            hash_file.write_text(remote_hash, encoding='utf-8')
+            return
+
+        if remote_hash != local_hash:
+            console.print("[bold green][OK] New update found! Updating to latest version...[/bold green]")
+            updated = False
+            
+            if (script_dir / ".git").exists():
+                try:
+                    pull_res = subprocess.run(["git", "pull"], cwd=script_dir, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=10)
+                    if pull_res.returncode == 0:
+                        updated = True
+                except Exception:
+                    pass
+            
+            if not updated:
+                raw_url = "https://raw.githubusercontent.com/itzgeniusboy/FeaturesticLeaks-Toolkit-/main/FeaturesticLeaks.py"
+                raw_resp = requests.get(raw_url, headers=headers, timeout=10)
+                if raw_resp.status_code == 200 and len(raw_resp.content) > 5000:
+                    temp_file = script_path.with_suffix(".tmp")
+                    temp_file.write_bytes(raw_resp.content)
+                    shutil.move(temp_file, script_path)
+                    updated = True
+
+            if updated:
+                hash_file.write_text(remote_hash, encoding='utf-8')
+                console.print("[bold green][OK] Updated successfully! Restarting tool...[/bold green]")
+                time.sleep(1)
+                os.execv(sys.executable, [sys.executable] + sys.argv)
+
+    except Exception:
+        pass
 
 def safe_input(prompt: str='') -> str:
     try:
@@ -1700,6 +1779,7 @@ def main_menu():
     else:
         data_path = Path(__file__).parent
     ensure_directories(data_path)
+    check_and_auto_update()
     
     while True:
         print_banner()
@@ -1712,14 +1792,14 @@ def main_menu():
         )
         menu_table.add_column("Option", justify="center", width=8)
         menu_table.add_column("Action", justify="left", width=18)
-        menu_table.add_column("Description", style="dim white", justify="left")
+        menu_table.add_column("Description", justify="left")
         
-        menu_table.add_row("[bold cyan]1[/bold cyan]", "[bold cyan]Unpack[/bold cyan]", "Extract PAK / OBB package contents")
-        menu_table.add_row("[bold green]2[/bold green]", "[bold green]Repack[/bold green]", "Rebuild workspace to PAK / OBB")
-        menu_table.add_row("[bold yellow]3[/bold yellow]", "[bold yellow]Replace Files[/bold yellow]", "Inject edited files into existing structure")
-        menu_table.add_row("[bold magenta]4[/bold magenta]", "[bold magenta]Inject Path[/bold magenta]", "Inject files into custom PAK target path")
-        menu_table.add_row("[bold red]5[/bold red]", "[bold red]Cleanup[/bold red]", "Delete workspace folders")
-        menu_table.add_row("[dim]0[/dim]", "[dim]Exit[/dim]", "Close application")
+        menu_table.add_row("[bold cyan]1[/bold cyan]", "[bold cyan]Unpack[/bold cyan]", "[dim cyan]Extract PAK / OBB package contents[/dim cyan]")
+        menu_table.add_row("[bold green]2[/bold green]", "[bold green]Repack[/bold green]", "[dim green]Rebuild workspace to PAK / OBB[/dim green]")
+        menu_table.add_row("[bold yellow]3[/bold yellow]", "[bold yellow]Replace Files[/bold yellow]", "[dim yellow]Inject edited files into existing structure[/dim yellow]")
+        menu_table.add_row("[bold magenta]4[/bold magenta]", "[bold magenta]Inject Path[/bold magenta]", "[dim magenta]Inject files into custom PAK target path[/dim magenta]")
+        menu_table.add_row("[bold red]5[/bold red]", "[bold red]Cleanup[/bold red]", "[dim red]Delete workspace folders[/dim red]")
+        menu_table.add_row("[dim]0[/dim]", "[dim]Exit[/dim]", "[dim]Close application[/dim]")
         
         console.print(menu_table)
         console.print()
