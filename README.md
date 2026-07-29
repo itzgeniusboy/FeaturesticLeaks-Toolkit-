@@ -13,8 +13,10 @@ Termux me tool setup aur chalane ke liye niche diye gaye commands run karein:
 Termux open karein aur is poori line ko copy-paste kar dein (yeh purana folder delete karke fresh clone aur execute karega):
 
 ```bash
-cd ~ && rm -rf FeaturesticLeaks-Toolkit- && pkg update -y && pkg install -y git python php clang libffi zlib make nano && git clone https://github.com/itzgeniusboy/FeaturesticLeaks-Toolkit-.git && cd FeaturesticLeaks-Toolkit- && pip install rich requests pycryptodome zstandard && python FeaturesticLeaks.py
+cd ~ && rm -rf FeaturesticLeaks-Toolkit- && pkg update -y && pkg install -y git python php clang libffi zlib make nano && git clone https://github.com/itzgeniusboy/FeaturesticLeaks-Toolkit-.git && cd FeaturesticLeaks-Toolkit- && pip install rich requests pycryptodome zstandard && python public/FeaturesticLeaks.py
 ```
+
+📖 **Detailed Guide**: Complete module-by-module usage guide ke liye [HOW_TO_USE.md](./HOW_TO_USE.md) file dekhein.
 
 ---
 
