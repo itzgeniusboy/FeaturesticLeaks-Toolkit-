@@ -3,11 +3,23 @@ import { Terminal, RefreshCw, Key, Shield, Play, Lock, CheckCircle2, AlertTriang
 import { VerificationResponse } from '../types';
 
 export const TermuxEmulator: React.FC = () => {
-  // Authentication & Session State
-  const [keyInput, setKeyInput] = useState('PAK-VIP-9999-ULTIMATE');
-  const [hwid, setHwid] = useState('FL-HWID-3A7F92B0C41E8D5A');
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [authData, setAuthData] = useState<VerificationResponse | null>(null);
+  // Authentication & Session State - Set default to true for instant zero-prompt testing
+  const [keyInput, setKeyInput] = useState('VIP-AUTO-BYPASS');
+  const [hwid, setHwid] = useState('LOCAL-DEVICE');
+  const [isAuthenticated, setIsAuthenticated] = useState(true);
+  const [authData, setAuthData] = useState<VerificationResponse | null>({
+    status: 'SUCCESS',
+    message: 'Login Completely Bypassed for Testing',
+    timestamp: new Date().toISOString(),
+    data: {
+      key: 'VIP-AUTO-BYPASS',
+      status: 'ACTIVE VIP',
+      expiry_date: '31-12-2026',
+      days_remaining: 999,
+      registered_hwid: 'LOCAL-DEVICE',
+      hwid_matched: true,
+    },
+  });
   const [isAuthenticating, setIsAuthenticating] = useState(false);
   const [currentScreen, setCurrentScreen] = useState<'main' | 'pak' | 'zip' | 'lua' | 'injector'>('main');
 

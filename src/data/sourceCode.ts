@@ -92,21 +92,11 @@ def get_android_hwid() -> str:
 
 def authenticate_user() -> dict:
     """
-    100% Offline Authentication Bypass.
-    Accepts ANY license key/string entered by the user and grants instant VIP access.
-    No HTTP requests or PHP server connections required.
+    100% Automatic Authentication Bypass for Testing.
+    Automatically grants ACTIVE VIP access instantly without asking for any prompts or keys.
     """
     hwid = "LOCAL-DEVICE"
-    saved_key = ""
-
-    # Check for cached key if present
-    if os.path.exists(CONFIG_FILE):
-        try:
-            with open(CONFIG_FILE, "r") as f:
-                data = json.load(f)
-                saved_key = data.get("license_key", "")
-        except Exception:
-            pass
+    key = "VIP-AUTO-BYPASS"
 
     console.clear()
 
@@ -115,50 +105,18 @@ def authenticate_user() -> dict:
         Align.center(
             Text.from_markup(
                 "[bold cyan]⚡ CYBERPUNK SECURITY & REVERSE ENGINEERING SUITE ⚡[/bold cyan]\n"
-                "[bold green]Termux / Linux Edition - 100% OFFLINE BYPASS MODE[/bold green]"
+                "[bold green]Termux / Linux Edition - AUTOMATIC DIRECT LOGIN ENABLED[/bold green]"
             )
         ),
-        title="[bold yellow]SYSTEM AUTHENTICATION (OFFLINE MODE)[/bold yellow]",
+        title="[bold yellow]SYSTEM AUTHENTICATION (BYPASSED)[/bold yellow]",
         border_style="bright_green",
         box=box.DOUBLE
     )
     console.print(banner_panel)
 
-    if saved_key:
-        console.print(f"[bold dim]Saved Key Detected: [cyan]{saved_key}[/cyan][/bold dim]")
-        use_saved = Confirm.ask("Use saved license key?", default=True)
-        if use_saved:
-            key = saved_key
-        else:
-            key = Prompt.ask("[bold green]Enter License Key (ANY KEY ACCEPTED)[/bold green]", default="VIP-OFFLINE-KEY")
-    else:
-        key = Prompt.ask("[bold green]Enter License Key (ANY KEY ACCEPTED)[/bold green]", default="VIP-OFFLINE-KEY")
+    console.print("\n[bold bright_green]✔ DIRECT VIP LOGIN ACCEPTED! LAUNCHING SUITE...[/bold bright_green]\n")
+    time.sleep(0.3)
 
-    key = key.strip()
-    if not key:
-        key = "VIP-OFFLINE-KEY"
-
-    # Offline Authentication Progress Bar
-    with Progress(
-        SpinnerColumn(spinner_name="dots"),
-        TextColumn("[bold bright_cyan]{task.description}"),
-        transient=True,
-        console=console
-    ) as progress:
-        progress.add_task(description="Bypassing Online Verification (Offline Mode)...", total=None)
-        time.sleep(0.6)
-
-    # Save key locally for session memory
-    try:
-        with open(CONFIG_FILE, "w") as f:
-            json.dump({"license_key": key, "hwid": hwid, "mode": "OFFLINE", "auth_time": datetime.now().isoformat()}, f)
-    except Exception:
-        pass
-
-    console.print("\n[bold bright_green]✔ ACCESS GRANTED! ACTIVE VIP UNLOCKED.[/bold bright_green]\n")
-    time.sleep(0.4)
-
-    # Return required offline dummy values
     return {
         "key": key,
         "status": "ACTIVE VIP",
