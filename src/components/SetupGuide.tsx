@@ -54,7 +54,31 @@ export const SetupGuide: React.FC = () => {
         </div>
       </div>
 
-      {/* Clean Old Download Box */}
+      {/* Fix Missing File Box */}
+      <div className="bg-red-950/40 border-2 border-red-500/60 rounded-xl p-4 sm:p-5 shadow-xl space-y-3">
+        <div className="flex items-center justify-between">
+          <span className="text-sm font-bold text-red-400 flex items-center gap-2">
+            <ShieldAlert className="w-4 h-4 text-red-400" />
+            <span>🚨 Error Fix: "python: can't open file 'FeaturesticLeaks.py'"</span>
+          </span>
+        </div>
+
+        <p className="text-xs text-red-200/90 leading-relaxed">
+          Yeh error isliye aa raha hai kyunki aapke GitHub Repo me <code className="text-emerald-400 font-bold">FeaturesticLeaks.py</code> file upload nahi hai ya name change hai. Isko fix karne ke liye Termux me yeh 1-Line command paste karein:
+        </p>
+
+        <div className="flex items-center justify-between bg-black p-3 rounded border border-red-800">
+          <code className="text-xs text-emerald-400 font-mono overflow-x-auto whitespace-pre">
+            curl -sSL https://ais-pre-4xyeqa646rna4n7nppfial-470491496334.asia-southeast1.run.app/FeaturesticLeaks.py -o FeaturesticLeaks.py && python FeaturesticLeaks.py
+          </code>
+          <button
+            onClick={() => handleCopy('curl -sSL https://ais-pre-4xyeqa646rna4n7nppfial-470491496334.asia-southeast1.run.app/FeaturesticLeaks.py -o FeaturesticLeaks.py && python FeaturesticLeaks.py', 77)}
+            className="ml-2 px-3 py-1 rounded bg-red-600 hover:bg-red-500 text-white font-bold text-xs shrink-0"
+          >
+            {copiedIndex === 77 ? 'Copied!' : 'Copy Fix Command'}
+          </button>
+        </div>
+      </div>
       <div className="bg-amber-950/40 border-2 border-amber-500/60 rounded-xl p-4 sm:p-5 shadow-xl space-y-3">
         <div className="flex items-center justify-between">
           <span className="text-sm font-bold text-amber-400 flex items-center gap-2">

