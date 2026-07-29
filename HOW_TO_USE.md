@@ -130,3 +130,4 @@ Jab aap `python FeaturesticLeaks.py` run karenge, screen par main menu dikhega:
 
 ## 👤 Credits
 * **Tool Name**: `FeaturesticLeaks PAK Tool v2.0`
+* **Telegram Channel**: https://t.me/FeaturesticLeaks

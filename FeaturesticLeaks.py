@@ -1,4 +1,5 @@
 # FEATURESTIC LEAKS - PAK TOOL v2.0
+# Official Telegram Channel: https://t.me/FeaturesticLeaks
 # Termux / Linux Android Game Reverse Engineering & PAK Manipulation Toolkit
 
 #One_Of_The_Best_Tool_In_Whole_Telegram - 100% WORKING FINAL
@@ -1452,7 +1453,7 @@ def ensure_directories(base_dir: Path):
 
 def print_banner():
     os.system('cls' if os.name == 'nt' else 'clear')
-    banner_text = "[bold cyan]FEATURESTIC LEAKS[/bold cyan]\n[bold green]PAK TOOL v2.0 - Termux Edition[/bold green]"
+    banner_text = "[bold cyan]FEATURESTIC LEAKS[/bold cyan]\n[bold green]PAK TOOL v2.0 - Termux Edition[/bold green]\n[bold yellow]📢 Channel: https://t.me/FeaturesticLeaks[/bold yellow]"
     console.print(Panel(banner_text, expand=False, border_style="bold magenta"))
     console.print()
 

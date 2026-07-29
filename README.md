@@ -3,7 +3,8 @@
 > **Termux / Linux Android Game Reverse Engineering & PAK Manipulation Toolkit**  
 > Complete high-performance reverse engineering suite for unpacking, repacking, path-injecting, and rebuilding Unreal Engine / Tencent `.pak` and `.obb` containers natively on Termux / Android.
 >
-> **Tool Name**: `FeaturesticLeaks PAK Tool v2.0`
+> **Tool Name**: `FeaturesticLeaks PAK Tool v2.0`  
+> **Telegram Channel**: [https://t.me/FeaturesticLeaks](https://t.me/FeaturesticLeaks)
 
 ---
 
@@ -132,4 +133,5 @@ Agar aap online license management system rely karna chahte hain:
 
 ## 👤 Credits & Support
 * **Tool Name**: `FeaturesticLeaks PAK Tool v2.0`
+* **Telegram Channel**: https://t.me/FeaturesticLeaks
 * **Platform**: Termux / Android Linux

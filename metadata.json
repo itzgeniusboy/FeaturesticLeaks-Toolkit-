@@ -1,6 +1,0 @@
-{
-  "name": "FeaturesticLeaks PAK Tool",
-  "description": "Termux CLI Toolkit and Key Authentication System with interactive terminal emulator, PHP backend validator, Python script generator, and asset studio.",
-  "requestFramePermissions": [],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
-}
