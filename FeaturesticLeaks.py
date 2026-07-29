@@ -80,6 +80,7 @@ from rich.markup import escape
 from rich.text import Text
 from rich.align import Align
 from rich.console import Group
+from rich.live import Live
 from rich.box import HEAVY_EDGE, ROUNDED, DOUBLE_EDGE
 from datetime import datetime
 import pytz
@@ -344,7 +345,7 @@ class SM4:
 class Misc:
     @staticmethod
     def pad_to_n(data: bytes, n: int) -> bytes:
-        assert n > 0
+        assert n > 0, "Block alignment size must be greater than 0"
         padding = n - len(data) % n
         if padding == n:
             return data
@@ -382,7 +383,7 @@ class Reader:
         if length == 0:
             return str()
         else:
-            assert length > 0
+            assert length > 0, "String length in PAK index reader must be greater than 0"
             offset = 0 if move_cursor else 4
             return self.unpack(f'{length}s', offset=offset, move_cursor=move_cursor)[0].rstrip(b'\x00').decode()
 
@@ -395,7 +396,7 @@ class PakInfo:
             return x ^ keystream[2]
         def decrypt_index_hash(x: bytes) -> bytes:
             key = struct.pack('<5I', *keystream[4:][:5])
-            assert len(x) == len(key)
+            assert len(x) == len(key), "Index hash decryption key length mismatch"
             return bytes((a ^ b for a, b in zip(x, key)))
         def decrypt_index_size(x: int) -> int:
             return x ^ (keystream[10] << 32 | keystream[11])
@@ -418,7 +419,7 @@ class TencentPakInfo(PakInfo):
     def __init__(self, buffer, keystream: List[int]):
         def decrypt_unk(x: bytes) -> bytes:
             key = struct.pack('<8I', *keystream[7:][:8])
-            assert len(x) == len(key)
+            assert len(x) == len(key), "PakInfo unknown key length mismatch"
             return bytes((a ^ b for a, b in zip(x, key)))
         def decrypt_stem_hash(x: int) -> int:
             return x ^ keystream[8]
@@ -537,7 +538,7 @@ class PakCrypto:
             def update(self, x: int) -> int:
                 self._value ^= x
                 return self._value
-        assert len(ciphertext) % SIMPLE2_BLOCK_SIZE == 0
+        assert len(ciphertext) % SIMPLE2_BLOCK_SIZE == 0, "Simple2 ciphertext length is not aligned to block size"
         initial_key, = struct.unpack('<I', SIMPLE2_DECRYPT_KEY)
         rolling_key = RollingKey(initial_key)
         plaintext = (struct.pack('<I', rolling_key.update(x)) for x in struct.unpack(f'<{len(ciphertext) // 4}I', ciphertext))
@@ -561,7 +562,7 @@ class PakCrypto:
         return SM4(key)
     @staticmethod
     def _decrypt_sm4(ciphertext, file_path: PurePath, encryption_method: int) -> bytes:
-        assert len(ciphertext) % SM4.block_length() == 0
+        assert len(ciphertext) % SM4.block_length() == 0, "SM4 ciphertext length is not aligned to block size"
         key = PakCrypto._derive_sm4_key(file_path, encryption_method)
         sm4 = PakCrypto._sm4_context_for_key(key)
         return bytes(it.chain.from_iterable((sm4.decrypt(x) for x in it.batched(ciphertext, SM4.block_length()))))
@@ -570,7 +571,7 @@ class PakCrypto:
         if pak_info.version > 7:
             key = PakCrypto.rsa_extract(pak_info.packed_key, RSA_MOD_1)
             iv = PakCrypto.rsa_extract(pak_info.packed_iv, RSA_MOD_1)
-            assert len(key) == 32 and len(iv) == 32
+            assert len(key) == 32 and len(iv) == 32, "SM4 key and IV length must be 32 bytes"
             aes = AES.new(key, MODE_CBC, iv[:16])
             return unpad(aes.decrypt(ciphertext), AES.block_size)
         else:
@@ -675,7 +676,7 @@ class TencentPakFile:
     
     def _verify_stem_hash(self) -> None:
         if not self._is_od and self._pak_info.version >= 9:
-                assert self._pak_info.stem_hash == zlib.crc32(self._file_path.stem.encode('utf-32le'))
+                assert self._pak_info.stem_hash == zlib.crc32(self._file_path.stem.encode('utf-32le')), "PAK filename stem CRC32 hash mismatch — invalid PAK stem"
     def _tencent_load_index(self) -> None:
         index_data = self._file_content[self._pak_info.index_offset:][:self._pak_info.index_size]
         if self._pak_info.index_encrypted:
@@ -687,8 +688,8 @@ class TencentPakFile:
     def _verify_index_hash(self, index_data) -> None:
         expected_hash = self._pak_info.index_hash
         if not self._is_od and self._pak_info.version >= 8:
-                assert expected_hash == PakCrypto.rsa_extract(self._pak_info.packed_index_hash, RSA_MOD_2)
-        assert expected_hash == SHA1.new(index_data).digest()
+                assert expected_hash == PakCrypto.rsa_extract(self._pak_info.packed_index_hash, RSA_MOD_2), "RSA index hash verification failed"
+        assert expected_hash == SHA1.new(index_data).digest(), "SHA1 index hash mismatch — PAK header or key corrupt"
     @staticmethod
     def _construct_mount_point(mount_point: str) -> PurePath:
         result = PurePath()
@@ -703,13 +704,13 @@ class TencentPakFile:
         size = PakCrypto.align_encrypted_content_size(block.end - block.start, encryption_method)
         return self._file_content[block.start:][:size]
     def _construct_zstd_dict(self, dict_entry: TencentPakEntry) -> None:
-        assert not self._zstd_dict
-        assert not dict_entry.encrypted
-        assert dict_entry.compression_method == CM_NONE
+        assert not self._zstd_dict, "ZSTD dictionary already loaded"
+        assert not dict_entry.encrypted, "ZSTD dictionary entry cannot be encrypted"
+        assert dict_entry.compression_method == CM_NONE, "ZSTD dictionary entry must not be compressed"
         reader = Reader(self._peek_content(dict_entry.offset, dict_entry.size, 0))
         dict_size = reader.u8()
         _ = reader.u4()
-        assert dict_size == reader.u4()
+        assert dict_size == reader.u4(), "ZSTD dictionary header size mismatch"
         dict_data = reader.s(dict_size)
         self._zstd_dict = PakCompression.zstd_dictionary(dict_data)
     def _load_index(self, index_data) -> None:
@@ -723,7 +724,7 @@ class TencentPakFile:
                 dir_path = PurePath(reader.string())
                 e = {reader.string(): self._files[~reader.i4()] for _ in range(reader.u8())}
                 if self._is_zstd_with_dict and dir_path.name == 'zstddic':
-                    assert len(e) == 1
+                    assert len(e) == 1, "ZSTD dictionary directory must contain exactly one file"
                     self._construct_zstd_dict(e[[*e.keys()][0]])
                 else:
                     self._index.update({PurePath(dir_path): e})
@@ -1522,27 +1523,110 @@ def print_banner():
     )
     console.print(banner_panel)
 
+def boot_sequence():
+    """
+    Animated rocket boot sequence (approx 2-3 seconds):
+    Left to right moving rocket with trail and dynamic status text.
+    Mobile/Termux safe rendering using standard unicode characters.
+    """
+    os.system('cls' if os.name == 'nt' else 'clear')
+    
+    total_frames = 22
+    statuses = [
+        (0, "Initializing core engine..."),
+        (5, "Loading encryption & PAK modules..."),
+        (10, "Verifying workspace folders..."),
+        (16, "Ready for launch..."),
+        (22, "🚀 LAUNCHED — Welcome to FeaturesticLeaks")
+    ]
+    
+    current_status = statuses[0][1]
+    track_len = 26
+    
+    try:
+        with Live(refresh_per_second=12, console=console, transient=True) as live:
+            for frame in range(total_frames + 1):
+                for threshold, msg in statuses:
+                    if frame >= threshold:
+                        current_status = msg
+                
+                pos = min(int((frame / total_frames) * track_len), track_len)
+                trail = "═" * pos
+                spaces = " " * (track_len - pos)
+                
+                if frame < total_frames:
+                    rocket_line = f"[dim cyan]{trail}[/dim cyan][bold bright_yellow]🚀[/bold bright_yellow][dim white]❯[/dim white]{spaces}"
+                else:
+                    rocket_line = f"[dim cyan]{'═' * track_len}[/dim cyan][bold bright_yellow] 🚀 READY[/bold bright_yellow]"
+                
+                anim_content = (
+                    f"  [bold bright_cyan]⚡ FEATURESTIC LEAKS PAK TOOL ⚡[/bold bright_cyan]\n\n"
+                    f"  {rocket_line}\n\n"
+                    f"  [bold cyan][⚙][/bold cyan] [white]{current_status}[/white]"
+                )
+                
+                panel = Panel(
+                    anim_content,
+                    border_style="cyan",
+                    box=ROUNDED,
+                    padding=(1, 2)
+                )
+                
+                live.update(panel)
+                time.sleep(0.09)
+    except KeyboardInterrupt:
+        pass
+    except Exception:
+        pass
+    
+    time.sleep(0.2)
+
 def handle_exception(e: Exception, action_name: str = "Operation", data_path: Optional[Path] = None):
     """
     Centralized error handler:
-    - Displays clean 1-2 line summary with error type and details.
-    - Provides actionable hints for common Android/Termux errors.
-    - Logs full traceback to data_path/logs/error_<timestamp>.log without flooding terminal.
+    - Extracts last frame from traceback (file, line, function).
+    - Formats a clean red-bordered Panel on screen with error summary, location, reason & hint.
+    - Saves full detailed traceback to logs/error_<timestamp>.log file.
     """
     err_type = type(e).__name__
-    err_msg = str(e).strip() if (str(e) and str(e).strip()) else "No details available"
+    raw_msg = str(e).strip() if (str(e) and str(e).strip()) else ""
     
-    console.print(f"[bold red][X] {action_name} Error: {err_type}: {escape(err_msg)}[/bold red]")
+    # Fallback message for empty errors
+    if not raw_msg:
+        if err_type == "AssertionError":
+            err_msg = "Invalid PAK header/structure or verification check failed"
+        elif err_type == "ValueError":
+            err_msg = "Invalid value or unsupported PAK version"
+        elif err_type == "KeyError":
+            err_msg = "Target file or path key not found in PAK index"
+        else:
+            err_msg = f"{err_type} occurred without additional details"
+    else:
+        err_msg = raw_msg
+
+    # Extract traceback information (last frame)
+    tb_lines = traceback.extract_tb(e.__traceback__)
+    file_info = "FeaturesticLeaks.py"
+    line_no = "?"
+    func_name = action_name
     
-    # Specific user-friendly hints for common error scenarios
+    if tb_lines:
+        last_frame = tb_lines[-1]
+        file_info = Path(last_frame.filename).name
+        line_no = str(last_frame.lineno)
+        func_name = last_frame.name
+
+    # Determine user-friendly reason/hint based on error type and message
+    reason_hint = err_msg
     if isinstance(e, PermissionError):
-        console.print("[yellow][!] Hint: Folder access denied. File ko normal storage (Download/) me copy karke try karo, ya Shizuku setup karo.[/yellow]")
+        reason_hint += "\n[yellow]Hint: Folder access denied. File ko Download/ me copy karke try karo, ya Shizuku setup karo.[/yellow]"
     elif isinstance(e, FileNotFoundError):
-        console.print("[yellow][!] Hint: File/folder nahi mila. Path check karo.[/yellow]")
+        reason_hint += "\n[yellow]Hint: File/folder nahi mila. Path check karo.[/yellow]"
     elif any(term in err_type.lower() or term in err_msg.lower() for term in ["zlib", "zstd", "decompress", "compress", "badzip"]):
-        console.print("[yellow][!] Hint: File corrupt hai ya unsupported PAK format hai.[/yellow]")
-    
+        reason_hint += "\n[yellow]Hint: File corrupt hai ya unsupported PAK format hai.[/yellow]"
+
     # Save full traceback to log file
+    log_filename = "N/A"
     try:
         base = data_path if data_path else Path(__file__).parent
         logs_dir = base / "logs"
@@ -1554,13 +1638,34 @@ def handle_exception(e: Exception, action_name: str = "Operation", data_path: Op
             f.write(f"Action: {action_name}\n")
             f.write(f"Time: {datetime.now().isoformat()}\n")
             f.write(f"Error Type: {err_type}\n")
-            f.write(f"Error Message: {err_msg}\n\n")
-            f.write("Traceback:\n")
+            f.write(f"Error Message: {err_msg}\n")
+            f.write(f"Location: {file_info}:{line_no} in {func_name}()\n\n")
+            f.write("Full Traceback:\n")
             f.write(traceback.format_exc())
             
-        console.print(f"[dim white]Full log saved to: logs/{log_file.name}[/dim white]")
+        log_filename = f"logs/{log_file.name}"
     except Exception:
         pass
+
+    # Build clean ERROR DETAILS panel for terminal display
+    panel_content = (
+        f"[bold red]{err_type}[/bold red] in [bold yellow]{func_name}()[/bold yellow]\n"
+        f"[dim white]File:[/dim white] [cyan]{file_info}[/cyan], line [yellow]{line_no}[/yellow]\n"
+        f"[dim white]Reason:[/dim white] {escape(reason_hint)}\n"
+        f"[dim white]Full log:[/dim white] [dim cyan]{log_filename}[/dim cyan]"
+    )
+
+    error_panel = Panel(
+        panel_content,
+        title="[bold red] ERROR DETAILS [/bold red]",
+        title_align="left",
+        border_style="bold red",
+        box=ROUNDED,
+        padding=(0, 1)
+    )
+    
+    console.print()
+    console.print(error_panel)
 
 def check_and_auto_update():
     """
@@ -1638,25 +1743,62 @@ def check_and_auto_update():
     except Exception:
         pass
 
-def safe_input(prompt: str='') -> str:
+def styled_prompt(message: str = "", context: str = "~") -> str:
+    """
+    Renders T3RMUX terminal themed prompt:
+    ┌─[FeaturesticLeaks@termux]-[context] (Optional Message)
+    └─>>> 
+    """
+    has_leading_nl = message.startswith('\n') or message.startswith('\r\n')
+    clean_msg = message.lstrip('\r\n').strip()
+    if clean_msg.startswith("-> "):
+        clean_msg = clean_msg[3:].strip()
+        
+    if has_leading_nl:
+        console.print()
+
+    # Header line
+    header = (
+        "[dim cyan]┌─[/dim cyan]"
+        "[dim white][[/dim white]"
+        "[bold bright_magenta]FeaturesticLeaks[/bold bright_magenta]"
+        "[bold bright_cyan]@termux[/bold bright_cyan]"
+        "[dim white]][/dim white]"
+        "[dim cyan]─[/dim cyan]"
+        "[dim white][[/dim white]"
+        f"[bold yellow]{context}[/bold yellow]"
+        "[dim white]][/dim white]"
+    )
+    
+    if clean_msg:
+        if clean_msg.lower().startswith("press enter"):
+            header += f" [dim yellow]({clean_msg})[/dim yellow]"
+        else:
+            header += f" [dim white]({clean_msg})[/dim white]"
+
+    console.print(header)
+
+    # Prompt arrow line
+    prompt_line = "[dim cyan]└─[/dim cyan][bold #FF6B6B]>>>[/bold #FF6B6B] "
+    console.print(prompt_line, end="")
+
     try:
-        return input(prompt)
+        return input()
     except (EOFError, RuntimeError):
         try:
             if sys.platform != 'win32':
                 with open('/dev/tty', 'r') as tty:
-                    sys.stderr.write(prompt)
-                    sys.stderr.flush()
                     return tty.readline().rstrip('\n')
             else:
                 with open('CON', 'r') as con:
-                    sys.stderr.write(prompt)
-                    sys.stderr.flush()
                     return con.readline().rstrip('\r\n')
         except Exception:
-            return ''
+            return ""
     except Exception:
-        return ''
+        return ""
+
+def safe_input(prompt: str = '', context: str = '~') -> str:
+    return styled_prompt(message=prompt, context=context)
 
 def human_size(size: int) -> str:
     for unit in ['B', 'KB', 'MB', 'GB', 'TB']:
@@ -1809,7 +1951,14 @@ def display_file_selector(title, folder_path, file_pattern="*.pak"):
     exts = [file_pattern.replace('*', '')] if file_pattern else [".pak", ".obb"]
     return pick_file_from_folder(title, Path(folder_path), extensions=exts)
 
+_BOOTED = False
+
 def main_menu():
+    global _BOOTED
+    if not _BOOTED:
+        boot_sequence()
+        _BOOTED = True
+
     play_welcome_audio()
     if getattr(sys, 'frozen', False):
         data_path = Path(sys.executable).parent
