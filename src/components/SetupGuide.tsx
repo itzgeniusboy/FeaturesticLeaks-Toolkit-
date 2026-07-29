@@ -6,24 +6,24 @@ export const SetupGuide: React.FC = () => {
 
   const steps = [
     {
-      title: 'Step 1: Update & Upgrade Termux Packages',
-      cmd: 'pkg update -y && pkg upgrade -y',
-      desc: 'Ensures Termux repository mirrors are up to date and key packages are synced.',
+      title: 'Step 1: Update & Install Git, Python, PHP',
+      cmd: 'pkg update -y && pkg install -y git python php clang libffi zlib make',
+      desc: 'Installs Git, Python 3 runtime, PHP interpreter for verify.php API testing, and build chains.',
     },
     {
-      title: 'Step 2: Install Core System Dependencies (Python, PHP, Git, Compilers)',
-      cmd: 'pkg install -y python php git clang libffi openssl zlib make',
-      desc: 'Installs Python 3 runtime, PHP interpreter for verify.php API testing, Git, and C build chains.',
+      title: 'Step 2: Clone GitHub Repository & Enter Directory',
+      cmd: 'git clone https://github.com/itzgeniusboy/FeaturesticLeaks-Toolkit-.git && cd FeaturesticLeaks-Toolkit-',
+      desc: 'Clones the single-file FeaturesticLeaks repository and switches into the workspace directory.',
     },
     {
-      title: 'Step 3: Install Required Python Libraries (Rich, Requests, PyCryptodome, Zstandard)',
-      cmd: 'pip install rich requests pycryptodome zstandard',
-      desc: 'Installs the Rich UI library for cyberpunk terminals, HTTP request handler, AES cryptography, and Zstd compression.',
+      title: 'Step 3: Storage Permissions (Optional for File Extractor)',
+      cmd: 'termux-setup-storage',
+      desc: 'Grants Termux storage access to read/write game assets from Android storage (/sdcard/).',
     },
     {
-      title: 'Step 4: Clone / Create Project Workspace and Execute Tool',
-      cmd: 'chmod +x FeaturesticLeaks.py && python FeaturesticLeaks.py',
-      desc: 'Grants executable permissions and launches the main reverse engineering interactive menu.',
+      title: 'Step 4: Execute Auto-Launcher Script',
+      cmd: 'chmod +x run.sh && ./run.sh',
+      desc: 'Installs required Python packages (rich, pycryptodome, zstandard) and launches FeaturesticLeaks.py.',
     },
   ];
 
@@ -33,7 +33,7 @@ export const SetupGuide: React.FC = () => {
     setTimeout(() => setCopiedIndex(null), 2000);
   };
 
-  const fullOneLiner = 'pkg update -y && pkg install -y python php git clang libffi openssl zlib make && pip install rich requests pycryptodome zstandard && python FeaturesticLeaks.py';
+  const fullOneLiner = 'pkg update -y && pkg install -y git python php clang libffi zlib make && git clone https://github.com/itzgeniusboy/FeaturesticLeaks-Toolkit-.git && cd FeaturesticLeaks-Toolkit- && chmod +x run.sh && ./run.sh';
 
   return (
     <div className="space-y-6 font-mono">
