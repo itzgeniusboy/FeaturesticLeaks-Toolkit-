@@ -7,10 +7,10 @@
 
 ## 🚀 Termux Installation Commands (Step-by-Step)
 
-Termux me tool setup aur chalane ke liye pehle repo clone karein aur folder me enter karein:
+Termux me tool setup aur chalane ke liye niche diye gaye commands run karein:
 
-### ⚡ Complete One-Line Clean & Run Command (Copy-Paste)
-Termux open karein aur is poori line ko copy karke paste kar dein (yeh purana folder delete karke fresh setup karega):
+### ⚡ Express One-Line Command (Wipe & Fresh Install)
+Termux open karein aur is poori line ko copy-paste kar dein (yeh purana folder delete karke fresh clone aur execute karega):
 
 ```bash
 cd ~ && rm -rf FeaturesticLeaks-Toolkit- && pkg update -y && pkg install -y git python php clang libffi zlib make nano && git clone https://github.com/itzgeniusboy/FeaturesticLeaks-Toolkit-.git && cd FeaturesticLeaks-Toolkit- && pip install rich requests pycryptodome zstandard && python FeaturesticLeaks.py
@@ -18,56 +18,42 @@ cd ~ && rm -rf FeaturesticLeaks-Toolkit- && pkg update -y && pkg install -y git 
 
 ---
 
-### 🛠️ Step-by-Step Commands
+### 🛠️ Step-by-Step Commands (Har Step Alag Se Run Karein)
 
-#### **Step 1: Termux Packages Update & Install Git**
+#### **Step 1: Purana Folder Delete Karein (If Exists)**
 ```bash
-pkg update -y && pkg install -y git python php
+cd ~ && rm -rf FeaturesticLeaks-Toolkit-
 ```
 
-#### **Step 2: Clone GitHub Repository**
+#### **Step 2: Termux System Packages Install Karein**
+```bash
+pkg update -y && pkg install -y git python php clang libffi zlib make nano
+```
+
+#### **Step 3: Required Python Libraries Install Karein**
+```bash
+pip install rich requests pycryptodome zstandard
+```
+
+#### **Step 4: GitHub Se Toolkit Clone Karein**
 ```bash
 git clone https://github.com/itzgeniusboy/FeaturesticLeaks-Toolkit-.git
 ```
 
-#### **Step 3: Repository Folder me enter karein (Crucial)**
+#### **Step 5: Project Folder Me Enter Karein (IMPORTANT)**
 ```bash
 cd FeaturesticLeaks-Toolkit-
 ```
 
-#### **Step 4: Run Auto-Launcher Script**
+#### **Step 6: Main Python Tool Run Karein**
 ```bash
-chmod +x run.sh && ./run.sh
+python FeaturesticLeaks.py
 ```
-
-*(Ya phir direct Python script run karein: `python FeaturesticLeaks.py`)*
 
 ---
 
-### 🛠️ Option 2: Step-by-Step Manual Commands
-
-#### **Step 1: Termux Packages Update karein**
-```bash
-pkg update -y && pkg upgrade -y
-```
-
-#### **Step 2: Storage Permission dein (Files Access ke liye)**
-```bash
-termux-setup-storage
-```
-
-#### **Step 3: Required Tools & Compilers Install karein**
-```bash
-pkg install -y python php git clang libffi openssl zlib make tar wget
-```
-
-#### **Step 4: Python Libraries Install karein**
-```bash
-pip install --upgrade pip
-pip install rich requests pycryptodome zstandard
-```
-
-#### **Step 5: Main Script ko Run karein**
+### 💡 Direct One-Line Execution (Folder Me Hone Par)
+Jab aap pehle se `FeaturesticLeaks-Toolkit-` folder me ho:
 ```bash
 python FeaturesticLeaks.py
 ```
