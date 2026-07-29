@@ -19,6 +19,7 @@ export interface VerificationResponse {
   timestamp: string;
   data?: {
     key: string;
+    status?: string;
     expiry_date: string;
     days_remaining: number;
     registered_hwid: string;

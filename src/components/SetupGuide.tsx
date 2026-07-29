@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { BookOpen, Copy, Check, Terminal, ShieldAlert, Cpu, Download, ArrowRight } from 'lucide-react';
+import { BookOpen, Copy, Check, Terminal, ShieldAlert, Cpu, Download, ArrowRight, CheckCircle2 } from 'lucide-react';
 
 export const SetupGuide: React.FC = () => {
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
