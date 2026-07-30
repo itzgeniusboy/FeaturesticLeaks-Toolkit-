@@ -1542,8 +1542,12 @@ def ensure_directories(base_dir: Path):
     (base_dir / "UNPACK").mkdir(parents=True, exist_ok=True)
     (base_dir / "REPLACE").mkdir(parents=True, exist_ok=True)
     (base_dir / "INJECT").mkdir(parents=True, exist_ok=True)
+    (base_dir / "LUA").mkdir(parents=True, exist_ok=True)
     (base_dir / "REPACK").mkdir(parents=True, exist_ok=True)
     (base_dir / "RESULT").mkdir(parents=True, exist_ok=True)
+    (base_dir / "LOGS").mkdir(parents=True, exist_ok=True)
+    
+    # Backwards compatibility legacy paths
     pak_tool_dir = base_dir / "PAK TOOL"
     (pak_tool_dir / "EDIT").mkdir(parents=True, exist_ok=True)
     (pak_tool_dir / "UNPACK").mkdir(parents=True, exist_ok=True)
@@ -1558,7 +1562,9 @@ def ensure_directories(base_dir: Path):
             (sdcard_path / "UNPACK").mkdir(parents=True, exist_ok=True)
             (sdcard_path / "REPLACE").mkdir(parents=True, exist_ok=True)
             (sdcard_path / "INJECT").mkdir(parents=True, exist_ok=True)
+            (sdcard_path / "LUA").mkdir(parents=True, exist_ok=True)
             (sdcard_path / "RESULT").mkdir(parents=True, exist_ok=True)
+            (sdcard_path / "LOGS").mkdir(parents=True, exist_ok=True)
     except Exception:
         pass
 
@@ -1589,6 +1595,7 @@ def display_workspace_summary(data_path: Path):
     unpack_cnt = get_cnt("UNPACK")
     replace_cnt = get_cnt("REPLACE") + get_cnt("PAK TOOL", "EDIT")
     inject_cnt = get_cnt("INJECT")
+    lua_cnt = get_cnt("LUA")
     result_cnt = get_cnt("RESULT")
 
     table = Table(
@@ -1604,13 +1611,153 @@ def display_workspace_summary(data_path: Path):
     table.add_column("Files Found", justify="center", style="bold cyan", width=12)
 
     table.add_row("📥 PAK/", "Put original game .pak / .obb files here", f"[bold cyan]{pak_cnt}[/bold cyan]")
-    table.add_row("📂 UNPACK/", "Extracted files from Option 1 will go here", f"[bold cyan]{unpack_cnt}[/bold cyan]")
-    table.add_row("✏️ REPLACE/", "Put edited files here for Option 3 (Replace)", f"[bold yellow]{replace_cnt}[/bold yellow]")
-    table.add_row("💉 INJECT/", "Put custom files here for Option 4 (Inject Path)", f"[bold magenta]{inject_cnt}[/bold magenta]")
-    table.add_row("🚀 RESULT/", "Final repacked .pak / .obb output saved here", f"[bold green]{result_cnt}[/bold green]")
+    table.add_row("📂 UNPACK/", "Extracted files from Unpack tool", f"[bold cyan]{unpack_cnt}[/bold cyan]")
+    table.add_row("✏️ REPLACE/", "Put edited files here to replace existing PAK files", f"[bold yellow]{replace_cnt}[/bold yellow]")
+    table.add_row("💉 INJECT/", "Put custom files here for Inject Path mode", f"[bold magenta]{inject_cnt}[/bold magenta]")
+    table.add_row("🌙 LUA/", "Put .lua / .luac scripts here for Lua tools", f"[bold cyan]{lua_cnt}[/bold cyan]")
+    table.add_row("🚀 RESULT/", "Final repacked PAK, OBB & compiled files saved here", f"[bold green]{result_cnt}[/bold green]")
 
     console.print(table)
     console.print("[dim white]💡 SDCard Location: [bold cyan]/sdcard/FeaturesticLeaks/[/bold cyan] (ZArchiver / File Manager me direct dikhega)[/dim white]\n")
+
+def run_lua_compiler(data_path: Path):
+    console.print(Panel(Align.center("[bold bright_cyan]🌙 LUA COMPILER (.lua -> .luac Bytecode)[/bold bright_cyan]"), border_style="cyan", box=ROUNDED))
+    
+    lua_dir = data_path / "LUA"
+    lua_dir.mkdir(parents=True, exist_ok=True)
+    sd_lua = Path("/sdcard/FeaturesticLeaks/LUA")
+    try:
+        if sd_lua.parent.exists():
+            sd_lua.mkdir(parents=True, exist_ok=True)
+    except Exception:
+        pass
+
+    lua_file, _ = pick_file_from_folder("Compile Lua", lua_dir, extensions=[".lua"])
+    if not lua_file:
+        custom_input = safe_input('-> Enter custom .lua file path (or press Enter to cancel): ').strip().strip('"\'')
+        if not custom_input:
+            return
+        lua_file = Path(custom_input)
+        if not lua_file.exists() or not lua_file.is_file():
+            console.print(f'[bold red][X] File not found: {lua_file}[/bold red]')
+            return
+
+    compilers = ["luac5.1", "luac51", "luac", "luac5.2", "luac5.3", "luac5.4"]
+    found_compiler = None
+    for c in compilers:
+        if shutil.which(c):
+            found_compiler = c
+            break
+
+    if not found_compiler:
+        console.print(Panel(
+            "[bold red][X] Lua Compiler (luac) is not installed in Termux![/bold red]\n\n"
+            "[bold cyan]👉 To compile .lua scripts, run this command in Termux:[/bold cyan]\n"
+            "[bold yellow]   pkg install lua51[/bold yellow]  or  [bold yellow]pkg install lua[/bold yellow]\n\n"
+            "[dim white]Tip: 'lua51' provides 'luac5.1' matching Unreal Engine / PUBG Lua version.[/dim white]",
+            border_style="red", box=ROUNDED
+        ))
+        return
+
+    res_dir = data_path / "RESULT"
+    res_dir.mkdir(parents=True, exist_ok=True)
+    out_luac = res_dir / f"{lua_file.stem}.luac"
+
+    console.print(f"[bold cyan][+] Compiling {lua_file.name} using {found_compiler}...[/bold cyan]")
+    try:
+        proc = subprocess.run([found_compiler, "-o", str(out_luac), str(lua_file)], capture_output=True, text=True)
+        if proc.returncode == 0:
+            console.print(f"[bold green][OK] Compiled successfully: {out_luac}[/bold green]")
+            if sd_lua.exists():
+                try:
+                    shutil.copy2(out_luac, sd_lua / out_luac.name)
+                    console.print(f"[bold green][+] Saved to SDCard: {sd_lua / out_luac.name}[/bold green]")
+                except Exception:
+                    pass
+        else:
+            console.print(f"[bold red][X] Compilation failed:[/bold red]\n[white]{proc.stderr}[/white]")
+    except Exception as e:
+        console.print(f"[bold red][X] Error executing compiler: {e}[/bold red]")
+
+def run_lua_decompiler(data_path: Path):
+    console.print(Panel(Align.center("[bold bright_cyan]🌙 LUA DECOMPILER (.luac Bytecode -> .lua Source)[/bold bright_cyan]"), border_style="cyan", box=ROUNDED))
+    
+    lua_dir = data_path / "LUA"
+    lua_dir.mkdir(parents=True, exist_ok=True)
+    sd_lua = Path("/sdcard/FeaturesticLeaks/LUA")
+    try:
+        if sd_lua.parent.exists():
+            sd_lua.mkdir(parents=True, exist_ok=True)
+    except Exception:
+        pass
+
+    luac_file, _ = pick_file_from_folder("Decompile Lua", lua_dir, extensions=[".luac", ".lua", ".bytecode", ".bytes"])
+    if not luac_file:
+        custom_input = safe_input('-> Enter custom .luac file path (or press Enter to cancel): ').strip().strip('"\'')
+        if not custom_input:
+            return
+        luac_file = Path(custom_input)
+        if not luac_file.exists() or not luac_file.is_file():
+            console.print(f'[bold red][X] File not found: {luac_file}[/bold red]')
+            return
+
+    res_dir = data_path / "RESULT"
+    res_dir.mkdir(parents=True, exist_ok=True)
+    out_lua = res_dir / f"{luac_file.stem}_decompiled.lua"
+
+    luadec_bin = shutil.which("luadec")
+    java_bin = shutil.which("java")
+
+    unluac_jar = None
+    possible_jars = [
+        data_path / "unluac.jar",
+        Path.home() / "unluac.jar",
+        Path("/data/data/com.termux/files/usr/share/java/unluac.jar")
+    ]
+    for j in possible_jars:
+        if j.exists():
+            unluac_jar = j
+            break
+
+    decompiled_text = None
+
+    if luadec_bin:
+        console.print(f"[bold cyan][+] Decompiling using luadec...[/bold cyan]")
+        try:
+            proc = subprocess.run([luadec_bin, str(luac_file)], capture_output=True, text=True)
+            if proc.returncode == 0 and proc.stdout.strip():
+                decompiled_text = proc.stdout
+        except Exception as e:
+            console.print(f"[dim red][!] luadec failed: {e}[/dim red]")
+
+    if not decompiled_text and java_bin and unluac_jar:
+        console.print(f"[bold cyan][+] Decompiling using unluac ({unluac_jar.name})...[/bold cyan]")
+        try:
+            proc = subprocess.run([java_bin, "-jar", str(unluac_jar), str(luac_file)], capture_output=True, text=True)
+            if proc.returncode == 0 and proc.stdout.strip():
+                decompiled_text = proc.stdout
+        except Exception as e:
+            console.print(f"[dim red][!] unluac failed: {e}[/dim red]")
+
+    if decompiled_text:
+        out_lua.write_text(decompiled_text, encoding="utf-8")
+        console.print(f"[bold green][OK] Decompiled successfully: {out_lua}[/bold green]")
+        if sd_lua.exists():
+            try:
+                shutil.copy2(out_lua, sd_lua / out_lua.name)
+                console.print(f"[bold green][+] Saved to SDCard: {sd_lua / out_lua.name}[/bold green]")
+            except Exception:
+                pass
+    else:
+        console.print(Panel(
+            "[bold red][X] No Lua Decompiler tool (luadec or unluac) found in Termux![/bold red]\n\n"
+            "[bold cyan]👉 Option 1: Install Java & unluac (Recommended for Lua 5.1 / PUBG):[/bold cyan]\n"
+            "[bold yellow]   1. pkg install openjdk-17[/bold yellow]\n"
+            "[bold yellow]   2. curl -L -o unluac.jar https://github.com/tech23-bot/unluac/releases/download/v1.0/unluac.jar[/bold yellow]\n\n"
+            "[bold cyan]👉 Option 2: Install luadec:[/bold cyan]\n"
+            "[bold yellow]   pkg install luadec[/bold yellow]",
+            border_style="red", box=ROUNDED
+        ))
 
 def show_workflow_guide():
     console.print(Panel(Align.center("[bold bright_cyan]📖 FEATURESTIC LEAKS - EASY STEP-BY-STEP WORKFLOW GUIDE[/bold bright_cyan]"), border_style="cyan", box=ROUNDED))
@@ -2715,26 +2862,11 @@ def run_obb_manager(data_path: Path) -> None:
         except Exception as e:
             handle_exception(e, "Rezip OBB", data_path)
 
-_BOOTED = False
-
-def main_menu():
-    global _BOOTED
-    if not _BOOTED:
-        boot_sequence()
-        _BOOTED = True
-
-    play_welcome_audio()
-    if getattr(sys, 'frozen', False):
-        data_path = Path(sys.executable).parent
-    else:
-        data_path = Path(__file__).parent
-    ensure_directories(data_path)
-    check_and_auto_update()
-    
+def pak_obb_tools_menu(data_path: Path):
     while True:
         print_banner()
-        display_workspace_summary(data_path)
         menu_table = Table(
+            title="[bold bright_cyan]📦 PAK / OBB TOOLS[/bold bright_cyan]",
             show_header=True,
             header_style="bold cyan",
             box=ROUNDED,
@@ -2744,25 +2876,20 @@ def main_menu():
         menu_table.add_column("Option", justify="center", width=8)
         menu_table.add_column("Action", justify="left", width=18)
         menu_table.add_column("Description", justify="left")
-        
+
         menu_table.add_row("[bold cyan]1[/bold cyan]", "[bold cyan]Unpack[/bold cyan]", "[dim cyan]Extract PAK / OBB package contents[/dim cyan]")
         menu_table.add_row("[bold green]2[/bold green]", "[bold green]Repack[/bold green]", "[dim green]Rebuild workspace to PAK / OBB[/dim green]")
         menu_table.add_row("[bold yellow]3[/bold yellow]", "[bold yellow]Replace Files[/bold yellow]", "[dim yellow]Inject edited files into existing structure[/dim yellow]")
         menu_table.add_row("[bold magenta]4[/bold magenta]", "[bold magenta]Inject Path[/bold magenta]", "[dim magenta]Inject files into custom PAK target path[/dim magenta]")
         menu_table.add_row("[bold cyan]5[/bold cyan]", "[bold cyan]White Body Mod[/bold cyan]", "[dim cyan]One-click character & gear asset nuller[/dim cyan]")
-        menu_table.add_row("[bold green]6[/bold green]", "[bold green]UE4 String Tool[/bold green]", "[dim green]Extract & repack .uasset/.uexp strings[/dim green]")
-        menu_table.add_row("[bold yellow]7[/bold yellow]", "[bold yellow]File Finder[/bold yellow]", "[dim yellow]Search .uasset/.uexp/.ubulk by pattern[/dim yellow]")
-        menu_table.add_row("[bold magenta]8[/bold magenta]", "[bold magenta]Skin ID Swap[/bold magenta]", "[dim magenta]Swap Lobby, Ingame & Weapon skin IDs[/dim magenta]")
-        menu_table.add_row("[bold blue]9[/bold blue]", "[bold blue]OBB Manager[/bold blue]", "[dim blue]Unzip & Rezip OBB with size padding[/dim blue]")
-        menu_table.add_row("[bold red]10[/bold red]", "[bold red]Cleanup[/bold red]", "[dim red]Delete workspace folders[/dim red]")
-        menu_table.add_row("[bold bright_magenta]11[/bold bright_magenta]", "[bold bright_magenta]Termux Setup[/bold bright_magenta]", "[dim bright_magenta]Setup 'leak' direct command & SDCard folders[/dim bright_magenta]")
-        menu_table.add_row("[bold bright_green]12[/bold bright_green]", "[bold bright_green]Folder Guide[/bold bright_green]", "[dim bright_green]Step-by-step guide & folder location help[/dim bright_green]")
-        menu_table.add_row("[dim]0[/dim]", "[dim]Exit[/dim]", "[dim]Close application[/dim]")
-        
+        menu_table.add_row("[bold magenta]6[/bold magenta]", "[bold magenta]Skin ID Swap[/bold magenta]", "[dim magenta]Swap Lobby, Ingame & Weapon skin IDs[/dim magenta]")
+        menu_table.add_row("[bold blue]7[/bold blue]", "[bold blue]OBB Manager[/bold blue]", "[dim blue]Unzip & Rezip OBB with size padding[/dim blue]")
+        menu_table.add_row("[dim]0[/dim]", "[dim]Back[/dim]", "[dim]Return to Main Menu[/dim]")
+
         console.print(menu_table)
         console.print()
-        choice = safe_input('-> Select option (0-12): ').strip()
-        
+        choice = safe_input('-> Select PAK/OBB option (0-7): ').strip()
+
         if choice == '1':
             pak_dir = data_path / "PAK"
             pak_dir.mkdir(parents=True, exist_ok=True)
@@ -2776,7 +2903,7 @@ def main_menu():
                 unpack_path = data_path / "UNPACK" / pak_file.stem
                 repack_path = data_path / "REPACK" / pak_file.stem
                 pak.dump(unpack_path)
-                
+
                 sd_unpack = Path("/sdcard/FeaturesticLeaks/UNPACK") / pak_file.stem
                 if sd_unpack.parent.exists() and sd_unpack != unpack_path:
                     try:
@@ -2795,7 +2922,7 @@ def main_menu():
             except Exception as e:
                 handle_exception(e, "Unpack", data_path)
             safe_input('\nPress Enter to continue...')
-            
+
         elif choice == '2':
             pak_dir = data_path / "PAK"
             pak_dir.mkdir(parents=True, exist_ok=True)
@@ -2821,7 +2948,7 @@ def main_menu():
                     repack_gamepatch(pak, repack_dir, output_pak)
                 else:
                     repack_obbzsdic(pak, repack_dir, output_pak)
-                
+
                 sd_res = Path("/sdcard/FeaturesticLeaks/RESULT")
                 if sd_res.exists():
                     try:
@@ -2833,14 +2960,14 @@ def main_menu():
             except Exception as e:
                 handle_exception(e, "Repack", data_path)
             safe_input('\nPress Enter to continue...')
-            
+
         elif choice == '3':
             pak_dir = data_path / "PAK"
             pak_file, _ = pick_file_from_folder("Replace Files", pak_dir)
             if not pak_file:
                 safe_input('\nPress Enter to continue...')
                 continue
-            
+
             cand_dirs = [
                 data_path / "REPLACE",
                 Path("/sdcard/FeaturesticLeaks/REPLACE"),
@@ -2852,7 +2979,7 @@ def main_menu():
                 if cd.exists() and any(cd.iterdir()):
                     actual_edit_path = cd
                     break
-                    
+
             if not actual_edit_path:
                 console.print('[yellow][!] REPLACE source folder me koi file nahi mili![/yellow]')
                 console.print('[cyan]👉 Pehle edited files ko /sdcard/FeaturesticLeaks/REPLACE/ me daalo.[/cyan]')
@@ -2866,16 +2993,16 @@ def main_menu():
                     safe_input('\nPress Enter to continue...')
                     continue
                 actual_edit_path = custom_p
-            
+
             try:
                 console.print(f'[bold cyan][+] Replacing files using source: {actual_edit_path}[/bold cyan]')
                 pak = TencentPakFile(pak_file)
                 result_dir = data_path / "RESULT"
                 result_dir.mkdir(parents=True, exist_ok=True)
                 output_pak = result_dir / pak_file.name
-                
+
                 count = repack_pak_file_full(pak, actual_edit_path, output_pak)
-                
+
                 sd_res = Path("/sdcard/FeaturesticLeaks/RESULT")
                 if sd_res.exists():
                     try:
@@ -2883,7 +3010,7 @@ def main_menu():
                         console.print(f'[bold green][+] Saved to SDCard: {sd_res / pak_file.name}[/bold green]')
                     except Exception:
                         pass
-                
+
                 if count > 0:
                     console.print(f'[bold green][OK] Repacked {count} file(s) successfully![/bold green]')
                     console.print(f'[bold green][+] Output: {output_pak}[/bold green]')
@@ -2894,18 +3021,18 @@ def main_menu():
                             console.print(f'[bold green][OK] Updated original file at {pak_file}[/bold green]')
                 else:
                     console.print('[bold red][X] No files repacked.[/bold red]')
-                    
+
             except Exception as e:
                 handle_exception(e, "Replace Files", data_path)
             safe_input('\nPress Enter to continue...')
-            
+
         elif choice == '4':
             pak_dir = data_path / "PAK"
             pak_file, _ = pick_file_from_folder("Inject Path", pak_dir)
             if not pak_file:
                 safe_input('\nPress Enter to continue...')
                 continue
-            
+
             cand_dirs = [
                 data_path / "INJECT",
                 Path("/sdcard/FeaturesticLeaks/INJECT"),
@@ -2918,7 +3045,7 @@ def main_menu():
                 if cd.exists() and any(cd.iterdir()):
                     actual_edit_path = cd
                     break
-                    
+
             if not actual_edit_path:
                 console.print('[yellow][!] INJECT source folder me koi file nahi mili![/yellow]')
                 console.print('[cyan]👉 Pehle source files ko /sdcard/FeaturesticLeaks/INJECT/ me daalo.[/cyan]')
@@ -2932,7 +3059,7 @@ def main_menu():
                     safe_input('\nPress Enter to continue...')
                     continue
                 actual_edit_path = custom_p
-            
+
             console.print(f'[bold cyan][+] Source files selected from: {actual_edit_path}[/bold cyan]')
             console.print('[cyan]-> Enter target folder path inside PAK (e.g. ShadowTrackerExtra/Saved/Paks):[/cyan]')
             target_path = safe_input('Target Path: ').strip().strip('"\'')
@@ -2940,15 +3067,15 @@ def main_menu():
                 console.print('[bold red][X] Target path cannot be empty.[/bold red]')
                 safe_input('\nPress Enter to continue...')
                 continue
-                
+
             try:
                 pak = TencentPakFile(pak_file)
                 result_dir = data_path / "RESULT"
                 result_dir.mkdir(parents=True, exist_ok=True)
                 output_pak = result_dir / pak_file.name
-                
+
                 count = repack_pak_file_full(pak, actual_edit_path, output_pak, target_path=target_path, force_add=True)
-                
+
                 sd_res = Path("/sdcard/FeaturesticLeaks/RESULT")
                 if sd_res.exists():
                     try:
@@ -2956,7 +3083,7 @@ def main_menu():
                         console.print(f'[bold green][+] Saved to SDCard: {sd_res / pak_file.name}[/bold green]')
                     except Exception:
                         pass
-                
+
                 if count > 0:
                     console.print(f'[bold green][OK] Injected {count} file(s) successfully -> {output_pak.name}[/bold green]')
                     console.print(f'[bold green][+] Full Output Path: {output_pak}[/bold green]')
@@ -2967,49 +3094,165 @@ def main_menu():
                             console.print(f'[bold green][OK] Updated original file at {pak_file}[/bold green]')
                 else:
                     console.print('[bold red][X] No files were injected.[/bold red]')
-                    
+
             except Exception as e:
                 handle_exception(e, "Inject Path", data_path)
             safe_input('\nPress Enter to continue...')
-            
+
         elif choice == '5':
             run_white_body_mod(data_path)
             safe_input('\nPress Enter to continue...')
-            
+
         elif choice == '6':
-            run_ue4_string_tool(data_path)
-            safe_input('\nPress Enter to continue...')
-            
-        elif choice == '7':
-            run_file_finder_tool(data_path)
-            safe_input('\nPress Enter to continue...')
-            
-        elif choice == '8':
             run_skin_id_modder(data_path)
             safe_input('\nPress Enter to continue...')
-            
-        elif choice == '9':
+
+        elif choice == '7':
             run_obb_manager(data_path)
             safe_input('\nPress Enter to continue...')
-            
-        elif choice == '10':
-            delete_folder(data_path)
+
+        elif choice == '0':
+            break
+        else:
+            console.print('[bold red][X] Invalid choice.[/bold red]')
+            time.sleep(1)
+
+def lua_tools_menu(data_path: Path):
+    while True:
+        print_banner()
+        menu_table = Table(
+            title="[bold bright_cyan]🌙 LUA TOOLS[/bold bright_cyan]",
+            show_header=True,
+            header_style="bold cyan",
+            box=ROUNDED,
+            border_style="dim cyan",
+            expand=True
+        )
+        menu_table.add_column("Option", justify="center", width=8)
+        menu_table.add_column("Action", justify="left", width=18)
+        menu_table.add_column("Description", justify="left")
+
+        menu_table.add_row("[bold cyan]1[/bold cyan]", "[bold cyan]Compile Lua[/bold cyan]", "[dim cyan]Convert .lua source to .luac bytecode[/dim cyan]")
+        menu_table.add_row("[bold green]2[/bold green]", "[bold green]Decompile Lua[/bold green]", "[dim green]Convert .luac bytecode to .lua source[/dim green]")
+        menu_table.add_row("[dim]0[/dim]", "[dim]Back[/dim]", "[dim]Return to Main Menu[/dim]")
+
+        console.print(menu_table)
+        console.print()
+        choice = safe_input('-> Select Lua option (0-2): ').strip()
+
+        if choice == '1':
+            run_lua_compiler(data_path)
             safe_input('\nPress Enter to continue...')
-            
-        elif choice == '11':
-            install_termux_shortcut_and_sdcard(data_path)
+        elif choice == '2':
+            run_lua_decompiler(data_path)
             safe_input('\nPress Enter to continue...')
-            
-        elif choice == '12':
+        elif choice == '0':
+            break
+        else:
+            console.print('[bold red][X] Invalid choice.[/bold red]')
+            time.sleep(1)
+
+def utilities_menu(data_path: Path):
+    while True:
+        print_banner()
+        menu_table = Table(
+            title="[bold bright_cyan]🛠️ UTILITIES & HELP[/bold bright_cyan]",
+            show_header=True,
+            header_style="bold cyan",
+            box=ROUNDED,
+            border_style="dim cyan",
+            expand=True
+        )
+        menu_table.add_column("Option", justify="center", width=8)
+        menu_table.add_column("Action", justify="left", width=22)
+        menu_table.add_column("Description", justify="left")
+
+        menu_table.add_row("[bold cyan]1[/bold cyan]", "[bold cyan]UE4 String Tool[/bold cyan]", "[dim cyan]Extract & repack .uasset/.uexp strings[/dim cyan]")
+        menu_table.add_row("[bold green]2[/bold green]", "[bold green]File Finder[/bold green]", "[dim green]Search .uasset/.uexp/.ubulk by pattern[/dim green]")
+        menu_table.add_row("[bold yellow]3[/bold yellow]", "[bold yellow]Workspace Summary & Guide[/bold yellow]", "[dim yellow]Folder guide & live file count summary[/dim yellow]")
+        menu_table.add_row("[bold bright_magenta]4[/bold bright_magenta]", "[bold bright_magenta]Termux Auto-Setup[/bold bright_magenta]", "[dim bright_magenta]Setup 'leak' direct command & SDCard folders[/dim bright_magenta]")
+        menu_table.add_row("[bold red]5[/bold red]", "[bold red]Cleanup Workspace[/bold red]", "[dim red]Delete workspace folders[/dim red]")
+        menu_table.add_row("[dim]0[/dim]", "[dim]Back[/dim]", "[dim]Return to Main Menu[/dim]")
+
+        console.print(menu_table)
+        console.print()
+        choice = safe_input('-> Select Utility option (0-5): ').strip()
+
+        if choice == '1':
+            run_ue4_string_tool(data_path)
+            safe_input('\nPress Enter to continue...')
+        elif choice == '2':
+            run_file_finder_tool(data_path)
+            safe_input('\nPress Enter to continue...')
+        elif choice == '3':
+            print_banner()
+            display_workspace_summary(data_path)
             show_workflow_guide()
             safe_input('\nPress Enter to continue...')
-            
+        elif choice == '4':
+            install_termux_shortcut_and_sdcard(data_path)
+            safe_input('\nPress Enter to continue...')
+        elif choice == '5':
+            delete_folder(data_path)
+            safe_input('\nPress Enter to continue...')
+        elif choice == '0':
+            break
+        else:
+            console.print('[bold red][X] Invalid choice.[/bold red]')
+            time.sleep(1)
+
+_BOOTED = False
+
+def main_menu():
+    global _BOOTED
+    if not _BOOTED:
+        boot_sequence()
+        _BOOTED = True
+
+    play_welcome_audio()
+    if getattr(sys, 'frozen', False):
+        data_path = Path(sys.executable).parent
+    else:
+        data_path = Path(__file__).parent
+    ensure_directories(data_path)
+    check_and_auto_update()
+
+    while True:
+        print_banner()
+        display_workspace_summary(data_path)
+        menu_table = Table(
+            title="[bold bright_cyan]⚡ MAIN MENU — CATEGORIES[/bold bright_cyan]",
+            show_header=True,
+            header_style="bold cyan",
+            box=ROUNDED,
+            border_style="dim cyan",
+            expand=True
+        )
+        menu_table.add_column("Category", justify="center", width=10)
+        menu_table.add_column("Title", justify="left", width=22)
+        menu_table.add_column("Features / Tools Included", justify="left")
+
+        menu_table.add_row("[bold cyan]1[/bold cyan]", "[bold cyan]📦 PAK / OBB Tools[/bold cyan]", "[dim cyan]Unpack, Repack, Replace Files, Inject Path, Mods, OBB[/dim cyan]")
+        menu_table.add_row("[bold green]2[/bold green]", "[bold green]🌙 Lua Tools[/bold green]", "[dim green]Compile (.lua -> .luac) & Decompile (.luac -> .lua)[/dim green]")
+        menu_table.add_row("[bold yellow]3[/bold yellow]", "[bold yellow]🛠️ Utilities & Help[/bold yellow]", "[dim yellow]UE4 String Tool, File Finder, Summary, Setup, Cleanup[/dim yellow]")
+        menu_table.add_row("[dim]0[/dim]", "[dim]Exit[/dim]", "[dim]Close application[/dim]")
+
+        console.print(menu_table)
+        console.print()
+        choice = safe_input('-> Select category (0-3): ').strip()
+
+        if choice == '1':
+            pak_obb_tools_menu(data_path)
+        elif choice == '2':
+            lua_tools_menu(data_path)
+        elif choice == '3':
+            utilities_menu(data_path)
         elif choice == '0':
             console.print("[dim white]Exiting Featurestic Leaks. Goodbye![/dim white]")
             time.sleep(1)
             break
         else:
-            console.print('[bold red][X] Invalid option choice.[/bold red]')
+            console.print('[bold red][X] Invalid category choice.[/bold red]')
             time.sleep(1)
 
 if __name__ == '__main__':
