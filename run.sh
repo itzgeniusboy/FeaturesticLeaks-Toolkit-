@@ -2,12 +2,14 @@
 # ==============================================================================
 # TERMUX AUTO-LAUNCHER & INSTALLER SCRIPT
 # TOOL : FEATURESTIC LEAKS PAK TOOL v2.0
+# DEVELOPER TELEGRAM : @L359D (https://t.me/L359D)
 # TELEGRAM CHANNEL : https://t.me/FeaturesticLeaks
 # ==============================================================================
 
 set -e
 
 echo -e "\e[1;36m[+] FeaturesticLeaks PAK Tool v2.0 - Termux Launcher\e[0m"
+echo -e "\e[1;32m👤 Developer Telegram: @L359D (https://t.me/L359D)\e[0m"
 echo -e "\e[1;33m📢 Official Telegram Channel: https://t.me/FeaturesticLeaks\e[0m\n"
 
 # Check & Request Storage Permission in Termux

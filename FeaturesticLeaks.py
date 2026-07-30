@@ -1,4 +1,5 @@
 # FEATURESTIC LEAKS - PAK TOOL v2.0
+# Developer Telegram: @L359D (https://t.me/L359D)
 # Official Telegram Channel: https://t.me/FeaturesticLeaks
 # Termux / Linux Android Game Reverse Engineering & PAK Manipulation Toolkit
 
@@ -2452,7 +2453,7 @@ def print_banner():
         "[bold bright_cyan]⚡ FEATURESTIC LEAKS ⚡[/bold bright_cyan]\n"
         "[dim cyan]────────────────────────────────────────────────[/dim cyan]\n"
         "[bold white]PAK TOOL v2.0 — Termux Suite[/bold white]\n"
-        "[dim white]Telegram: https://t.me/FeaturesticLeaks[/dim white]"
+        "[bold yellow]Developer:[bold white] @L359D[/bold white][/bold yellow] [dim cyan]|[/dim cyan] [bold yellow]Channel:[bold white] t.me/FeaturesticLeaks[/bold white][/bold yellow]"
     )
     
     banner_panel = Panel(

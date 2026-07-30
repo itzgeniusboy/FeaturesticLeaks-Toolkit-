@@ -1,6 +1,8 @@
 #!/data/data/com.termux/files/usr/bin/sh
 echo "=========================================="
 echo "⚡ FeaturesticLeaks Termux Auto-Setup ⚡"
+echo "👤 Developer: @L359D (Telegram)"
+echo "📢 Channel: https://t.me/FeaturesticLeaks"
 echo "=========================================="
 
 echo "[1/4] Setting up storage permissions..."
