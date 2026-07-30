@@ -3678,11 +3678,22 @@ def pak_obb_tools_menu(data_path: Path):
                     continue
                 actual_edit_path = custom_p
 
-            console.print(f'[bold cyan][+] Source files selected from: {actual_edit_path}[/bold cyan]')
-            console.print('[cyan]-> Enter target folder path inside PAK (e.g. ShadowTrackerExtra/Saved/Paks):[/cyan]')
-            target_path = safe_input('Target Path: ').strip().strip('"\'')
-            if not target_path:
-                console.print('[bold red][X] Target path cannot be empty.[/bold red]')
+            console.print(f"\n[bold green][OK] Source files selected from:[/bold green] [cyan]{actual_edit_path}[/cyan]\n")
+            console.print(Panel(
+                "[bold bright_cyan]📂 ENTER TARGET PATH INSIDE PAK CONTAINER[/bold bright_cyan]\n"
+                "[dim white]PAK ke andar kis folder path par files inject karni hain woh path yahan write/paste karein.[/dim white]\n\n"
+                "[bold yellow]📌 Examples:[/bold yellow]\n"
+                "  [bold cyan]Example 1:[/bold cyan] [bold white]Content/Lua/GameLua/Mod/BRMod/Gameplay/Core[/bold white]\n"
+                "  [bold cyan]Example 2:[/bold cyan] [bold white]ShadowTrackerExtra/Saved/Paks[/bold white]\n"
+                "  [bold cyan]Example 3:[/bold cyan] [bold white]ShadowTrackerExtra/Content/Paks[/bold white]",
+                title="[bold yellow]💡 TARGET PATH HELP & EXAMPLES[/bold yellow]",
+                border_style="cyan",
+                box=ROUNDED,
+                padding=(0, 2)
+            ))
+            target_path = safe_input('\n-> Enter Target Path (or "C" to cancel): ').strip().strip('"\'')
+            if not target_path or target_path.upper() == 'C':
+                console.print('[bold yellow][!] Path injection cancelled.[/bold yellow]')
                 safe_input('\nPress Enter to continue...')
                 continue
 
