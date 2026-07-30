@@ -1540,6 +1540,8 @@ def repack_gamepatch(pak, repack_dir, output_pak):
 def ensure_directories(base_dir: Path):
     (base_dir / "PAK").mkdir(parents=True, exist_ok=True)
     (base_dir / "UNPACK").mkdir(parents=True, exist_ok=True)
+    (base_dir / "REPLACE").mkdir(parents=True, exist_ok=True)
+    (base_dir / "INJECT").mkdir(parents=True, exist_ok=True)
     (base_dir / "REPACK").mkdir(parents=True, exist_ok=True)
     (base_dir / "RESULT").mkdir(parents=True, exist_ok=True)
     pak_tool_dir = base_dir / "PAK TOOL"
@@ -1547,6 +1549,137 @@ def ensure_directories(base_dir: Path):
     (pak_tool_dir / "UNPACK").mkdir(parents=True, exist_ok=True)
     (pak_tool_dir / "RESULT").mkdir(parents=True, exist_ok=True)
     (pak_tool_dir / "PAK").mkdir(parents=True, exist_ok=True)
+
+    sdcard_path = Path("/sdcard/FeaturesticLeaks")
+    try:
+        if sdcard_path.parent.exists():
+            sdcard_path.mkdir(parents=True, exist_ok=True)
+            (sdcard_path / "PAK").mkdir(parents=True, exist_ok=True)
+            (sdcard_path / "UNPACK").mkdir(parents=True, exist_ok=True)
+            (sdcard_path / "REPLACE").mkdir(parents=True, exist_ok=True)
+            (sdcard_path / "INJECT").mkdir(parents=True, exist_ok=True)
+            (sdcard_path / "RESULT").mkdir(parents=True, exist_ok=True)
+    except Exception:
+        pass
+
+def display_workspace_summary(data_path: Path):
+    sd_path = Path("/sdcard/FeaturesticLeaks")
+    
+    def get_cnt(folder_name: str, subfolder: str = "") -> int:
+        cnt = 0
+        paths = []
+        p1 = data_path / folder_name
+        if subfolder: p1 = p1 / subfolder
+        paths.append(p1)
+        
+        if sd_path.exists():
+            p2 = sd_path / folder_name
+            if subfolder: p2 = p2 / subfolder
+            paths.append(p2)
+            
+        for p in paths:
+            if p.exists():
+                try:
+                    cnt += len([f for f in p.rglob("*") if f.is_file()])
+                except Exception:
+                    pass
+        return cnt
+
+    pak_cnt = get_cnt("PAK")
+    unpack_cnt = get_cnt("UNPACK")
+    replace_cnt = get_cnt("REPLACE") + get_cnt("PAK TOOL", "EDIT")
+    inject_cnt = get_cnt("INJECT")
+    result_cnt = get_cnt("RESULT")
+
+    table = Table(
+        title="[bold bright_cyan]🗺️ WORKSPACE FOLDER GUIDE & LIVE FILE COUNT[/bold bright_cyan]",
+        border_style="dim cyan",
+        box=ROUNDED,
+        show_header=True,
+        header_style="bold yellow",
+        expand=True
+    )
+    table.add_column("Folder Name", justify="left", style="bold white", width=14)
+    table.add_column("Where to Put / Purpose", justify="left", style="dim white")
+    table.add_column("Files Found", justify="center", style="bold cyan", width=12)
+
+    table.add_row("📥 PAK/", "Put original game .pak / .obb files here", f"[bold cyan]{pak_cnt}[/bold cyan]")
+    table.add_row("📂 UNPACK/", "Extracted files from Option 1 will go here", f"[bold cyan]{unpack_cnt}[/bold cyan]")
+    table.add_row("✏️ REPLACE/", "Put edited files here for Option 3 (Replace)", f"[bold yellow]{replace_cnt}[/bold yellow]")
+    table.add_row("💉 INJECT/", "Put custom files here for Option 4 (Inject Path)", f"[bold magenta]{inject_cnt}[/bold magenta]")
+    table.add_row("🚀 RESULT/", "Final repacked .pak / .obb output saved here", f"[bold green]{result_cnt}[/bold green]")
+
+    console.print(table)
+    console.print("[dim white]💡 SDCard Location: [bold cyan]/sdcard/FeaturesticLeaks/[/bold cyan] (ZArchiver / File Manager me direct dikhega)[/dim white]\n")
+
+def show_workflow_guide():
+    console.print(Panel(Align.center("[bold bright_cyan]📖 FEATURESTIC LEAKS - EASY STEP-BY-STEP WORKFLOW GUIDE[/bold bright_cyan]"), border_style="cyan", box=ROUNDED))
+    
+    guide_text = """
+[bold yellow]1️⃣ STEP 1: ORIGINAL PAK FILE DAALO[/bold yellow]
+• Apni game .pak ya .obb file ko is folder me rakho:
+  👉 [bold cyan]/sdcard/FeaturesticLeaks/PAK/[/bold cyan]
+• Tool kholo aur [bold green]Option 1 (Unpack)[/bold green] run karo.
+• Files extract ho kar [bold cyan]/sdcard/FeaturesticLeaks/UNPACK/[/bold cyan] me chali jayengi.
+
+[bold yellow]2️⃣ STEP 2: FILES EDIT KARO & REPLACEMENT RAKHO[/bold yellow]
+• [bold white]Option A (Existing file replace karni hai):[/bold white]
+  Edited files ko [bold cyan]/sdcard/FeaturesticLeaks/REPLACE/[/bold cyan] folder me daalo.
+  Phir main menu se [bold green]Option 3 (Replace Files)[/bold green] run karo.
+  
+• [bold white]Option B (Custom internal path par new file inject karni hai):[/bold white]
+  New files ko [bold cyan]/sdcard/FeaturesticLeaks/INJECT/[/bold cyan] folder me daalo.
+  Phir main menu se [bold green]Option 4 (Inject Path)[/bold green] run karo aur internal path enter karo.
+
+[bold yellow]3️⃣ STEP 3: MODDED PAK OUTPUT LE LO[/bold yellow]
+• Aapki modified output .pak file is folder me milegi:
+  👉 [bold green]/sdcard/FeaturesticLeaks/RESULT/[/bold green]
+• Is file ko Game/OBB folder me copy kar do aur game start karo!
+    """
+    console.print(Panel(guide_text, border_style="dim white", box=ROUNDED))
+
+def install_termux_shortcut_and_sdcard(data_path: Path):
+    console.print("\n[bold cyan][+] Setting up Termux One-Command Shortcut & SDCard Workspace...[/bold cyan]")
+    
+    sdcard_path = Path("/sdcard/FeaturesticLeaks")
+    try:
+        sdcard_path.mkdir(parents=True, exist_ok=True)
+        (sdcard_path / "PAK").mkdir(parents=True, exist_ok=True)
+        (sdcard_path / "REPLACE").mkdir(parents=True, exist_ok=True)
+        (sdcard_path / "INJECT").mkdir(parents=True, exist_ok=True)
+        (sdcard_path / "RESULT").mkdir(parents=True, exist_ok=True)
+        (sdcard_path / "UNPACK").mkdir(parents=True, exist_ok=True)
+        console.print(f"[bold green][OK] SDCard Workspace Created: /sdcard/FeaturesticLeaks/[/bold green]")
+    except Exception as e:
+        console.print(f"[yellow][!] Notice: SDCard folder permission check skipped.[/yellow]")
+    
+    script_file = Path(__file__).resolve()
+    usr_bin_leak = Path("/data/data/com.termux/files/usr/bin/leak")
+    
+    shortcut_created = False
+    if usr_bin_leak.parent.exists():
+        try:
+            content = f"#!/data/data/com.termux/files/usr/bin/sh\npython3 \"{script_file}\" \"$@\"\n"
+            usr_bin_leak.write_text(content, encoding="utf-8")
+            usr_bin_leak.chmod(0o755)
+            console.print("[bold green][OK] Created Termux command shortcut: 'leak'[/bold green]")
+            shortcut_created = True
+        except Exception:
+            pass
+            
+    if not shortcut_created:
+        bashrc = Path.home() / ".bashrc"
+        alias_line = f"alias leak='python3 \"{script_file}\"'\n"
+        try:
+            current_bashrc = bashrc.read_text(encoding="utf-8") if bashrc.exists() else ""
+            if "alias leak=" not in current_bashrc:
+                with open(bashrc, "a", encoding="utf-8") as f:
+                    f.write("\n" + alias_line)
+            console.print("[bold green][OK] Added 'leak' alias to ~/.bashrc[/bold green]")
+        except Exception:
+            pass
+            
+    console.print("\n[bold green]🎉 Complete! Ab Termux me kahin bhi sirf 'leak' type karo aur tool ready![/bold green]")
 
 def print_banner():
     os.system('cls' if os.name == 'nt' else 'clear')
@@ -1930,9 +2063,18 @@ def pick_file_from_folder(action_title: str, default_folder: Path, extensions: L
         
         # Scan folder
         found_files = []
-        for p in target_path.iterdir():
-            if p.is_file() and any(p.name.lower().endswith(ext) for ext in extensions):
-                found_files.append(p)
+        scan_dirs = [target_path]
+        
+        sd_twin = Path("/sdcard/FeaturesticLeaks") / target_path.name
+        if sd_twin.exists() and sd_twin != target_path:
+            scan_dirs.append(sd_twin)
+            
+        for sdir in scan_dirs:
+            if sdir.exists() and sdir.is_dir():
+                for p in sdir.iterdir():
+                    if p.is_file() and any(p.name.lower().endswith(ext) for ext in extensions):
+                        if not any(existing.name.lower() == p.name.lower() for existing in found_files):
+                            found_files.append(p)
         
         found_files.sort(key=lambda x: x.name.lower())
         
@@ -2591,6 +2733,7 @@ def main_menu():
     
     while True:
         print_banner()
+        display_workspace_summary(data_path)
         menu_table = Table(
             show_header=True,
             header_style="bold cyan",
@@ -2612,11 +2755,13 @@ def main_menu():
         menu_table.add_row("[bold magenta]8[/bold magenta]", "[bold magenta]Skin ID Swap[/bold magenta]", "[dim magenta]Swap Lobby, Ingame & Weapon skin IDs[/dim magenta]")
         menu_table.add_row("[bold blue]9[/bold blue]", "[bold blue]OBB Manager[/bold blue]", "[dim blue]Unzip & Rezip OBB with size padding[/dim blue]")
         menu_table.add_row("[bold red]10[/bold red]", "[bold red]Cleanup[/bold red]", "[dim red]Delete workspace folders[/dim red]")
+        menu_table.add_row("[bold bright_magenta]11[/bold bright_magenta]", "[bold bright_magenta]Termux Setup[/bold bright_magenta]", "[dim bright_magenta]Setup 'leak' direct command & SDCard folders[/dim bright_magenta]")
+        menu_table.add_row("[bold bright_green]12[/bold bright_green]", "[bold bright_green]Folder Guide[/bold bright_green]", "[dim bright_green]Step-by-step guide & folder location help[/dim bright_green]")
         menu_table.add_row("[dim]0[/dim]", "[dim]Exit[/dim]", "[dim]Close application[/dim]")
         
         console.print(menu_table)
         console.print()
-        choice = safe_input('-> Select option (0-10): ').strip()
+        choice = safe_input('-> Select option (0-12): ').strip()
         
         if choice == '1':
             pak_dir = data_path / "PAK"
@@ -2631,12 +2776,22 @@ def main_menu():
                 unpack_path = data_path / "UNPACK" / pak_file.stem
                 repack_path = data_path / "REPACK" / pak_file.stem
                 pak.dump(unpack_path)
+                
+                sd_unpack = Path("/sdcard/FeaturesticLeaks/UNPACK") / pak_file.stem
+                if sd_unpack.parent.exists() and sd_unpack != unpack_path:
+                    try:
+                        pak.dump(sd_unpack)
+                    except Exception:
+                        pass
+
                 log_path = unpack_path / f'Debug_{pak_file.stem}.log'
                 dump_unpacking_log(pak, log_path)
                 for dir_path, _ in pak._index.items():
                     current_repack_path = repack_path / pak._mount_point / dir_path
                     current_repack_path.mkdir(parents=True, exist_ok=True)
                 console.print(f'[bold green][OK] Successfully extracted to: {unpack_path}[/bold green]')
+                if sd_unpack.parent.exists():
+                    console.print(f'[bold green][+] Also extracted to SDCard: {sd_unpack}[/bold green]')
             except Exception as e:
                 handle_exception(e, "Unpack", data_path)
             safe_input('\nPress Enter to continue...')
@@ -2666,30 +2821,42 @@ def main_menu():
                     repack_gamepatch(pak, repack_dir, output_pak)
                 else:
                     repack_obbzsdic(pak, repack_dir, output_pak)
+                
+                sd_res = Path("/sdcard/FeaturesticLeaks/RESULT")
+                if sd_res.exists():
+                    try:
+                        shutil.copy2(output_pak, sd_res / pak_file.name)
+                        console.print(f'[bold green][+] Saved to SDCard: {sd_res / pak_file.name}[/bold green]')
+                    except Exception:
+                        pass
                 console.print('[bold green][OK] Repack completed successfully![/bold green]')
             except Exception as e:
                 handle_exception(e, "Repack", data_path)
             safe_input('\nPress Enter to continue...')
             
         elif choice == '3':
-            pak_tool_dir = data_path / "PAK TOOL"
-            pak_dir = pak_tool_dir / "PAK"
-            edit_dir = pak_tool_dir / "EDIT"
-            result_dir = pak_tool_dir / "RESULT"
-            pak_dir.mkdir(parents=True, exist_ok=True)
-            edit_dir.mkdir(parents=True, exist_ok=True)
-            result_dir.mkdir(parents=True, exist_ok=True)
-            
+            pak_dir = data_path / "PAK"
             pak_file, _ = pick_file_from_folder("Replace Files", pak_dir)
             if not pak_file:
                 safe_input('\nPress Enter to continue...')
                 continue
             
-            actual_edit_path = edit_dir
-            if not edit_dir.exists() or not any(edit_dir.iterdir()):
-                console.print(f'[yellow][!] Workspace EDIT folder ({edit_dir}) is empty.[/yellow]')
-                console.print('[cyan]-> Enter source folder or file path to inject:[/cyan]')
-                custom_edit = safe_input('Path: ').strip().strip('"\'')
+            cand_dirs = [
+                data_path / "REPLACE",
+                Path("/sdcard/FeaturesticLeaks/REPLACE"),
+                data_path / "PAK TOOL" / "EDIT",
+                Path("/sdcard/FeaturesticLeaks/PAK TOOL/EDIT")
+            ]
+            actual_edit_path = None
+            for cd in cand_dirs:
+                if cd.exists() and any(cd.iterdir()):
+                    actual_edit_path = cd
+                    break
+                    
+            if not actual_edit_path:
+                console.print('[yellow][!] REPLACE source folder me koi file nahi mili![/yellow]')
+                console.print('[cyan]👉 Pehle edited files ko /sdcard/FeaturesticLeaks/REPLACE/ me daalo.[/cyan]')
+                custom_edit = safe_input('-> Enter custom source folder path (or press Enter to cancel): ').strip().strip('"\'')
                 if not custom_edit:
                     safe_input('\nPress Enter to continue...')
                     continue
@@ -2701,11 +2868,21 @@ def main_menu():
                 actual_edit_path = custom_p
             
             try:
-                console.print(f'[bold cyan][+] Replacing files in {pak_file.name}...[/bold cyan]')
+                console.print(f'[bold cyan][+] Replacing files using source: {actual_edit_path}[/bold cyan]')
                 pak = TencentPakFile(pak_file)
+                result_dir = data_path / "RESULT"
+                result_dir.mkdir(parents=True, exist_ok=True)
                 output_pak = result_dir / pak_file.name
                 
                 count = repack_pak_file_full(pak, actual_edit_path, output_pak)
+                
+                sd_res = Path("/sdcard/FeaturesticLeaks/RESULT")
+                if sd_res.exists():
+                    try:
+                        shutil.copy2(output_pak, sd_res / pak_file.name)
+                        console.print(f'[bold green][+] Saved to SDCard: {sd_res / pak_file.name}[/bold green]')
+                    except Exception:
+                        pass
                 
                 if count > 0:
                     console.print(f'[bold green][OK] Repacked {count} file(s) successfully![/bold green]')
@@ -2723,26 +2900,30 @@ def main_menu():
             safe_input('\nPress Enter to continue...')
             
         elif choice == '4':
-            pak_tool_dir = data_path / "PAK TOOL"
-            pak_dir = pak_tool_dir / "PAK"
-            edit_dir = pak_tool_dir / "EDIT"
-            result_dir = pak_tool_dir / "RESULT"
-            pak_dir.mkdir(parents=True, exist_ok=True)
-            edit_dir.mkdir(parents=True, exist_ok=True)
-            result_dir.mkdir(parents=True, exist_ok=True)
-            
+            pak_dir = data_path / "PAK"
             pak_file, _ = pick_file_from_folder("Inject Path", pak_dir)
             if not pak_file:
                 safe_input('\nPress Enter to continue...')
                 continue
             
-            actual_edit_path = edit_dir
-            if not edit_dir.exists() or not any(edit_dir.iterdir()):
-                console.print(f'[yellow][!] Workspace EDIT folder ({edit_dir}) is empty.[/yellow]')
-                console.print('[cyan]-> Enter source folder or file path to inject:[/cyan]')
-                custom_edit = safe_input('Path: ').strip().strip('"\'')
+            cand_dirs = [
+                data_path / "INJECT",
+                Path("/sdcard/FeaturesticLeaks/INJECT"),
+                data_path / "REPLACE",
+                Path("/sdcard/FeaturesticLeaks/REPLACE"),
+                data_path / "PAK TOOL" / "EDIT"
+            ]
+            actual_edit_path = None
+            for cd in cand_dirs:
+                if cd.exists() and any(cd.iterdir()):
+                    actual_edit_path = cd
+                    break
+                    
+            if not actual_edit_path:
+                console.print('[yellow][!] INJECT source folder me koi file nahi mili![/yellow]')
+                console.print('[cyan]👉 Pehle source files ko /sdcard/FeaturesticLeaks/INJECT/ me daalo.[/cyan]')
+                custom_edit = safe_input('-> Enter custom source folder path (or press Enter to cancel): ').strip().strip('"\'')
                 if not custom_edit:
-                    console.print(f'[bold red][X] Source folder ({edit_dir}) me koi file nahi mili. Pehle files is folder me daalo.[/bold red]')
                     safe_input('\nPress Enter to continue...')
                     continue
                 custom_p = Path(custom_edit)
@@ -2752,31 +2933,31 @@ def main_menu():
                     continue
                 actual_edit_path = custom_p
             
-            console.print()
-            console.print('[yellow]-> Enter target internal path inside PAK where files should be added:[/yellow]')
-            console.print('[dim]Example: Content/Lua/GameLua/Mod/BRMod/Gameplay/Core[/dim]')
-            target_path = safe_input('Target Path: ').strip()
-            
+            console.print(f'[bold cyan][+] Source files selected from: {actual_edit_path}[/bold cyan]')
+            console.print('[cyan]-> Enter target folder path inside PAK (e.g. ShadowTrackerExtra/Saved/Paks):[/cyan]')
+            target_path = safe_input('Target Path: ').strip().strip('"\'')
             if not target_path:
-                console.print('[bold red][X] No path provided.[/bold red]')
+                console.print('[bold red][X] Target path cannot be empty.[/bold red]')
                 safe_input('\nPress Enter to continue...')
                 continue
-            
-            target_path = target_path.replace('\\', '/').strip('/')
-            if not target_path:
-                console.print('[bold red][X] Invalid target path.[/bold red]')
-                safe_input('\nPress Enter to continue...')
-                continue
-            
+                
             try:
-                console.print(f'[bold cyan][+] Injecting files into {target_path} in {pak_file.name}...[/bold cyan]')
                 pak = TencentPakFile(pak_file)
+                result_dir = data_path / "RESULT"
+                result_dir.mkdir(parents=True, exist_ok=True)
                 output_pak = result_dir / pak_file.name
                 
-                count = repack_pak_file_full(pak, actual_edit_path, output_pak, target_path, force_add=True)
+                count = repack_pak_file_full(pak, actual_edit_path, output_pak, target_path=target_path, force_add=True)
+                
+                sd_res = Path("/sdcard/FeaturesticLeaks/RESULT")
+                if sd_res.exists():
+                    try:
+                        shutil.copy2(output_pak, sd_res / pak_file.name)
+                        console.print(f'[bold green][+] Saved to SDCard: {sd_res / pak_file.name}[/bold green]')
+                    except Exception:
+                        pass
                 
                 if count > 0:
-                    console.print()
                     console.print(f'[bold green][OK] Injected {count} file(s) successfully -> {output_pak.name}[/bold green]')
                     console.print(f'[bold green][+] Full Output Path: {output_pak}[/bold green]')
                     if pak_file.parent != pak_dir and pak_file.parent.exists():
@@ -2813,6 +2994,14 @@ def main_menu():
             
         elif choice == '10':
             delete_folder(data_path)
+            safe_input('\nPress Enter to continue...')
+            
+        elif choice == '11':
+            install_termux_shortcut_and_sdcard(data_path)
+            safe_input('\nPress Enter to continue...')
+            
+        elif choice == '12':
+            show_workflow_guide()
             safe_input('\nPress Enter to continue...')
             
         elif choice == '0':
