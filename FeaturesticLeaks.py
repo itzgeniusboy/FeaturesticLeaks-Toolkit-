@@ -14,9 +14,10 @@ import uuid
 import hashlib
 import platform
 import subprocess
-import requests
 import base64
 import zlib
+import json
+import zipfile
 from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import PurePath, Path
@@ -66,6 +67,7 @@ def _ensure_package(pkg_name, import_name=None):
 
 _ensure_package("rich")
 _ensure_package("requests")
+import requests
 _ensure_package("pytz")
 _ensure_package("gmalg")
 _ensure_package("pycryptodome", "Crypto")
@@ -1951,6 +1953,585 @@ def display_file_selector(title, folder_path, file_pattern="*.pak"):
     exts = [file_pattern.replace('*', '')] if file_pattern else [".pak", ".obb"]
     return pick_file_from_folder(title, Path(folder_path), extensions=exts)
 
+# ==================== INTEGRATED FEATURE MODULES ====================
+
+class UE4StringTool:
+    """Extracts and repacks string literals in .uasset / .uexp binary files."""
+    def __init__(self):
+        self.MIN_STRING_LEN = 2
+        self.MAX_STRING_LEN = 8000
+
+    def read_int(self, f):
+        data = f.read(4)
+        if len(data) < 4:
+            return None
+        return struct.unpack('<i', data)[0]
+
+    def is_garbage_text(self, text):
+        if not text or len(text.strip()) == 0:
+            return True
+        allowed_control = {'\n', '\r', '\t'}
+        for char in text:
+            code = ord(char)
+            if code == 0:
+                return True
+            if code < 32 and char not in allowed_control:
+                return True
+            if char == '\ufffd':
+                return True
+        return False
+
+    def is_valid_string_start(self, f, current_pos):
+        f.seek(current_pos)
+        length = self.read_int(f)
+        if length is None or length == 0:
+            return False
+        if not (self.MIN_STRING_LEN <= abs(length) <= self.MAX_STRING_LEN):
+            return False
+
+        try:
+            if length < 0:
+                read_len = -length * 2
+                data = f.read(read_len)
+                if len(data) != read_len or data[-2:] != b'\x00\x00':
+                    return False
+                text = data[:-2].decode('utf-16le')
+            else:
+                read_len = length
+                data = f.read(read_len)
+                if len(data) != read_len or data[-1:] != b'\x00':
+                    return False
+                text = data[:-1].decode('utf-8')
+
+            if self.is_garbage_text(text):
+                return False
+            return True
+        except Exception:
+            return False
+
+    def extract_strings(self, file_path: Path) -> Tuple[bool, str]:
+        if not file_path.exists():
+            return False, f"File not found: {file_path.name}"
+
+        json_path = file_path.with_suffix(file_path.suffix + ".json")
+        console.print(f"[bold cyan][+] Extracting readable strings from {file_path.name}...[/bold cyan]")
+
+        try:
+            with open(file_path, 'rb') as f:
+                f.seek(0, 2)
+                file_size = f.tell()
+                f.seek(0)
+
+                entries = []
+                cursor = 0
+
+                while cursor < file_size - 4:
+                    if self.is_valid_string_start(f, cursor):
+                        f.seek(cursor)
+                        length = self.read_int(f)
+                        is_utf16 = length < 0
+                        abs_len = abs(length)
+
+                        if is_utf16:
+                            raw_data = f.read(abs_len * 2)
+                            text = raw_data[:-2].decode('utf-16le')
+                            total_size = 4 + (abs_len * 2)
+                        else:
+                            raw_data = f.read(abs_len)
+                            text = raw_data[:-1].decode('utf-8')
+                            total_size = 4 + abs_len
+
+                        entries.append({
+                            "offset": cursor,
+                            "original_len_int": length,
+                            "text": text
+                        })
+                        cursor += total_size
+                    else:
+                        cursor += 1
+
+            if not entries:
+                return False, "No valid readable string entries found."
+
+            with open(json_path, 'w', encoding='utf-8') as jf:
+                json.dump(entries, jf, indent=4, ensure_ascii=False)
+
+            return True, f"Extracted {len(entries)} string(s) -> {json_path.name}"
+        except Exception as e:
+            return False, str(e)
+
+    def repack_strings(self, file_path: Path, json_path: Path) -> Tuple[bool, str]:
+        if not file_path.exists():
+            return False, f"Missing source file: {file_path.name}"
+        if not json_path.exists():
+            return False, f"Missing JSON file: {json_path.name}"
+
+        output_path = file_path.parent / f"{file_path.stem}_repacked{file_path.suffix}"
+        console.print(f"[bold cyan][+] Repacking strings into {file_path.name}...[/bold cyan]")
+
+        try:
+            with open(json_path, 'r', encoding='utf-8') as jf:
+                entries = json.load(jf)
+
+            entries.sort(key=lambda x: x['offset'])
+
+            with open(file_path, 'rb') as f_orig, open(output_path, 'wb') as f_out:
+                cursor_orig = 0
+                count_modified = 0
+
+                for i, entry in enumerate(entries):
+                    gap_size = entry['offset'] - cursor_orig
+                    if gap_size > 0:
+                        f_out.write(f_orig.read(gap_size))
+                    elif gap_size < 0:
+                        f_orig.seek(entry['offset'])
+
+                    new_text = entry['text']
+                    old_len_int = entry['original_len_int']
+                    is_utf16 = old_len_int < 0
+
+                    if is_utf16:
+                        max_byte_size = abs(old_len_int) * 2
+                    else:
+                        max_byte_size = abs(old_len_int)
+
+                    f_orig.seek(entry['offset'] + 4)
+                    old_raw = f_orig.read(max_byte_size)
+                    try:
+                        if is_utf16:
+                            old_text = old_raw[:-2].decode('utf-16le')
+                        else:
+                            old_text = old_raw[:-1].decode('utf-8')
+                    except Exception:
+                        old_text = "<decode_err>"
+
+                    if new_text != old_text:
+                        console.print(f"  [dim cyan]Old:[/dim cyan] \"{old_text}\" -> [bold yellow]New:[/bold yellow] \"{new_text}\"")
+                        count_modified += 1
+
+                    if is_utf16:
+                        new_bytes = new_text.encode('utf-16le') + b'\x00\x00'
+                    else:
+                        new_bytes = new_text.encode('utf-8') + b'\x00'
+
+                    current_byte_size = len(new_bytes)
+
+                    if current_byte_size > max_byte_size:
+                        f_out.close()
+                        f_orig.close()
+                        if output_path.exists():
+                            output_path.unlink()
+                        return False, f"String '{new_text}' exceeds max byte length ({current_byte_size} > {max_byte_size})"
+
+                    f_out.write(struct.pack('<i', old_len_int))
+                    f_out.write(new_bytes)
+
+                    pad_len = max_byte_size - current_byte_size
+                    if pad_len > 0:
+                        f_out.write(b'\x00' * pad_len)
+
+                    f_orig.seek(entry['offset'])
+                    len_check = self.read_int(f_orig)
+                    skip_len = 4 + (abs(len_check) * 2 if len_check < 0 else abs(len_check))
+                    f_orig.seek(entry['offset'] + skip_len)
+                    cursor_orig = f_orig.tell()
+
+                f_out.write(f_orig.read())
+
+            return True, f"Repacked successfully! Modified {count_modified} string(s) -> {output_path.name}"
+        except Exception as e:
+            return False, str(e)
+
+def run_ue4_string_tool(data_path: Path) -> None:
+    console.print(Panel(
+        "[bold cyan]⚡ FEATURESTIC LEAKS — UE4 ASSET STRING TOOL ⚡[/bold cyan]\n"
+        "[dim white]Extract readable string literals from .uasset / .uexp files to JSON & Repack JSON back to binary.[/dim white]",
+        border_style="cyan",
+        box=ROUNDED,
+        padding=(0, 2)
+    ))
+    
+    console.print("[bold yellow]1.[/bold yellow] [bold white]Unpack Strings to JSON[/bold white]")
+    console.print("[bold yellow]2.[/bold yellow] [bold white]Repack Strings from JSON[/bold white]")
+    console.print("[bold yellow]0.[/bold yellow] [dim white]Back to Main Menu[/dim white]")
+    
+    choice = safe_input("\n-> Select Mode (0-2): ").strip()
+    tool = UE4StringTool()
+    
+    if choice == '1':
+        target_dir = data_path / "UNPACK"
+        if not target_dir.exists():
+            target_dir.mkdir(parents=True, exist_ok=True)
+        file_p, _ = pick_file_from_folder("Unpack Strings", target_dir, extensions=[".uasset", ".uexp"])
+        if file_p:
+            ok, msg = tool.extract_strings(file_p)
+            if ok:
+                console.print(f"[bold green][OK] {msg}[/bold green]")
+            else:
+                console.print(f"[bold red][X] {msg}[/bold red]")
+                
+    elif choice == '2':
+        target_dir = data_path / "UNPACK"
+        if not target_dir.exists():
+            target_dir.mkdir(parents=True, exist_ok=True)
+        file_p, _ = pick_file_from_folder("Repack Strings Source", target_dir, extensions=[".uasset", ".uexp"])
+        if file_p:
+            json_p = file_p.with_suffix(file_p.suffix + ".json")
+            if not json_p.exists():
+                console.print(f"[bold red][X] JSON file not found: {json_p.name}[/bold red]")
+                console.print("[yellow][!] Please unpack strings to JSON first (Option 1).[/yellow]")
+                return
+            ok, msg = tool.repack_strings(file_p, json_p)
+            if ok:
+                console.print(f"[bold green][OK] {msg}[/bold green]")
+            else:
+                console.print(f"[bold red][X] {msg}[/bold red]")
+
+def run_white_body_mod(data_path: Path) -> None:
+    console.print(Panel(
+        "[bold cyan]⚡ FEATURESTIC LEAKS — ONE CLICK WHITE BODY MOD ⚡[/bold cyan]\n"
+        "[dim white]Scans extracted assets, copies target meshes & textures to EDIT folder, and nulls them.[/dim white]",
+        border_style="cyan",
+        box=ROUNDED,
+        padding=(0, 2)
+    ))
+    
+    unpack_dir = data_path / "UNPACK"
+    if not unpack_dir.exists() or not any(unpack_dir.iterdir()):
+        console.print("[bold red][X] Extracted UNPACK folder is empty or not found.[/bold red]")
+        console.print("[yellow][!] Please unpack a PAK / OBB package first using Option 1.[/yellow]")
+        return
+    
+    edit_dir = data_path / "PAK TOOL" / "EDIT"
+    edit_dir.mkdir(parents=True, exist_ok=True)
+    
+    target_patterns = [
+        "/Game/Arts_Player/Characters/Mesh/Equip/Bag/Mat/M_Bag_",
+        "Materials/T_M_Bag",
+        "/Game/Arts/UI/TableIcons/ItemIcon/Equipment/Icon_Shoes",
+        "/Game/Arts_Player/Characters/Mesh/Equip/Helmet/",
+        "/Game/Arts_Player/Weapon/MainWeapon/Rifle/M416/Texture/",
+        "/Game/Arts_Player/Characters/Mesh/Female/Body/Mesh/F_Leg_Bare/Tex/",
+        "/Game/Arts_Player/Characters/Mesh/MaleBody/Mesh/F_Leg_Bare/Tex/",
+        "/Game/Arts_Player/Characters/Mesh/Equip/Helmet_New/Mat/T_",
+        "/Game/Arts_Player/Characters/Mesh/Equip/Helmet/Mat/T_",
+        "/Game/Arts_Player/Characters/Mesh/Equip/Armor/Mat/M_Armor_",
+        "/Game/Arts_Player/Characters/Mesh/Female/Avatar/Cloth/Tex/",
+        "/Game/Arts_Player/Characters/Mesh/Male/Avatar/Cloth/Tex/T_Jacket_",
+        "/Game/Arts_Player/Characters/Mesh/Female/Body/Tex/",
+        "/Game/Arts_Player/Characters/Mesh/Male/Body/Tex/",
+        "/Game/Arts_Player/Characters/Mesh/Male/Head/Tex/"
+    ]
+    
+    console.print("[bold cyan][+] Scanning workspace for character & gear assets...[/bold cyan]")
+    found_files = []
+    
+    for root, _, files in os.walk(unpack_dir):
+        for file in files:
+            if file.endswith(".uasset") or file.endswith(".uexp"):
+                file_p = Path(root) / file
+                file_str = str(file_p).replace('\\', '/')
+                
+                matched = False
+                for pattern in target_patterns:
+                    if pattern.lower() in file_str.lower() or pattern.lower() in file.lower():
+                        matched = True
+                        break
+                
+                if matched:
+                    found_files.append(file_p)
+    
+    if not found_files:
+        console.print("[bold yellow][!] No matching White Body assets found in UNPACK directory.[/bold yellow]")
+        return
+    
+    console.print(f"[bold green][OK] Found {len(found_files)} White Body asset(s). Copying & nulling...[/bold green]")
+    
+    copied_count = 0
+    for src in found_files:
+        try:
+            rel_path = src.relative_to(unpack_dir)
+            parts = rel_path.parts
+            if len(parts) > 1:
+                rel_path = Path(*parts[1:])
+            
+            dest = edit_dir / rel_path
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            
+            shutil.copy2(src, dest)
+            
+            with open(dest, "wb") as f:
+                f.write(b"# FEATURESTIC LEAKS WHITE BODY MOD\n")
+            
+            copied_count += 1
+            console.print(f"  [dim green]Nulled:[/dim green] [cyan]{dest.name}[/cyan]")
+        except Exception as e:
+            console.print(f"  [bold red]Error on {src.name}: {e}[/bold red]")
+    
+    summary_panel = Panel(
+        f"[bold green][OK] White Body Mod Complete![/bold green]\n"
+        f"[white]Total nulled assets:[/white] [bold yellow]{copied_count}[/bold yellow]\n"
+        f"[white]Output directory:[/white] [cyan]{edit_dir}[/cyan]\n"
+        f"[dim white]You can now use Option 3 (Replace Files) or Option 2 (Repack) to build your PAK.[/dim white]",
+        border_style="green",
+        box=ROUNDED,
+        padding=(0, 2)
+    )
+    console.print(summary_panel)
+
+def run_file_finder_tool(data_path: Path) -> None:
+    console.print(Panel(
+        "[bold cyan]🔍 FEATURESTIC LEAKS — ADVANCED FILE FINDER 🔍[/bold cyan]\n"
+        "[dim white]Search .uasset, .uexp, .ubulk, .lua files by keyword in workspace.[/dim white]",
+        border_style="cyan",
+        box=ROUNDED,
+        padding=(0, 2)
+    ))
+    
+    unpack_dir = data_path / "UNPACK"
+    if not unpack_dir.exists():
+        unpack_dir.mkdir(parents=True, exist_ok=True)
+    
+    console.print(f"[dim]Default search directory: {unpack_dir}[/dim]")
+    custom_dir = safe_input("-> Enter search directory [Press Enter for default]: ").strip().strip('"\'')
+    
+    search_dir = Path(custom_dir) if custom_dir else unpack_dir
+    if not search_dir.exists():
+        console.print(f"[bold red][X] Directory not found: {search_dir}[/bold red]")
+        return
+    
+    pattern = safe_input("-> Enter search keyword/pattern (e.g. M416, Jacket, Bag, or press Enter for all): ").strip().lower()
+    
+    extensions = [".uasset", ".uexp", ".ubulk", ".lua", ".json", ".png"]
+    
+    console.print("\n[bold cyan][+] Scanning directory for files...[/bold cyan]")
+    found_files = []
+    
+    for root, _, files in os.walk(search_dir):
+        for file in files:
+            if any(file.lower().endswith(ext) for ext in extensions):
+                if not pattern or pattern in file.lower() or pattern in root.lower():
+                    found_files.append(Path(root) / file)
+    
+    if not found_files:
+        console.print(f"[bold yellow][!] No matching files found in {search_dir}[/bold yellow]")
+        return
+    
+    file_table = Table(
+        title=f"[bold cyan]FOUND FILES ({len(found_files)})[/bold cyan]",
+        border_style="dim cyan",
+        box=ROUNDED,
+        show_header=True
+    )
+    file_table.add_column("#", style="bold yellow", justify="center", width=6)
+    file_table.add_column("Filename", style="bold white")
+    file_table.add_column("Size", style="dim white", justify="right", width=12)
+    
+    for i, f in enumerate(found_files[:15], 1):
+        file_table.add_row(str(i), f.name, human_size(f.stat().st_size))
+    
+    if len(found_files) > 15:
+        file_table.add_row("...", f"and {len(found_files) - 15} more files", "")
+    
+    console.print(file_table)
+    
+    copy_choice = safe_input("\n-> Copy found files to output folder? (y/N): ").strip().lower()
+    if copy_choice == 'y':
+        out_dir = data_path / "FOUND_FILES"
+        out_dir.mkdir(parents=True, exist_ok=True)
+        
+        flat_choice = safe_input("-> Preserve directory paths? (y/N - 'N' copies flat): ").strip().lower()
+        preserve_paths = (flat_choice == 'y')
+        
+        copied_count = 0
+        for f in found_files:
+            try:
+                if preserve_paths:
+                    rel_p = f.relative_to(search_dir)
+                    dest = out_dir / rel_p
+                    dest.parent.mkdir(parents=True, exist_ok=True)
+                else:
+                    dest = out_dir / f.name
+                    counter = 1
+                    original_dest = dest
+                    while dest.exists():
+                        dest = out_dir / f"{original_dest.stem}_{counter}{original_dest.suffix}"
+                        counter += 1
+                
+                shutil.copy2(f, dest)
+                copied_count += 1
+            except Exception as e:
+                console.print(f"[bold red]Error copying {f.name}: {e}[/bold red]")
+        
+        console.print(f"[bold green][OK] Successfully copied {copied_count} file(s) to: {out_dir}[/bold green]")
+
+def run_skin_id_modder(data_path: Path) -> None:
+    console.print(Panel(
+        "[bold cyan]⚡ FEATURESTIC LEAKS — SKIN ID SWAP MODDER ⚡[/bold cyan]\n"
+        "[dim white]Swap skin IDs & offset indexes for Lobby, Ingame, Accessories, Hit Effect, Deadbox.[/dim white]",
+        border_style="cyan",
+        box=ROUNDED,
+        padding=(0, 2)
+    ))
+    
+    console.print("[bold yellow]1.[/bold yellow] [bold white]Skin Lobby ID Swap[/bold white]")
+    console.print("[bold yellow]2.[/bold yellow] [bold white]Skin Ingame ID Swap[/bold white]")
+    console.print("[bold yellow]3.[/bold yellow] [bold white]Gun Accessories ID Swap[/bold white]")
+    console.print("[bold yellow]4.[/bold yellow] [bold white]Hit Effect ID Swap[/bold white]")
+    console.print("[bold yellow]5.[/bold yellow] [bold white]Deadbox Weapon ID Swap[/bold white]")
+    console.print("[bold yellow]0.[/bold yellow] [dim white]Back to Main Menu[/dim white]")
+    
+    choice = safe_input("\n-> Select Skin Category (0-5): ").strip()
+    if choice == '0' or not choice:
+        return
+    
+    orig_id_str = safe_input("-> Enter Original Skin ID (decimal, e.g. 101001): ").strip()
+    new_id_str = safe_input("-> Enter Target/Replacement Skin ID (decimal, e.g. 101002): ").strip()
+    
+    if not orig_id_str.isdigit() or not new_id_str.isdigit():
+        console.print("[bold red][X] Invalid Skin IDs. Both must be numeric decimal numbers.[/bold red]")
+        return
+    
+    orig_id = int(orig_id_str)
+    new_id = int(new_id_str)
+    
+    orig_hex = struct.pack('<I', orig_id)
+    new_hex = struct.pack('<I', new_id)
+    
+    search_dir = data_path / "UNPACK"
+    if not search_dir.exists() or not any(search_dir.iterdir()):
+        search_dir = data_path / "PAK"
+    
+    if not search_dir.exists() or not any(search_dir.iterdir()):
+        console.print(f"[bold red][X] No workspace files found in {search_dir}. Please unpack a PAK file first.[/bold red]")
+        return
+    
+    console.print(f"\n[bold cyan][+] Scanning workspace files for Skin ID {orig_id} ({orig_hex.hex().upper()})...[/bold cyan]")
+    
+    modified_files = 0
+    for root, _, files in os.walk(search_dir):
+        for file in files:
+            file_p = Path(root) / file
+            if file_p.suffix in ['.uasset', '.uexp', '.dat', '.pak']:
+                try:
+                    with open(file_p, 'rb') as f:
+                        data = f.read()
+                    
+                    if orig_hex in data:
+                        new_data = data.replace(orig_hex, new_hex)
+                        with open(file_p, 'wb') as f:
+                            f.write(new_data)
+                        modified_files += 1
+                        console.print(f"  [bold green][OK] Swapped ID in:[/bold green] [cyan]{file_p.name}[/cyan]")
+                except Exception as e:
+                    pass
+    
+    if modified_files > 0:
+        console.print(f"\n[bold green][OK] Skin ID swap complete! Modified {modified_files} file(s).[/bold green]")
+    else:
+        console.print(f"\n[bold yellow][!] Skin ID {orig_id} not found in workspace binary files.[/bold yellow]")
+
+def run_obb_manager(data_path: Path) -> None:
+    console.print(Panel(
+        "[bold cyan]📦 FEATURESTIC LEAKS — OBB PACKAGE MANAGER 📦[/bold cyan]\n"
+        "[dim white]Unzip OBB archive & Rezip OBB with byte-exact padding matching original size.[/dim white]",
+        border_style="cyan",
+        box=ROUNDED,
+        padding=(0, 2)
+    ))
+    
+    console.print("[bold yellow]1.[/bold yellow] [bold white]Unzip OBB Package[/bold white]")
+    console.print("[bold yellow]2.[/bold yellow] [bold white]Rezip OBB Package (with exact size padding)[/bold white]")
+    console.print("[bold yellow]0.[/bold yellow] [dim white]Back to Main Menu[/dim white]")
+    
+    choice = safe_input("\n-> Select Option (0-2): ").strip()
+    
+    if choice == '1':
+        obb_dir = data_path / "PAK"
+        obb_dir.mkdir(parents=True, exist_ok=True)
+        obb_file, _ = pick_file_from_folder("Unzip OBB", obb_dir, extensions=[".obb", ".zip"])
+        if not obb_file:
+            return
+        
+        orig_size = obb_file.stat().st_size
+        out_unpack = data_path / "UNPACK" / obb_file.stem
+        out_unpack.mkdir(parents=True, exist_ok=True)
+        
+        size_ini = data_path / f"size_{obb_file.stem}.ini"
+        size_ini.write_text(str(orig_size), encoding='utf-8')
+        
+        console.print(f"[bold cyan][+] Extracting OBB ({human_size(orig_size)})...[/bold cyan]")
+        try:
+            with zipfile.ZipFile(obb_file, 'r') as zf:
+                zf.extractall(out_unpack)
+            console.print(f"[bold green][OK] Successfully extracted OBB to: {out_unpack}[/bold green]")
+        except Exception as e:
+            handle_exception(e, "Unzip OBB", data_path)
+            
+    elif choice == '2':
+        unpack_dir = data_path / "UNPACK"
+        if not unpack_dir.exists() or not any(unpack_dir.iterdir()):
+            console.print("[bold red][X] No extracted OBB folders found in UNPACK directory.[/bold red]")
+            return
+        
+        folders = [item for item in unpack_dir.iterdir() if item.is_dir()]
+        if not folders:
+            console.print("[bold red][X] No subfolders found in UNPACK.[/bold red]")
+            return
+        
+        folder_table = Table(
+            title="[bold cyan]EXTRACTED OBB FOLDERS[/bold cyan]",
+            border_style="dim cyan",
+            box=ROUNDED
+        )
+        folder_table.add_column("Index", style="bold yellow", justify="center", width=8)
+        folder_table.add_column("Folder Name", style="bold white")
+        for i, f in enumerate(folders, 1):
+            folder_table.add_row(str(i), f.name)
+        
+        console.print(folder_table)
+        sel_idx = safe_input(f"-> Select folder number (1-{len(folders)}): ").strip()
+        if not sel_idx.isdigit() or not (1 <= int(sel_idx) <= len(folders)):
+            console.print("[bold red][X] Invalid selection.[/bold red]")
+            return
+        
+        target_folder = folders[int(sel_idx) - 1]
+        
+        size_ini = data_path / f"size_{target_folder.name}.ini"
+        target_orig_size = 0
+        if size_ini.exists():
+            try:
+                target_orig_size = int(size_ini.read_text(encoding='utf-8').strip())
+            except Exception:
+                pass
+        
+        result_dir = data_path / "RESULT"
+        result_dir.mkdir(parents=True, exist_ok=True)
+        out_obb = result_dir / f"{target_folder.name}.obb"
+        
+        console.print(f"[bold cyan][+] Rezips OBB package: {out_obb.name}...[/bold cyan]")
+        try:
+            with zipfile.ZipFile(out_obb, 'w', compression=zipfile.ZIP_STORED) as zf:
+                for root, _, files in os.walk(target_folder):
+                    for file in files:
+                        full_p = Path(root) / file
+                        rel_p = full_p.relative_to(target_folder)
+                        zf.write(full_p, arcname=str(rel_p).replace('\\', '/'))
+            
+            curr_size = out_obb.stat().st_size
+            if target_orig_size > 0:
+                if curr_size < target_orig_size:
+                    pad_bytes = target_orig_size - curr_size
+                    with open(out_obb, 'ab') as f:
+                        f.write(b'\x00' * pad_bytes)
+                    console.print(f"[bold green][OK] Added {pad_bytes} padding bytes to match original size ({human_size(target_orig_size)})![/bold green]")
+                elif curr_size > target_orig_size:
+                    console.print(f"[yellow][!] Repacked OBB size ({human_size(curr_size)}) exceeds original size ({human_size(target_orig_size)}).[/yellow]")
+            
+            console.print(f"[bold green][OK] OBB successfully created: {out_obb}[/bold green]")
+        except Exception as e:
+            handle_exception(e, "Rezip OBB", data_path)
+
 _BOOTED = False
 
 def main_menu():
@@ -1984,12 +2565,17 @@ def main_menu():
         menu_table.add_row("[bold green]2[/bold green]", "[bold green]Repack[/bold green]", "[dim green]Rebuild workspace to PAK / OBB[/dim green]")
         menu_table.add_row("[bold yellow]3[/bold yellow]", "[bold yellow]Replace Files[/bold yellow]", "[dim yellow]Inject edited files into existing structure[/dim yellow]")
         menu_table.add_row("[bold magenta]4[/bold magenta]", "[bold magenta]Inject Path[/bold magenta]", "[dim magenta]Inject files into custom PAK target path[/dim magenta]")
-        menu_table.add_row("[bold red]5[/bold red]", "[bold red]Cleanup[/bold red]", "[dim red]Delete workspace folders[/dim red]")
+        menu_table.add_row("[bold cyan]5[/bold cyan]", "[bold cyan]White Body Mod[/bold cyan]", "[dim cyan]One-click character & gear asset nuller[/dim cyan]")
+        menu_table.add_row("[bold green]6[/bold green]", "[bold green]UE4 String Tool[/bold green]", "[dim green]Extract & repack .uasset/.uexp strings[/dim green]")
+        menu_table.add_row("[bold yellow]7[/bold yellow]", "[bold yellow]File Finder[/bold yellow]", "[dim yellow]Search .uasset/.uexp/.ubulk by pattern[/dim yellow]")
+        menu_table.add_row("[bold magenta]8[/bold magenta]", "[bold magenta]Skin ID Swap[/bold magenta]", "[dim magenta]Swap Lobby, Ingame & Weapon skin IDs[/dim magenta]")
+        menu_table.add_row("[bold blue]9[/bold blue]", "[bold blue]OBB Manager[/bold blue]", "[dim blue]Unzip & Rezip OBB with size padding[/dim blue]")
+        menu_table.add_row("[bold red]10[/bold red]", "[bold red]Cleanup[/bold red]", "[dim red]Delete workspace folders[/dim red]")
         menu_table.add_row("[dim]0[/dim]", "[dim]Exit[/dim]", "[dim]Close application[/dim]")
         
         console.print(menu_table)
         console.print()
-        choice = safe_input('-> Select option (0-5): ').strip()
+        choice = safe_input('-> Select option (0-10): ').strip()
         
         if choice == '1':
             pak_dir = data_path / "PAK"
@@ -2164,6 +2750,26 @@ def main_menu():
             safe_input('\nPress Enter to continue...')
             
         elif choice == '5':
+            run_white_body_mod(data_path)
+            safe_input('\nPress Enter to continue...')
+            
+        elif choice == '6':
+            run_ue4_string_tool(data_path)
+            safe_input('\nPress Enter to continue...')
+            
+        elif choice == '7':
+            run_file_finder_tool(data_path)
+            safe_input('\nPress Enter to continue...')
+            
+        elif choice == '8':
+            run_skin_id_modder(data_path)
+            safe_input('\nPress Enter to continue...')
+            
+        elif choice == '9':
+            run_obb_manager(data_path)
+            safe_input('\nPress Enter to continue...')
+            
+        elif choice == '10':
             delete_folder(data_path)
             safe_input('\nPress Enter to continue...')
             
