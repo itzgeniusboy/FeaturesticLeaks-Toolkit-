@@ -1620,8 +1620,590 @@ def display_workspace_summary(data_path: Path):
     console.print(table)
     console.print("[dim white]💡 SDCard Location: [bold cyan]/sdcard/FeaturesticLeaks/[/bold cyan] (ZArchiver / File Manager me direct dikhega)[/dim white]\n")
 
+# ============================================================================
+# LUA ENGINE & PSEUDO-DECOMPILER (Pure Python + External Tools Fallback)
+# ============================================================================
+
+_LUA_K_KEY = bytes.fromhex("112136474657a78d9d8490d8ab008c35261af7e45805b8b31507d02c1e8ff6c8")
+
+_LUA_CUSTOM_TO_STD = {
+    17:0,  18:1,  3:3,   21:4,  22:5,  23:6,  24:7,  8:8,
+    27:10, 28:11, 29:12, 13:13, 14:14, 2:15,  5:18,
+    20:28, 16:29, 25:25, 26:27, 30:30, 31:31, 32:32,
+    33:33, 34:34, 35:35, 36:36, 37:37, 38:38, 39:39,
+    40:40, 41:41, 42:42, 43:43, 44:44, 45:45, 46:46
+}
+_LUA_STD_TO_CUSTOM = {v: k for k, v in _LUA_CUSTOM_TO_STD.items()}
+
+_LUA_NIL   = 0
+_LUA_BOOL  = 1
+_LUA_NUM   = 3
+_LUA_FLOAT = 19
+_LUA_STR   = 4
+_LUA_STRL  = 20
+
+_LUA53_OPCODES = [
+    "MOVE", "LOADK", "LOADKX", "LOADBOOL", "LOADNIL", "GETUPVAL",
+    "GETTABUP", "GETTABLE", "SETTABUP", "SETUPVAL", "SETTABLE",
+    "NEWTABLE", "SELF", "ADD", "SUB", "MUL", "MOD", "POW",
+    "DIV", "IDIV", "BAND", "BOR", "BXOR", "SHL", "SHR",
+    "UNM", "BNOT", "NOT", "LEN", "CONCAT", "JMP", "EQ",
+    "LT", "LE", "TEST", "TESTSET", "CALL", "TAILCALL", "RETURN",
+    "FORLOOP", "FORPREP", "TFORCALL", "TFORLOOP", "SETLIST",
+    "CLOSURE", "VARARG", "EXTRAARG"
+]
+
+def _lua_xor(data, key):
+    return bytes([data[i] ^ key[i % len(key)] for i in range(len(data))])
+
+class _LuaCustomReader:
+    def __init__(self, d, k):
+        self.d = d
+        self.pos = 0
+        self.k = k
+
+    def read(self, n):
+        v = bytes(self.d[self.pos:self.pos + n])
+        self.pos += n
+        return v
+
+    def byte(self):
+        v = self.d[self.pos]
+        self.pos += 1
+        return v
+
+    def i32(self):
+        v = struct.unpack_from('<i', self.d, self.pos)[0]
+        self.pos += 4
+        return v
+
+    def i64(self):
+        v = struct.unpack_from('<q', self.d, self.pos)[0]
+        self.pos += 8
+        return v
+
+    def dbl(self):
+        v = struct.unpack_from('<d', self.d, self.pos)[0]
+        self.pos += 8
+        return v
+
+    def string(self):
+        if self.pos >= len(self.d):
+            return None
+        sz = self.byte()
+        if sz == 0:
+            return None
+        if sz == 0xFF:
+            if self.pos + 8 > len(self.d): return None
+            sz = struct.unpack_from('<Q', self.d, self.pos)[0]
+            self.pos += 8
+        if self.pos + sz - 1 > len(self.d):
+            return None
+        raw = bytes(self.d[self.pos:self.pos + sz - 1])
+        self.pos += sz - 1
+        b = _lua_xor(raw, self.k)
+        try:
+            return b.decode('utf-8')
+        except Exception:
+            return b.decode('latin-1', errors='replace')
+
+class _LuaProto:
+    __slots__ = ('src', 'ld', 'll', 'np', 'va', 'ms', 'ins', 'K', 'upvals', 'upvs', 'locs', 'subs')
+    def __init__(self):
+        self.src = None
+        self.ld = 0; self.ll = 0
+        self.np = 0; self.va = 0; self.ms = 0
+        self.ins = []
+        self.K = []
+        self.upvals = b''
+        self.upvs = []
+        self.locs = []
+        self.subs = []
+
+def _parse_lua_custom(r):
+    p = _LuaProto()
+    try:
+        p.src = r.string()
+        p.ld = r.i32()
+        p.ll = r.i32()
+        p.np = r.byte()
+        p.va = r.byte()
+        p.ms = r.byte()
+
+        n = r.i32()
+        p.ins = [struct.unpack_from('<I', r.read(4))[0] for _ in range(n)]
+
+        n = r.i32()
+        for _ in range(n):
+            t = r.byte()
+            if t == _LUA_NIL:
+                p.K.append(('nil', None))
+            elif t == _LUA_BOOL:
+                b = r.byte()
+                p.K.append(('bool', bool(b)))
+            elif t == _LUA_NUM:
+                raw = r.i64()
+                fv = struct.unpack('<d', struct.pack('<q', raw))[0]
+                p.K.append(('float', fv))
+            elif t == _LUA_FLOAT:
+                raw = r.dbl()
+                iv = struct.unpack('<q', struct.pack('<d', raw))[0]
+                p.K.append(('int', iv))
+            elif t in (_LUA_STR, _LUA_STRL):
+                s = r.string()
+                p.K.append(('str', s))
+            else:
+                p.K.append(('unknown', None))
+
+        n = r.i32()
+        p.upvals = r.read(n * 2)
+
+        n = r.i32()
+        for _ in range(n):
+            sub = _parse_lua_custom(r)
+            if sub:
+                p.subs.append(sub)
+
+        n = r.i32(); r.read(n)
+        n = r.i32(); r.read(n * 8)
+        n = r.i32()
+        for _ in range(n):
+            nm = r.string()
+            sp = r.i32()
+            ep = r.i32()
+            if nm:
+                p.locs.append((nm, sp, ep))
+
+        n = r.i32()
+        for _ in range(n):
+            s = r.string()
+            if s:
+                p.upvs.append(s)
+
+        return p
+    except Exception:
+        return None
+
+def _load_lua_custom_proto(path: str) -> Optional[_LuaProto]:
+    try:
+        with open(path, 'rb') as f:
+            d = bytearray(f.read())
+    except OSError:
+        return None
+
+    if len(d) < 18 or d[:4] != b'\x1bLua' or d[4] != 0x53:
+        return None
+
+    for offset in (34, 18, 35, 33):
+        if offset >= len(d):
+            continue
+        r = _LuaCustomReader(bytes(d), _LUA_K_KEY)
+        r.pos = offset
+        p = _parse_lua_custom(r)
+        if p is not None:
+            return p
+
+    return None
+
+class _LuaStdReader:
+    def __init__(self, data):
+        self.d = data
+        self.sz_int      = self.d[12] if len(self.d) > 12 else 4
+        self.sz_size_t   = self.d[13] if len(self.d) > 13 else 4
+        self.sz_ins      = self.d[14] if len(self.d) > 14 else 4
+        self.sz_lua_int  = self.d[15] if len(self.d) > 15 else 8
+        self.sz_lua_num  = self.d[16] if len(self.d) > 16 else 8
+        self.fmt_int    = '<i' if self.sz_int == 4 else '<q'
+        self.fmt_size_t = '<I' if self.sz_size_t == 4 else '<Q'
+        self.pos = 34 if len(self.d) >= 34 else 18
+
+    def read(self, n):
+        v = self.d[self.pos:self.pos + n]; self.pos += n; return v
+    def byte(self):
+        v = self.d[self.pos]; self.pos += 1; return v
+    def int(self):
+        v = struct.unpack_from(self.fmt_int, self.d, self.pos)[0]
+        self.pos += self.sz_int; return v
+    def size_t(self):
+        v = struct.unpack_from(self.fmt_size_t, self.d, self.pos)[0]
+        self.pos += self.sz_size_t; return v
+    def lua_int(self):
+        v = struct.unpack_from('<q', self.d, self.pos)[0]
+        self.pos += self.sz_lua_int; return v
+    def lua_num(self):
+        v = struct.unpack_from('<d', self.d, self.pos)[0]
+        self.pos += self.sz_lua_num; return v
+    def string(self):
+        if self.pos >= len(self.d): return None
+        sz = self.byte()
+        if sz == 0: return None
+        if sz == 0xFF: sz = self.size_t()
+        length = sz - 1
+        if self.pos + length > len(self.d): return None
+        v = self.d[self.pos:self.pos + length]; self.pos += length
+        return v
+
+class _LuaStdProto:
+    __slots__ = ('src', 'ld', 'll', 'np', 'va', 'ms', 'ins', 'K', 'upvals', 'subs')
+    def __init__(self): self.K = []; self.subs = []
+
+def _parse_lua_std(r) -> Optional[_LuaStdProto]:
+    try:
+        p = _LuaStdProto()
+        p.src = r.string()
+        p.ld  = r.int(); p.ll = r.int()
+        p.np  = r.byte(); p.va = r.byte(); p.ms = r.byte()
+        n = r.int()
+        p.ins = []
+        for _ in range(n):
+            ins = struct.unpack_from('<I', r.read(r.sz_ins))[0]
+            p.ins.append(ins)
+        n = r.int()
+        p.K = []
+        for _ in range(n):
+            t = r.byte()
+            if t == 0:   p.K.append((t, None))
+            elif t == 1: p.K.append((t, r.byte()))
+            elif t == 3: p.K.append((t, r.lua_num()))
+            elif t == 19: p.K.append((t, r.lua_int()))
+            elif t in (4, 20): p.K.append((t, r.string()))
+            else: p.K.append((t, None))
+        n = r.int()
+        p.upvals = r.read(n * 2)
+        n = r.int()
+        for _ in range(n):
+            sub = _parse_lua_std(r)
+            if sub: p.subs.append(sub)
+        n = r.int(); r.read(n * r.sz_int)
+        n = r.int()
+        for _ in range(n): r.string(); r.int(); r.int()
+        n = r.int()
+        for _ in range(n): r.string()
+        return p
+    except Exception:
+        return None
+
+def _std_to_custom_lua_proto(std_p: _LuaStdProto) -> _LuaProto:
+    p = _LuaProto()
+    p.src = std_p.src
+    p.ld = std_p.ld
+    p.ll = std_p.ll
+    p.np = std_p.np
+    p.va = std_p.va
+    p.ms = std_p.ms
+
+    p.ins = []
+    for ins in std_p.ins:
+        op = ins & 0x3F
+        custom_op = _LUA_STD_TO_CUSTOM.get(op, op)
+        p.ins.append((ins & ~0x3F) | custom_op)
+
+    p.K = []
+    for t, v in std_p.K:
+        if t == 0:    p.K.append(('nil', None))
+        elif t == 1:  p.K.append(('bool', bool(v)))
+        elif t == 3:  p.K.append(('float', v))
+        elif t == 19: p.K.append(('int', v))
+        elif t in (4, 20):
+            s = v.decode('utf-8') if isinstance(v, bytes) else (v or '')
+            p.K.append(('str', s))
+        else:
+            p.K.append(('unknown', v))
+
+    p.upvals = std_p.upvals
+    p.subs = []
+    for sub_std in std_p.subs:
+        p.subs.append(_std_to_custom_lua_proto(sub_std))
+    p.upvs = []
+    p.locs = []
+    return p
+
+def _load_std_bytecode_to_proto(file_path: str) -> Optional[_LuaProto]:
+    try:
+        with open(file_path, 'rb') as f:
+            data = f.read()
+    except Exception:
+        return None
+    if len(data) < 18 or data[:4] != b'\x1bLua':
+        return None
+    try:
+        r = _LuaStdReader(data)
+        std_p = _parse_lua_std(r)
+        if std_p is None:
+            return None
+        return _std_to_custom_lua_proto(std_p)
+    except Exception:
+        return None
+
+def _get_lua_opcode_name(opcode: int) -> str:
+    std_op = _LUA_CUSTOM_TO_STD.get(opcode, opcode)
+    if 0 <= std_op < len(_LUA53_OPCODES):
+        return _LUA53_OPCODES[std_op]
+    return f"OP_{opcode}"
+
+def _decode_lua_instruction(ins: int) -> dict:
+    op = ins & 0x3F
+    std_op = _LUA_CUSTOM_TO_STD.get(op, op)
+    A = (ins >> 6) & 0xFF
+    B = (ins >> 23) & 0x1FF
+    C = (ins >> 14) & 0x1FF
+    Bx = (ins >> 14) & 0x3FFFF
+    sBx = Bx - 0x1FFFF
+    Ax = (ins >> 6) & 0x3FFFFFF
+    return {
+        'op': op, 'std_op': std_op,
+        'opcode_name': _get_lua_opcode_name(op),
+        'A': A, 'B': B, 'C': C,
+        'Bx': Bx, 'sBx': sBx, 'Ax': Ax,
+        'raw': ins
+    }
+
+def _format_lua_const(k) -> str:
+    typ, val = k
+    if typ == 'nil': return 'nil'
+    elif typ == 'bool': return 'true' if val else 'false'
+    elif typ == 'float':
+        if val is not None and val == int(val): return str(int(val))
+        return str(val)
+    elif typ == 'int': return str(val)
+    elif typ == 'str':
+        if val is None: return 'nil'
+        s = val.replace('\\', '\\\\').replace('"', '\\"').replace('\n', '\\n').replace('\t', '\\t')
+        return f'"{s}"'
+    return str(val)
+
+def _reg_name(proto, reg_idx: int) -> str:
+    if reg_idx < len(proto.locs) and proto.locs[reg_idx][0]:
+        return proto.locs[reg_idx][0]
+    return f"R{reg_idx}"
+
+def _pseudo_decompile_lua(proto, depth: int = 0, func_name: str = "main") -> str:
+    indent = "  " * depth
+    lines = []
+
+    params = []
+    for i in range(proto.np):
+        if i < len(proto.locs) and proto.locs[i][0]:
+            params.append(proto.locs[i][0])
+        else:
+            params.append(f"arg{i}")
+    if proto.va: params.append("...")
+    param_str = ", ".join(params)
+
+    if depth == 0:
+        lines.append("--[[ Decompiled by FeaturesticLeaks (Python Lua Engine) ]]")
+        lines.append("--[[ Official Telegram: https://t.me/FeaturesticLeaks ]]")
+        lines.append("")
+
+    lines.append(f"{indent}local function {func_name}({param_str})")
+
+    if proto.upvs:
+        for uv in proto.upvs:
+            lines.append(f"{indent}  -- upvalue: {uv}")
+
+    pc = 0
+    while pc < len(proto.ins):
+        ins = proto.ins[pc]
+        dec = _decode_lua_instruction(ins)
+        op_name = dec['opcode_name']
+        A, B, C = dec['A'], dec['B'], dec['C']
+        Bx, sBx = dec['Bx'], dec['sBx']
+        line = ""
+
+        if op_name == "LOADK":
+            if Bx < len(proto.K):
+                const = _format_lua_const(proto.K[Bx])
+                rn = _reg_name(proto, A)
+                line = f"local {rn} = {const}"
+
+        elif op_name == "LOADNIL":
+            rn_start = _reg_name(proto, A)
+            if B > A:
+                rn_end = _reg_name(proto, B)
+                line = f"local {rn_start}, ..., {rn_end} = nil"
+            else:
+                line = f"local {rn_start} = nil"
+
+        elif op_name == "LOADBOOL":
+            val = "true" if B != 0 else "false"
+            rn = _reg_name(proto, A)
+            line = f"local {rn} = {val}"
+
+        elif op_name == "GETUPVAL":
+            rn = _reg_name(proto, A)
+            if B < len(proto.upvs):
+                line = f"local {rn} = {proto.upvs[B]}"
+            else:
+                line = f"local {rn} = upval_{B}"
+
+        elif op_name == "GETTABUP":
+            rn = _reg_name(proto, A)
+            upval = proto.upvs[B] if B < len(proto.upvs) else "_ENV"
+            if C & 0x100:
+                key = _format_lua_const(proto.K[C & 0xFF]) if (C & 0xFF) < len(proto.K) else f"K{C & 0xFF}"
+            else:
+                key = _reg_name(proto, C)
+            line = f"local {rn} = {upval}[{key}]"
+
+        elif op_name == "SETTABUP":
+            upval = proto.upvs[B] if B < len(proto.upvs) else "_ENV"
+            if C & 0x100:
+                val = _format_lua_const(proto.K[C & 0xFF]) if (C & 0xFF) < len(proto.K) else f"K{C & 0xFF}"
+            else:
+                val = _reg_name(proto, C)
+            if A & 0x100:
+                key = _format_lua_const(proto.K[A & 0xFF]) if (A & 0xFF) < len(proto.K) else f"K{A & 0xFF}"
+            else:
+                key = _reg_name(proto, A)
+            line = f"{upval}[{key}] = {val}"
+
+        elif op_name == "GETTABLE":
+            rn = _reg_name(proto, A)
+            if C & 0x100:
+                key = _format_lua_const(proto.K[C & 0xFF]) if (C & 0xFF) < len(proto.K) else f"K{C & 0xFF}"
+            else:
+                key = _reg_name(proto, C)
+            line = f"local {rn} = {_reg_name(proto, B)}[{key}]"
+
+        elif op_name == "SETTABLE":
+            if C & 0x100:
+                val = _format_lua_const(proto.K[C & 0xFF]) if (C & 0xFF) < len(proto.K) else f"K{C & 0xFF}"
+            else:
+                val = _reg_name(proto, C)
+            if B & 0x100:
+                key = _format_lua_const(proto.K[B & 0xFF]) if (B & 0xFF) < len(proto.K) else f"K{B & 0xFF}"
+            else:
+                key = _reg_name(proto, B)
+            line = f"{_reg_name(proto, A)}[{key}] = {val}"
+
+        elif op_name in ("ADD", "SUB", "MUL", "DIV", "MOD", "POW", "IDIV",
+                         "BAND", "BOR", "BXOR", "SHL", "SHR"):
+            ops = {"ADD": "+", "SUB": "-", "MUL": "*", "DIV": "/",
+                   "MOD": "%", "POW": "^", "IDIV": "//",
+                   "BAND": "&", "BOR": "|", "BXOR": "~",
+                   "SHL": "<<", "SHR": ">>"}
+            op_sym = ops.get(op_name, op_name)
+            if B & 0x100:
+                left = _format_lua_const(proto.K[B & 0xFF]) if (B & 0xFF) < len(proto.K) else f"K{B & 0xFF}"
+            else:
+                left = _reg_name(proto, B)
+            if C & 0x100:
+                right = _format_lua_const(proto.K[C & 0xFF]) if (C & 0xFF) < len(proto.K) else f"K{C & 0xFF}"
+            else:
+                right = _reg_name(proto, C)
+            rn = _reg_name(proto, A)
+            line = f"local {rn} = {left} {op_sym} {right}"
+
+        elif op_name in ("UNM", "BNOT", "NOT", "LEN"):
+            ops = {"UNM": "-", "BNOT": "~", "NOT": "not ", "LEN": "#"}
+            op_sym = ops.get(op_name, op_name)
+            if B & 0x100:
+                val = _format_lua_const(proto.K[B & 0xFF]) if (B & 0xFF) < len(proto.K) else f"K{B & 0xFF}"
+            else:
+                val = _reg_name(proto, B)
+            rn = _reg_name(proto, A)
+            line = f"local {rn} = {op_sym}{val}"
+
+        elif op_name == "CONCAT":
+            parts = [_reg_name(proto, i) for i in range(B, C + 1)]
+            rn = _reg_name(proto, A)
+            line = f"local {rn} = {' .. '.join(parts)}"
+
+        elif op_name == "JMP":
+            target = pc + 1 + sBx
+            line = f"-- goto line_{target}"
+
+        elif op_name in ("EQ", "LT", "LE"):
+            ops = {"EQ": "==", "LT": "<", "LE": "<="}
+            op_sym = ops.get(op_name, op_name)
+            if B & 0x100:
+                left = _format_lua_const(proto.K[B & 0xFF]) if (B & 0xFF) < len(proto.K) else f"K{B & 0xFF}"
+            else:
+                left = _reg_name(proto, B)
+            if C & 0x100:
+                right = _format_lua_const(proto.K[C & 0xFF]) if (C & 0xFF) < len(proto.K) else f"K{C & 0xFF}"
+            else:
+                right = _reg_name(proto, C)
+            target = pc + 2
+            if A == 0:
+                line = f"if {left} {op_sym} {right} then goto line_{target} end"
+            else:
+                line = f"if not ({left} {op_sym} {right}) then goto line_{target} end"
+
+        elif op_name == "TEST":
+            target = pc + 2
+            rn = _reg_name(proto, A)
+            if C == 0:
+                line = f"if not {rn} then goto line_{target} end"
+            else:
+                line = f"if {rn} then goto line_{target} end"
+
+        elif op_name == "CALL":
+            if B == 0: args = "..."
+            elif B == 1: args = ""
+            else: args = ", ".join([_reg_name(proto, i) for i in range(A + 1, A + B)])
+            if C == 0: ret = "..."
+            elif C == 1: ret = ""
+            else: ret = ", ".join([_reg_name(proto, i) for i in range(A, A + C - 1)])
+            fn = _reg_name(proto, A)
+            if ret:
+                line = f"local {ret} = {fn}({args})"
+            else:
+                line = f"{fn}({args})"
+
+        elif op_name == "TAILCALL":
+            if B == 0: args = "..."
+            else: args = ", ".join([_reg_name(proto, i) for i in range(A + 1, A + B)])
+            line = f"return {_reg_name(proto, A)}({args})"
+
+        elif op_name == "RETURN":
+            if B == 0: line = "return ..."
+            elif B == 1: line = "return"
+            else:
+                rets = ", ".join([_reg_name(proto, i) for i in range(A, A + B - 1)])
+                line = f"return {rets}"
+
+        elif op_name == "NEWTABLE":
+            rn = _reg_name(proto, A)
+            line = f"local {rn} = {{}}"
+
+        elif op_name == "CLOSURE":
+            rn = _reg_name(proto, A)
+            if Bx < len(proto.subs):
+                sub_name = f"sub_func_{pc}"
+                line = f"local {rn} = {sub_name}"
+            else:
+                line = f"local {rn} = closure_{Bx}"
+
+        elif op_name == "VARARG":
+            if B == 0:
+                line = f"local {_reg_name(proto, A)}... = ..."
+            else:
+                vars = ", ".join([_reg_name(proto, A + i) for i in range(B - 1)])
+                line = f"local {vars} = ..."
+
+        elif op_name == "MOVE":
+            rn_a = _reg_name(proto, A)
+            rn_b = _reg_name(proto, B)
+            line = f"local {rn_a} = {rn_b}"
+
+        else:
+            line = f"-- {op_name} A={A} B={B} C={C}"
+
+        if line:
+            lines.append(f"{indent}  {line}")
+        pc += 1
+
+    for i, sub in enumerate(proto.subs):
+        sub_name = f"sub_func_{i}"
+        lines.append("")
+        lines.append(_pseudo_decompile_lua(sub, depth + 1, sub_name))
+
+    lines.append(f"{indent}end")
+    return "\n".join(lines)
+
 def run_lua_compiler(data_path: Path):
-    console.print(Panel(Align.center("[bold bright_cyan]🌙 LUA COMPILER (.lua -> .luac Bytecode)[/bold bright_cyan]"), border_style="cyan", box=ROUNDED))
+    console.print(Panel(Align.center("[bold bright_cyan]🌙 LUA COMPILER (.lua Source -> .luac Bytecode)[/bold bright_cyan]"), border_style="cyan", box=ROUNDED))
     
     lua_dir = data_path / "LUA"
     lua_dir.mkdir(parents=True, exist_ok=True)
@@ -1720,41 +2302,76 @@ def run_lua_decompiler(data_path: Path):
             break
 
     decompiled_text = None
+    decompile_engine = None
 
+    # Method 1: luadec
     if luadec_bin:
-        console.print(f"[bold cyan][+] Decompiling using luadec...[/bold cyan]")
+        console.print(f"[bold cyan][+] Attempting decompile using luadec...[/bold cyan]")
         try:
-            proc = subprocess.run([luadec_bin, str(luac_file)], capture_output=True, text=True)
-            if proc.returncode == 0 and proc.stdout.strip():
+            proc = subprocess.run([luadec_bin, str(luac_file)], capture_output=True, text=True, timeout=15)
+            if proc.returncode == 0 and proc.stdout.strip() and "function 0 0" not in proc.stdout:
                 decompiled_text = proc.stdout
+                decompile_engine = "luadec"
         except Exception as e:
-            console.print(f"[dim red][!] luadec failed: {e}[/dim red]")
+            console.print(f"[dim yellow][!] luadec failed: {e}[/dim yellow]")
 
+    # Method 2: unluac.jar via java
     if not decompiled_text and java_bin and unluac_jar:
-        console.print(f"[bold cyan][+] Decompiling using unluac ({unluac_jar.name})...[/bold cyan]")
+        console.print(f"[bold cyan][+] Attempting decompile using unluac ({unluac_jar.name})...[/bold cyan]")
         try:
-            proc = subprocess.run([java_bin, "-jar", str(unluac_jar), str(luac_file)], capture_output=True, text=True)
+            proc = subprocess.run([java_bin, "-jar", str(unluac_jar), str(luac_file)], capture_output=True, text=True, timeout=20)
             if proc.returncode == 0 and proc.stdout.strip():
                 decompiled_text = proc.stdout
+                decompile_engine = "unluac"
         except Exception as e:
-            console.print(f"[dim red][!] unluac failed: {e}[/dim red]")
+            console.print(f"[dim yellow][!] unluac failed: {e}[/dim yellow]")
+
+    # Method 3: Check if file is already plain-text Lua
+    if not decompiled_text:
+        try:
+            raw_txt = luac_file.read_text(encoding="utf-8", errors="replace")
+            keywords = ["function", "local ", "if ", "then", "return", "end", "for ", "while "]
+            if any(kw in raw_txt[:2000] for kw in keywords):
+                decompiled_text = raw_txt
+                decompile_engine = "Plain Source Text"
+        except Exception:
+            pass
+
+    # Method 4: Built-in Python Lua Pseudo-Decompiler (Custom & Standard Bytecode)
+    if not decompiled_text:
+        console.print(f"[bold cyan][+] Attempting decompile using Python Lua Engine...[/bold cyan]")
+        try:
+            # First try custom opcode format
+            proto = _load_lua_custom_proto(str(luac_file))
+            if proto:
+                decompiled_text = _pseudo_decompile_lua(proto)
+                decompile_engine = "Python Engine (Custom Bytecode)"
+            else:
+                # Next try standard Lua 5.3/5.1 bytecode
+                proto_std = _load_std_bytecode_to_proto(str(luac_file))
+                if proto_std:
+                    decompiled_text = _pseudo_decompile_lua(proto_std)
+                    decompile_engine = "Python Engine (Standard Bytecode)"
+        except Exception as e:
+            console.print(f"[dim yellow][!] Python Lua Decompiler engine exception: {e}[/dim yellow]")
 
     if decompiled_text:
         out_lua.write_text(decompiled_text, encoding="utf-8")
-        console.print(f"[bold green][OK] Decompiled successfully: {out_lua}[/bold green]")
+        console.print(f"[bold green][OK] Decompiled successfully ({decompile_engine}):[/bold green]")
+        console.print(f"[bold green][+] Output file: {out_lua}[/bold green]")
         if sd_lua.exists():
             try:
                 shutil.copy2(out_lua, sd_lua / out_lua.name)
-                console.print(f"[bold green][+] Saved to SDCard: {sd_lua / out_lua.name}[/bold green]")
+                console.print(f"[bold green][+] Also saved to SDCard: {sd_lua / out_lua.name}[/bold green]")
             except Exception:
                 pass
     else:
         console.print(Panel(
-            "[bold red][X] No Lua Decompiler tool (luadec or unluac) found in Termux![/bold red]\n\n"
-            "[bold cyan]👉 Option 1: Install Java & unluac (Recommended for Lua 5.1 / PUBG):[/bold cyan]\n"
+            "[bold red][X] Could not decompile file automatically.[/bold red]\n\n"
+            "[bold cyan]👉 To enable 100% full decompiler support for older/complex Lua 5.1/5.3 bytecode:[/bold cyan]\n"
             "[bold yellow]   1. pkg install openjdk-17[/bold yellow]\n"
             "[bold yellow]   2. curl -L -o unluac.jar https://github.com/tech23-bot/unluac/releases/download/v1.0/unluac.jar[/bold yellow]\n\n"
-            "[bold cyan]👉 Option 2: Install luadec:[/bold cyan]\n"
+            "[bold cyan]👉 Or install luadec:[/bold cyan]\n"
             "[bold yellow]   pkg install luadec[/bold yellow]",
             border_style="red", box=ROUNDED
         ))
