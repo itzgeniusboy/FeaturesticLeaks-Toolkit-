@@ -2404,7 +2404,7 @@ def show_workflow_guide():
     console.print(Panel(guide_text, border_style="dim white", box=ROUNDED))
 
 def install_termux_shortcut_and_sdcard(data_path: Path):
-    console.print("\n[bold cyan][+] Setting up Termux One-Command Shortcut & SDCard Workspace...[/bold cyan]")
+    console.print("\n[bold cyan][+] Setting up Termux Shortcuts ('leak', 'paktool') & SDCard Workspace...[/bold cyan]")
     
     sdcard_path = Path("/sdcard/FeaturesticLeaks")
     try:
@@ -2414,37 +2414,59 @@ def install_termux_shortcut_and_sdcard(data_path: Path):
         (sdcard_path / "INJECT").mkdir(parents=True, exist_ok=True)
         (sdcard_path / "RESULT").mkdir(parents=True, exist_ok=True)
         (sdcard_path / "UNPACK").mkdir(parents=True, exist_ok=True)
+        (sdcard_path / "LUA").mkdir(parents=True, exist_ok=True)
         console.print(f"[bold green][OK] SDCard Workspace Created: /sdcard/FeaturesticLeaks/[/bold green]")
-    except Exception as e:
+    except Exception:
         console.print(f"[yellow][!] Notice: SDCard folder permission check skipped.[/yellow]")
     
     script_file = Path(__file__).resolve()
-    usr_bin_leak = Path("/data/data/com.termux/files/usr/bin/leak")
+    script_dir = script_file.parent
     
-    shortcut_created = False
-    if usr_bin_leak.parent.exists():
+    # Try creating executables in Termux bin directories
+    bin_dirs = [
+        Path(os.environ.get("PREFIX", "/data/data/com.termux/files/usr")) / "bin",
+        Path("/data/data/com.termux/files/usr/bin"),
+        Path.home() / ".local" / "bin"
+    ]
+    
+    shortcuts_created = []
+    for bin_dir in bin_dirs:
+        if bin_dir.exists() and os.access(bin_dir, os.W_OK):
+            for cmd_name in ["leak", "paktool"]:
+                cmd_path = bin_dir / cmd_name
+                try:
+                    content = f"#!/data/data/com.termux/files/usr/bin/sh\ncd \"{script_dir}\" && python3 \"{script_file}\" \"$@\"\n"
+                    cmd_path.write_text(content, encoding="utf-8")
+                    cmd_path.chmod(0o755)
+                    shortcuts_created.append(cmd_name)
+                except Exception:
+                    pass
+            if shortcuts_created:
+                break
+    
+    # Backup/Always ensure bashrc / zshrc aliases exist
+    shell_files = [Path.home() / ".bashrc", Path.home() / ".zshrc"]
+    aliases_to_add = [
+        f"alias leak='cd \"{script_dir}\" && python3 \"{script_file}\"'",
+        f"alias paktool='cd \"{script_dir}\" && python3 \"{script_file}\"'"
+    ]
+    
+    for sh_file in shell_files:
         try:
-            content = f"#!/data/data/com.termux/files/usr/bin/sh\npython3 \"{script_file}\" \"$@\"\n"
-            usr_bin_leak.write_text(content, encoding="utf-8")
-            usr_bin_leak.chmod(0o755)
-            console.print("[bold green][OK] Created Termux command shortcut: 'leak'[/bold green]")
-            shortcut_created = True
+            curr_content = sh_file.read_text(encoding="utf-8") if sh_file.exists() else ""
+            lines_to_append = []
+            for alias_line in aliases_to_add:
+                cmd_alias = alias_line.split("=")[0]
+                if cmd_alias not in curr_content:
+                    lines_to_append.append(alias_line)
+            if lines_to_append:
+                with open(sh_file, "a", encoding="utf-8") as f:
+                    f.write("\n" + "\n".join(lines_to_append) + "\n")
         except Exception:
             pass
-            
-    if not shortcut_created:
-        bashrc = Path.home() / ".bashrc"
-        alias_line = f"alias leak='python3 \"{script_file}\"'\n"
-        try:
-            current_bashrc = bashrc.read_text(encoding="utf-8") if bashrc.exists() else ""
-            if "alias leak=" not in current_bashrc:
-                with open(bashrc, "a", encoding="utf-8") as f:
-                    f.write("\n" + alias_line)
-            console.print("[bold green][OK] Added 'leak' alias to ~/.bashrc[/bold green]")
-        except Exception:
-            pass
-            
-    console.print("\n[bold green]🎉 Complete! Ab Termux me kahin bhi sirf 'leak' type karo aur tool ready![/bold green]")
+
+    console.print("[bold green][OK] Created shortcuts: 'leak' & 'paktool'[/bold green]")
+    console.print("\n[bold green]🎉 Complete! Next time Termux me kahin bhi 'leak' ya 'paktool' type karke directly open kar sakte hain![/bold green]")
 
 def print_banner():
     os.system('cls' if os.name == 'nt' else 'clear')
@@ -3844,6 +3866,10 @@ def main_menu():
     else:
         data_path = Path(__file__).parent
     ensure_directories(data_path)
+    try:
+        install_termux_shortcut_and_sdcard(data_path)
+    except Exception:
+        pass
     check_and_auto_update()
 
     while True:

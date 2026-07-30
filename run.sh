@@ -43,7 +43,7 @@ python3 -c "import rich, requests, Crypto, zstandard, pytz, gmalg" 2>/dev/null |
 # Ensure workspaces exist
 mkdir -p PAK UNPACK REPACK RESULT "PAK TOOL/PAK" "PAK TOOL/EDIT" "PAK TOOL/UNPACK" "PAK TOOL/RESULT"
 
-# Create global shortcut 'paktool' in Termux bin if possible
+# Create global shortcuts 'leak' and 'paktool' in Termux bin if possible
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BIN_DIR=""
 
@@ -56,11 +56,23 @@ elif [ -d "$HOME/.local/bin" ]; then
 fi
 
 if [ -n "$BIN_DIR" ]; then
-    echo "#!/usr/bin/env bash" > "$BIN_DIR/paktool"
-    echo "cd \"$SCRIPT_DIR\" && python3 FeaturesticLeaks.py \"\$@\"" >> "$BIN_DIR/paktool"
-    chmod +x "$BIN_DIR/paktool"
-    echo -e "\e[1;32m[✔] Quick command created/updated in $BIN_DIR/paktool!\e[0m"
+    for CMD_NAME in paktool leak; do
+        cat <<EOF > "$BIN_DIR/$CMD_NAME"
+#!/data/data/com.termux/files/usr/bin/sh
+cd "$SCRIPT_DIR" && python3 FeaturesticLeaks.py "\$@"
+EOF
+        chmod +x "$BIN_DIR/$CMD_NAME"
+    done
+    echo -e "\e[1;32m[✔] Global commands ('leak', 'paktool') created/updated in $BIN_DIR!\e[0m"
 fi
+
+# Also add aliases to ~/.bashrc and ~/.zshrc for fallback
+for SHELL_RC in "$HOME/.bashrc" "$HOME/.zshrc"; do
+    if [ -f "$SHELL_RC" ] || [ -f "$HOME/.bashrc" ]; then
+        grep -q "alias leak=" "$SHELL_RC" 2>/dev/null || echo "alias leak='cd \"$SCRIPT_DIR\" && python3 FeaturesticLeaks.py'" >> "$SHELL_RC"
+        grep -q "alias paktool=" "$SHELL_RC" 2>/dev/null || echo "alias paktool='cd \"$SCRIPT_DIR\" && python3 FeaturesticLeaks.py'" >> "$SHELL_RC"
+    fi
+done
 
 if [ -f "FeaturesticLeaks.py" ]; then
     chmod +x FeaturesticLeaks.py
