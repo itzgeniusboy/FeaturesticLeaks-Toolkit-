@@ -931,7 +931,7 @@ def _get_all_dirs_and_mp(pak_file):
 
 def repack_pak_file_full(pak_file, edited_root, output_path, target_path=None, force_add=False):
     """
-    FULL REBUILD REPACK - FIXED FOR NEW FILES (OPTION 4)
+    FULL REBUILD REPACK - FIXED FOR NEW FILES (OPTION 4) & REPLACE FILES (OPTION 3)
     """
     import copy as _cp
 
@@ -950,7 +950,7 @@ def repack_pak_file_full(pak_file, edited_root, output_path, target_path=None, f
                 edit_files.append(p)
     
     if not edit_files:
-        console.print('[bold red][X] No files found to inject/add![/bold red]')
+        console.print(f'[bold red][X] Source folder ({edited_root}) me koi file nahi mili. Pehle files is folder me daalo.[/bold red]')
         return 0
     
     console.print(f'[bold cyan][+] Found {len(edit_files)} file(s) to process[/bold cyan]')
@@ -987,9 +987,70 @@ def repack_pak_file_full(pak_file, edited_root, output_path, target_path=None, f
     
     for p in edit_files:
         fl = p.name.lower()
+        
+        # In Inject Path mode with target_path & force_add:
+        # Every source file is directly assigned to target_path / filename.
+        # Check if it already exists in PAK to reuse entry metadata/template, or pick a template entry.
+        if force_add and target_path:
+            new_fp = f"{target_path.rstrip('/')}/{p.name}"
+            
+            # Check if this exact full path already exists in PAK
+            existing_ent = None
+            for dir_path, files in pak_file._index.items():
+                for name, entry in files.items():
+                    if str(PurePath(dir_path)/name).replace('\\', '/') == new_fp:
+                        existing_ent = entry
+                        break
+                if existing_ent:
+                    break
+            
+            if existing_ent:
+                edited[new_fp] = (p, existing_ent)
+            else:
+                # Find a template entry with matching suffix or any entry
+                template_entry = None
+                for dir_path, files in pak_file._index.items():
+                    for name, entry in files.items():
+                        if Path(name).suffix.lower() == p.suffix.lower():
+                            template_entry = entry
+                            break
+                    if template_entry:
+                        break
+                if not template_entry:
+                    for dir_path, files in pak_file._index.items():
+                        for name, entry in files.items():
+                            template_entry = entry
+                            break
+                        if template_entry:
+                            break
+                if template_entry:
+                    edited[new_fp] = (p, template_entry)
+                else:
+                    console.print(f'[bold red][X] Failed to find template metadata for {p.name}[/bold red]')
+            continue
+
+        # Standard Replace Files mode (Option 3 or relative path preserved)
         found_match = False
         
-        if fl in pak_name_map:
+        # Check relative path from edited_root if user recreated PAK folder structure
+        if edit_p.is_dir():
+            try:
+                rel_p = p.relative_to(edit_p)
+                rel_fp = str(rel_p).replace('\\', '/')
+                # Check if rel_fp matches an existing full path
+                for dir_path, files in pak_file._index.items():
+                    for name, entry in files.items():
+                        full_path = str(PurePath(dir_path)/name).replace('\\', '/')
+                        if full_path.lower().endswith(rel_fp.lower()):
+                            edited[full_path] = (p, entry)
+                            found_match = True
+                            break
+                    if found_match:
+                        break
+            except Exception:
+                pass
+
+        if not found_match and fl in pak_name_map:
             cands = pak_name_map[fl]
             if target_path:
                 target_candidates = [(fp, e) for fp, e in cands if target_path.strip('/') in fp]
@@ -1027,26 +1088,6 @@ def repack_pak_file_full(pak_file, edited_root, output_path, target_path=None, f
                         break
                 if found_match:
                     break
-        
-        if not found_match and force_add and target_path:
-            template_entry = None
-            for dir_path, files in pak_file._index.items():
-                for name, entry in files.items():
-                    if Path(name).suffix.lower() == p.suffix.lower():
-                        template_entry = entry
-                        break
-                if template_entry: break
-            
-            if not template_entry:
-                for dir_path, files in pak_file._index.items():
-                    for name, entry in files.items():
-                        template_entry = entry
-                        break
-                    if template_entry: break
-            
-            if template_entry:
-                new_fp = f"{target_path.rstrip('/')}/{p.name}"
-                edited[new_fp] = (p, template_entry)
 
     if not edited:
         console.print('[bold red][X] No files to repack![/bold red]')
@@ -2701,6 +2742,7 @@ def main_menu():
                 console.print('[cyan]-> Enter source folder or file path to inject:[/cyan]')
                 custom_edit = safe_input('Path: ').strip().strip('"\'')
                 if not custom_edit:
+                    console.print(f'[bold red][X] Source folder ({edit_dir}) me koi file nahi mili. Pehle files is folder me daalo.[/bold red]')
                     safe_input('\nPress Enter to continue...')
                     continue
                 custom_p = Path(custom_edit)
@@ -2735,15 +2777,15 @@ def main_menu():
                 
                 if count > 0:
                     console.print()
-                    console.print(f'[bold green][OK] Successfully processed {count} file(s) to {target_path}[/bold green]')
-                    console.print(f'[bold green][+] Output: {output_pak}[/bold green]')
+                    console.print(f'[bold green][OK] Injected {count} file(s) successfully -> {output_pak.name}[/bold green]')
+                    console.print(f'[bold green][+] Full Output Path: {output_pak}[/bold green]')
                     if pak_file.parent != pak_dir and pak_file.parent.exists():
                         copy_back = safe_input('\n-> Copy repacked PAK back to original directory? (y/N): ').strip().lower()
                         if copy_back == 'y':
                             shutil.copy2(output_pak, pak_file)
                             console.print(f'[bold green][OK] Updated original file at {pak_file}[/bold green]')
                 else:
-                    console.print('[bold red][X] No files were processed.[/bold red]')
+                    console.print('[bold red][X] No files were injected.[/bold red]')
                     
             except Exception as e:
                 handle_exception(e, "Inject Path", data_path)
