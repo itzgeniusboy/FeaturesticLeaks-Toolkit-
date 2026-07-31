@@ -23,16 +23,38 @@ for arg in "$@"; do
 done
 
 # ==================== SECTION 1: STARTUP CHECK ====================
-# Checks if termux-api package & Termux:API app binaries are installed
+# Checks if termux-api package & Termux:API app binaries are installed and responsive
 check_termux_api() {
     if ! command -v termux-toast &> /dev/null || ! command -v termux-dialog &> /dev/null; then
-        echo -e "\e[1;31m[✖] Termux:API tools not found!\e[0m"
-        echo -e "\e[1;33m👉 Please install Termux:API app from Play Store / F-Droid\e[0m"
-        echo -e "\e[1;33m👉 Also install termux-api package: pkg install termux-api jq\e[0m\n"
-        echo -e "\e[1;36m[!] Falling back to standard CLI Text Menu...\e[0m"
-        sleep 2
+        echo -e "\e[1;31m[✖] Termux:API package not found!\e[0m"
+        echo -e "\e[1;33m👉 Install Termux:API app + run: pkg install termux-api jq\e[0m\n"
+        echo -e "\e[1;36m[+] Falling back to standard CLI Text Menu...\e[0m"
+        sleep 1
         return 1
     fi
+
+    echo -e "\e[1;36m[🔍] Checking Termux:API App responsiveness...\e[0m"
+    
+    # Test termux-dialog with 3 second timeout so script NEVER hangs/freezes
+    local check_json
+    check_json=$(timeout 3 termux-dialog confirm -t "FeaturesticLeaks PAK Tool" -m "Open in Termux GUI Mode? (Select No for CLI)" 2>/dev/null || echo "TIMEOUT")
+
+    if [ "$check_json" = "TIMEOUT" ] || [ -z "$check_json" ]; then
+        echo -e "\e[1;33m[!] Termux:API App is not responding or not installed on Android.\e[0m"
+        echo -e "\e[1;36m[+] Automatically switching to standard CLI Text Menu...\e[0m\n"
+        sleep 1
+        return 1
+    fi
+
+    local code
+    code=$(parse_json_field "$check_json" "code")
+    if [ "$code" -ne 0 ] 2>/dev/null; then
+        echo -e "\e[1;33m[!] GUI mode cancelled by user.\e[0m"
+        echo -e "\e[1;36m[+] Opening standard CLI Text Menu...\e[0m\n"
+        sleep 1
+        return 1
+    fi
+
     return 0
 }
 
