@@ -3502,6 +3502,169 @@ def run_obb_manager(data_path: Path) -> None:
         except Exception as e:
             handle_exception(e, "Rezip OBB", data_path)
 
+def run_pak_compare_dumper(data_path: Path) -> None:
+    console.print(Panel(
+        "[bold bright_cyan]🔍 PAK COMPARE & DUMP TOOL (PAK DUMPER) 🔍[/bold bright_cyan]\n"
+        "[dim white]Compare two .pak/.obb files or dump detailed internal file lists, offsets, sizes, hashes, and encryption modes.[/dim white]",
+        border_style="bright_cyan",
+        box=ROUNDED,
+        padding=(0, 2)
+    ))
+
+    console.print("\n[bold yellow]Select PAK Compare / Dump Mode:[/bold yellow]")
+    console.print("  [bold cyan][1][/bold cyan] Dump Single PAK/OBB Index & Hashes to Text/JSON")
+    console.print("  [bold cyan][2][/bold cyan] Compare Two PAK/OBB Files (Added, Modified, Removed Assets)")
+    console.print("  [bold cyan][0][/bold cyan] Cancel / Back")
+
+    sub_choice = safe_input('\n-> Select option (0-2): ').strip()
+    
+    if sub_choice == '1':
+        pak_dir = data_path / "PAK"
+        pak_dir.mkdir(parents=True, exist_ok=True)
+        pak_file, _ = pick_file_from_folder("PAK Dump", pak_dir)
+        if not pak_file:
+            return
+        try:
+            console.print(f"\n[bold cyan][+] Reading PAK index for {pak_file.name}...[/bold cyan]")
+            pak = TencentPakFile(pak_file)
+            entries = []
+            for dir_p, files in pak._index.items():
+                for fname, entry in files.items():
+                    rel_path = (pak._mount_point / dir_p / fname).as_posix()
+                    enc_m = pak._get_method_str(entry.encryption_method, True)
+                    comp_m = pak._get_method_str(entry.compression_method, False)
+                    entries.append({
+                        "file_path": rel_path,
+                        "size": entry.size,
+                        "uncompressed_size": entry.uncompressed_size,
+                        "offset": entry.offset,
+                        "encrypted": entry.encrypted,
+                        "encryption_method": enc_m,
+                        "compression_method": comp_m,
+                        "hash": entry.hash.hex() if hasattr(entry.hash, 'hex') else str(entry.hash)
+                    })
+
+            dump_dir = data_path / "DUMP_LOGS"
+            dump_dir.mkdir(parents=True, exist_ok=True)
+            txt_dump = dump_dir / f"Dump_{pak_file.stem}.txt"
+            json_dump = dump_dir / f"Dump_{pak_file.stem}.json"
+
+            with open(txt_dump, "w", encoding="utf-8") as f:
+                f.write(f"=== FEATURESTIC LEAKS PAK INDEX DUMP ===\n")
+                f.write(f"PAK File: {pak_file.name}\n")
+                f.write(f"Mount Point: {pak._mount_point}\n")
+                f.write(f"Total Files: {len(entries)}\n")
+                f.write("="*60 + "\n\n")
+                for e in entries:
+                    f.write(f"Path: {e['file_path']}\n")
+                    f.write(f"  Size: {e['size']} bytes (Uncompressed: {e['uncompressed_size']} bytes)\n")
+                    f.write(f"  Offset: {e['offset']} | Compression: {e['compression_method']} | Encryption: {e['encryption_method']}\n")
+                    f.write(f"  Hash: {e['hash']}\n\n")
+
+            with open(json_dump, "w", encoding="utf-8") as f:
+                json.dump({"pak_file": pak_file.name, "mount_point": str(pak._mount_point), "total_files": len(entries), "files": entries}, f, indent=2)
+
+            console.print(f"\n[bold green][OK] Dump created successfully![/bold green]")
+            console.print(f"  📄 [bold white]Text Dump:[/bold white] {txt_dump}")
+            console.print(f"  📄 [bold white]JSON Dump:[/bold white] {json_dump}")
+
+            sd_dump = Path("/sdcard/FeaturesticLeaks/DUMP_LOGS")
+            if sd_dump.parent.exists():
+                sd_dump.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(txt_dump, sd_dump / txt_dump.name)
+                shutil.copy2(json_dump, sd_dump / json_dump.name)
+                console.print(f"  📲 [bold green]Saved to SDCard:[/bold green] /sdcard/FeaturesticLeaks/DUMP_LOGS/")
+
+        except Exception as e:
+            handle_exception(e, "PAK Dump", data_path)
+
+    elif sub_choice == '2':
+        pak_dir = data_path / "PAK"
+        pak_dir.mkdir(parents=True, exist_ok=True)
+        console.print("\n[bold cyan][1/2] Select Original / Old PAK file:[/bold cyan]")
+        pak_file_1, _ = pick_file_from_folder("Select First PAK", pak_dir)
+        if not pak_file_1:
+            return
+
+        console.print("\n[bold cyan][2/2] Select New / Modified PAK file:[/bold cyan]")
+        pak_file_2, _ = pick_file_from_folder("Select Second PAK", pak_dir)
+        if not pak_file_2:
+            return
+
+        try:
+            console.print(f"\n[bold cyan][+] Reading PAK 1 ({pak_file_1.name})...[/bold cyan]")
+            pak1 = TencentPakFile(pak_file_1)
+            map1 = {}
+            for dir_p, files in pak1._index.items():
+                for fname, entry in files.items():
+                    rel_p = (pak1._mount_point / dir_p / fname).as_posix()
+                    map1[rel_p] = entry
+
+            console.print(f"[bold cyan][+] Reading PAK 2 ({pak_file_2.name})...[/bold cyan]")
+            pak2 = TencentPakFile(pak_file_2)
+            map2 = {}
+            for dir_p, files in pak2._index.items():
+                for fname, entry in files.items():
+                    rel_p = (pak2._mount_point / dir_p / fname).as_posix()
+                    map2[rel_p] = entry
+
+            keys1, keys2 = set(map1.keys()), set(map2.keys())
+            added = keys2 - keys1
+            removed = keys1 - keys2
+            common = keys1 & keys2
+
+            modified = []
+            for k in common:
+                e1, e2 = map1[k], map2[k]
+                if e1.size != e2.size or e1.uncompressed_size != e2.uncompressed_size or getattr(e1, 'hash', None) != getattr(e2, 'hash', None):
+                    modified.append((k, e1, e2))
+
+            summary_table = Table(title="[bold yellow]PAK COMPARE RESULT SUMMARY[/bold yellow]", box=ROUNDED, border_style="cyan")
+            summary_table.add_column("Category", style="bold white")
+            summary_table.add_column("Count", style="bold yellow", justify="right")
+
+            summary_table.add_row("Total Files in PAK 1", str(len(keys1)))
+            summary_table.add_row("Total Files in PAK 2", str(len(keys2)))
+            summary_table.add_row("🆕 Added Assets", f"[bold green]{len(added)}[/bold green]")
+            summary_table.add_row("✏️ Modified / Changed Assets", f"[bold yellow]{len(modified)}[/bold yellow]")
+            summary_table.add_row("🗑️ Removed / Missing Assets", f"[bold red]{len(removed)}[/bold red]")
+            summary_table.add_row("✅ Unchanged Common Assets", str(len(common) - len(modified)))
+
+            console.print(summary_table)
+
+            dump_dir = data_path / "DUMP_LOGS"
+            dump_dir.mkdir(parents=True, exist_ok=True)
+            diff_log = dump_dir / f"Compare_{pak_file_1.stem}_vs_{pak_file_2.stem}.txt"
+
+            with open(diff_log, "w", encoding="utf-8") as f:
+                f.write(f"=== FEATURESTIC LEAKS PAK COMPARISON LOG ===\n")
+                f.write(f"PAK 1 (Original): {pak_file_1.name} ({len(keys1)} files)\n")
+                f.write(f"PAK 2 (Modified): {pak_file_2.name} ({len(keys2)} files)\n")
+                f.write("="*60 + "\n\n")
+
+                f.write(f"--- ADDED ASSETS ({len(added)}) ---\n")
+                for a in sorted(added):
+                    f.write(f"+ {a} ({map2[a].size} bytes)\n")
+
+                f.write(f"\n--- MODIFIED ASSETS ({len(modified)}) ---\n")
+                for k, e1, e2 in sorted(modified, key=lambda x: x[0]):
+                    f.write(f"* {k}\n  PAK1: {e1.size} bytes | PAK2: {e2.size} bytes\n")
+
+                f.write(f"\n--- REMOVED ASSETS ({len(removed)}) ---\n")
+                for r in sorted(removed):
+                    f.write(f"- {r}\n")
+
+            console.print(f"\n[bold green][OK] Comparison log saved:[/bold green] {diff_log}")
+
+            sd_dump = Path("/sdcard/FeaturesticLeaks/DUMP_LOGS")
+            if sd_dump.parent.exists():
+                sd_dump.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(diff_log, sd_dump / diff_log.name)
+                console.print(f"📲 [bold green]Saved to SDCard:[/bold green] /sdcard/FeaturesticLeaks/DUMP_LOGS/{diff_log.name}")
+
+        except Exception as e:
+            handle_exception(e, "PAK Compare", data_path)
+
 def pak_obb_tools_menu(data_path: Path):
     while True:
         print_banner()
@@ -3524,11 +3687,12 @@ def pak_obb_tools_menu(data_path: Path):
         menu_table.add_row("[bold cyan]5[/bold cyan]", "[bold cyan]White Body Mod[/bold cyan]", "[dim cyan]One-click character & gear asset nuller[/dim cyan]")
         menu_table.add_row("[bold magenta]6[/bold magenta]", "[bold magenta]Skin ID Swap[/bold magenta]", "[dim magenta]Swap Lobby, Ingame & Weapon skin IDs[/dim magenta]")
         menu_table.add_row("[bold blue]7[/bold blue]", "[bold blue]OBB Manager[/bold blue]", "[dim blue]Unzip & Rezip OBB with size padding[/dim blue]")
+        menu_table.add_row("[bold yellow]8[/bold yellow]", "[bold yellow]PAK Compare & Dumper[/bold yellow]", "[dim yellow]Compare 2 PAKs or dump index/offsets/hashes[/dim yellow]")
         menu_table.add_row("[dim]0[/dim]", "[dim]Back[/dim]", "[dim]Return to Main Menu[/dim]")
 
         console.print(menu_table)
         console.print()
-        choice = safe_input('-> Select PAK/OBB option (0-7): ').strip()
+        choice = safe_input('-> Select PAK/OBB option (0-8): ').strip()
 
         if choice == '1':
             pak_dir = data_path / "PAK"
@@ -3760,6 +3924,10 @@ def pak_obb_tools_menu(data_path: Path):
 
         elif choice == '7':
             run_obb_manager(data_path)
+            safe_input('\nPress Enter to continue...')
+
+        elif choice == '8':
+            run_pak_compare_dumper(data_path)
             safe_input('\nPress Enter to continue...')
 
         elif choice == '0':
