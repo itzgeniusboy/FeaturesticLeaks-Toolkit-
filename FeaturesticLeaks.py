@@ -4028,6 +4028,50 @@ def run_pak_compare_dumper(data_path: Path) -> None:
                 shutil.copy2(diff_log, sd_dump / diff_log.name)
                 console.print(f"📲 [bold green]Saved to SDCard:[/bold green] /sdcard/FeaturesticLeaks/DUMP_LOGS/{diff_log.name}")
 
+            # Option to extract modified and added assets automatically
+            diff_count = len(modified) + len(added)
+            if diff_count > 0:
+                console.print(f"\n[bold yellow]💡 Found {diff_count} modified/added files in PAK 2.[/bold yellow]")
+                extract_choice = safe_input("-> Do you want to extract these modified/added files to RESULT/Modified_Files? (y/n): ").strip().lower()
+                if extract_choice == 'y':
+                    mod_out_dir = data_path / "RESULT" / "Modified_Files"
+                    mod_out_dir.mkdir(parents=True, exist_ok=True)
+                    console.print(f"\n[bold cyan][+] Extracting {diff_count} modified/added files from PAK 2...[/bold cyan]")
+                    
+                    extracted_cnt = 0
+                    # Extract added assets
+                    for rel_p in sorted(added):
+                        entry = map2[rel_p]
+                        dest_file = mod_out_dir / rel_p.lstrip('/')
+                        dest_file.parent.mkdir(parents=True, exist_ok=True)
+                        try:
+                            pak2._write_to_disk(dest_file, entry)
+                            extracted_cnt += 1
+                        except Exception:
+                            pass
+
+                    # Extract modified assets
+                    for rel_p, e1, e2 in sorted(modified, key=lambda x: x[0]):
+                        dest_file = mod_out_dir / rel_p.lstrip('/')
+                        dest_file.parent.mkdir(parents=True, exist_ok=True)
+                        try:
+                            pak2._write_to_disk(dest_file, e2)
+                            extracted_cnt += 1
+                        except Exception:
+                            pass
+
+                    console.print(f"[bold green]✅ Extracted {extracted_cnt}/{diff_count} files to:[/bold green] {mod_out_dir}")
+                    
+                    sd_mod = Path("/sdcard/FeaturesticLeaks/RESULT/Modified_Files")
+                    if sd_mod.parent.parent.exists():
+                        try:
+                            if sd_mod.exists():
+                                shutil.rmtree(sd_mod)
+                            shutil.copytree(mod_out_dir, sd_mod)
+                            console.print(f"📲 [bold green]Synced to SDCard:[/bold green] /sdcard/FeaturesticLeaks/RESULT/Modified_Files/")
+                        except Exception:
+                            pass
+
         except Exception as e:
             handle_exception(e, "PAK Compare", data_path)
 
