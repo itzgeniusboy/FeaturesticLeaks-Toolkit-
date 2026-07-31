@@ -827,12 +827,21 @@ class TencentPakFile:
                 file.truncate(entry.size)
                 return
             else:
-                for x in PakCrypto.generate_block_indices(len(entry.compressed_blocks), encryption_method):
-                    data = self._peek_block_content(entry.compressed_blocks[x], encryption_method)
+                if len(entry.compressed_blocks) == 0:
+                    data = self._peek_content(entry.offset, entry.size, encryption_method)
                     if entry.encrypted:
                         data = PakCrypto.decrypt_block(data, file_path, encryption_method)
                     data = PakCompression.decompress_block(data, self._zstd_dict, compression_method)
                     file.write(data)
+                else:
+                    block_size = entry.compression_block_size if entry.compression_block_size > 0 else 65536
+                    for x in PakCrypto.generate_block_indices(len(entry.compressed_blocks), encryption_method):
+                        data = self._peek_block_content(entry.compressed_blocks[x], encryption_method)
+                        if entry.encrypted:
+                            data = PakCrypto.decrypt_block(data, file_path, encryption_method)
+                        data = PakCompression.decompress_block(data, self._zstd_dict, compression_method)
+                        file.seek(x * block_size)
+                        file.write(data)
                 file.truncate(entry.uncompressed_size)
     
     def dump(self, out_path: Path) -> None:
@@ -1845,26 +1854,26 @@ def display_workspace_summary(data_path: Path):
     result_cnt = get_cnt("RESULT")
 
     table = Table(
-        title="[bold green]🟢 WORKSPACE STATUS & FILES 🟢[/bold green]",
-        border_style="green",
+        title="[bold bright_cyan]📂 WORKSPACE STATUS & FILES 📂[/bold bright_cyan]",
+        border_style="bright_cyan",
         box=ROUNDED,
         show_header=True,
-        header_style="bold green",
+        header_style="bold bright_cyan",
         expand=True
     )
-    table.add_column("Folder Name", justify="left", style="bold green", width=14)
-    table.add_column("Where to Put / Purpose", justify="left", style="bold white")
-    table.add_column("Files Found", justify="center", style="bold bright_green", width=12)
+    table.add_column("Folder Name", justify="left", style="bold bright_cyan", width=14)
+    table.add_column("Where to Put / Purpose", justify="left", style="bold bright_white")
+    table.add_column("Files Found", justify="center", style="bold bright_yellow", width=12)
 
-    table.add_row("📥 PAK/", "Put original game .pak / .obb files here", f"[bold bright_green]{pak_cnt}[/bold bright_green]")
-    table.add_row("📂 UNPACK/", "Extracted files from Unpack tool", f"[bold bright_green]{unpack_cnt}[/bold bright_green]")
-    table.add_row("✏️ REPLACE/", "Put edited files here to replace existing PAK files", f"[bold bright_green]{replace_cnt}[/bold bright_green]")
-    table.add_row("💉 INJECT/", "Put custom files here for Inject Path mode", f"[bold bright_green]{inject_cnt}[/bold bright_green]")
-    table.add_row("🌙 LUA/", "Put .lua / .luac scripts here for Lua tools", f"[bold bright_green]{lua_cnt}[/bold bright_green]")
-    table.add_row("🚀 RESULT/", "Final repacked PAK, OBB & compiled files saved here", f"[bold bright_green]{result_cnt}[/bold bright_green]")
+    table.add_row("📥 PAK/", "Put original game .pak / .obb files here", f"[bold bright_yellow]{pak_cnt}[/bold bright_yellow]")
+    table.add_row("📂 UNPACK/", "Extracted files from Unpack tool", f"[bold bright_yellow]{unpack_cnt}[/bold bright_yellow]")
+    table.add_row("✏️ REPLACE/", "Put edited files here to replace existing PAK files", f"[bold bright_yellow]{replace_cnt}[/bold bright_yellow]")
+    table.add_row("💉 INJECT/", "Put custom files here for Inject Path mode", f"[bold bright_yellow]{inject_cnt}[/bold bright_yellow]")
+    table.add_row("🌙 LUA/", "Put .lua / .luac scripts here for Lua tools", f"[bold bright_yellow]{lua_cnt}[/bold bright_yellow]")
+    table.add_row("🚀 RESULT/", "Final repacked PAK, OBB & compiled files saved here", f"[bold bright_yellow]{result_cnt}[/bold bright_yellow]")
 
     console.print(table)
-    console.print("[bold green]💡 SDCard Location: [bold white]/sdcard/FeaturesticLeaks/[/bold white] (ZArchiver / File Manager me direct dikhega)[/bold green]\n")
+    console.print("[bold bright_cyan]💡 SDCard Location: [bold bright_white]/sdcard/FeaturesticLeaks/[/bold bright_white] (ZArchiver / File Manager me direct dikhega)[/bold bright_cyan]\n")
 
 # ============================================================================
 # LUA ENGINE & PSEUDO-DECOMPILER (Pure Python + External Tools Fallback)
@@ -2507,6 +2516,522 @@ def analyze_and_display_lua_error(lua_file: Path, stderr_text: str):
     if not found_known_issue:
         console.print("[bold yellow]💡 Tip:[/bold yellow] Check for missing closing braces '}', quotes, syntax errors, or select Option [1] to attempt auto-patching.")
 
+# ============================================================================
+# UNIVERSAL LUA PACKER & UNPACKER MODULE (PLUGIN-STYLE ARCHITECTURE)
+# ============================================================================
+
+class UniversalLuaPacker:
+    """
+    Universal Lua pack/unpack (encode/decode) module with 8-byte ASCII tag headers
+    and extensible plugin architecture.
+    """
+    TAG_LEN = 8
+    XOR_KEY = 0x5A
+
+    _registry = {}
+
+    @classmethod
+    def register(cls, name: str, pack_fn, unpack_fn):
+        """Register a new packing/unpacking method."""
+        cls._registry[name.lower()] = (pack_fn, unpack_fn)
+
+    @classmethod
+    def _format_tag(cls, name: str) -> bytes:
+        tag = name.upper().ljust(cls.TAG_LEN, '_')[:cls.TAG_LEN]
+        return tag.encode('ascii')
+
+    @classmethod
+    def _parse_tag(cls, tag_bytes: bytes) -> str:
+        try:
+            return tag_bytes.decode('ascii', errors='ignore').rstrip('_').lower()
+        except Exception:
+            return ""
+
+    @classmethod
+    def pack(cls, method: str, input_bytes: bytes) -> bytes:
+        """Packs input_bytes using the specified method name and prepends 8-byte ASCII tag."""
+        method_key = method.lower()
+        if method_key not in cls._registry:
+            raise ValueError(f"Unrecognized packing method '{method}'. Available methods: {list(cls._registry.keys())}")
+        pack_fn, _ = cls._registry[method_key]
+        tag = cls._format_tag(method_key)
+        payload = pack_fn(input_bytes)
+        return tag + payload
+
+    @classmethod
+    def unpack(cls, packed_bytes: bytes) -> bytes:
+        """Auto-detects method from 8-byte ASCII tag header and unpacks payload back to original bytes."""
+        if len(packed_bytes) < cls.TAG_LEN:
+            raise ValueError("Invalid packed payload: data shorter than 8-byte tag header.")
+        tag_bytes = packed_bytes[:cls.TAG_LEN]
+        method_key = cls._parse_tag(tag_bytes)
+        if method_key not in cls._registry:
+            raise ValueError(f"Unrecognized tag header '{tag_bytes.decode('ascii', errors='ignore')}'. Available methods: {list(cls._registry.keys())}")
+        _, unpack_fn = cls._registry[method_key]
+        payload = packed_bytes[cls.TAG_LEN:]
+        return unpack_fn(payload)
+
+    @classmethod
+    def run_self_test(cls) -> bool:
+        """Verifies lossless round-trip for all registered methods."""
+        test_sample = b"-- FeaturesticLeaks Universal Lua Pack/Unpack Self-Test\nlocal x = 10\nprint('OK')"
+        for method in cls._registry:
+            packed = cls.pack(method, test_sample)
+            unpacked = cls.unpack(packed)
+            assert unpacked == test_sample, f"Lossless round-trip test failed for method '{method}'"
+        return True
+
+
+# Default Methods Registration
+def _b64_pack(data: bytes) -> bytes:
+    return base64.b64encode(data)
+
+def _b64_unpack(payload: bytes) -> bytes:
+    return base64.b64decode(payload)
+
+def _xor_pack(data: bytes) -> bytes:
+    xor_data = bytes(b ^ UniversalLuaPacker.XOR_KEY for b in data)
+    return base64.b64encode(xor_data)
+
+def _xor_unpack(payload: bytes) -> bytes:
+    raw_b64 = base64.b64decode(payload)
+    return bytes(b ^ UniversalLuaPacker.XOR_KEY for b in raw_b64)
+
+def _zlib_pack(data: bytes) -> bytes:
+    compressed = zlib.compress(data)
+    return base64.b64encode(compressed)
+
+def _zlib_unpack(payload: bytes) -> bytes:
+    compressed = base64.b64decode(payload)
+    return zlib.decompress(compressed)
+
+def _raw_pack(data: bytes) -> bytes:
+    return data
+
+def _raw_unpack(payload: bytes) -> bytes:
+    return payload
+
+UniversalLuaPacker.register("b64", _b64_pack, _b64_unpack)
+UniversalLuaPacker.register("xor", _xor_pack, _xor_unpack)
+UniversalLuaPacker.register("zlib", _zlib_pack, _zlib_unpack)
+UniversalLuaPacker.register("raw", _raw_pack, _raw_unpack)
+
+# Run self-test on load
+try:
+    UniversalLuaPacker.run_self_test()
+except Exception:
+    pass
+
+
+def run_universal_lua_pack(data_path: Path):
+    console.print(Panel(Align.center("[bold bright_cyan]📦 UNIVERSAL LUA PACKER[/bold bright_cyan]"), border_style="cyan", box=ROUNDED))
+    lua_dir = data_path / "LUA"
+    lua_dir.mkdir(parents=True, exist_ok=True)
+    
+    lua_file, _ = pick_file_from_folder("Universal Pack Lua", lua_dir, extensions=[".lua", ".txt", ".luac"])
+    if not lua_file:
+        custom_input = safe_input('-> Enter custom Lua file path (or press Enter to cancel): ').strip().strip('"\'')
+        if not custom_input:
+            return
+        lua_file = Path(custom_input)
+        if not lua_file.exists() or not lua_file.is_file():
+            console.print(f'[bold red][X] File not found: {lua_file}[/bold red]')
+            return
+
+    console.print("\n[bold green]Available Packing Methods:[/bold green]")
+    console.print(" [1] b64  - Base64 Encode")
+    console.print(" [2] xor  - XOR + Base64 Encode")
+    console.print(" [3] zlib - Zlib Compress + Base64 Encode")
+    console.print(" [4] raw  - Tag Header Passthrough\n")
+    
+    method_choice = safe_input('SELECT METHOD [1-4] (default 1): ').strip()
+    method_map = {'1': 'b64', '2': 'xor', '3': 'zlib', '4': 'raw'}
+    method_name = method_map.get(method_choice, 'b64')
+
+    try:
+        raw_bytes = lua_file.read_bytes()
+        packed_bytes = UniversalLuaPacker.pack(method_name, raw_bytes)
+        
+        res_dir = data_path / "RESULT"
+        res_dir.mkdir(parents=True, exist_ok=True)
+        out_file = res_dir / f"{lua_file.stem}_packed.bin"
+        out_file.write_bytes(packed_bytes)
+        
+        console.print(f"[bold green][OK] File packed successfully using method '{method_name.upper()}':[/bold green]")
+        console.print(f"     [bold white]{out_file}[/bold white]")
+        console.print(f"     [dim]Header Tag: {packed_bytes[:8].decode('ascii', errors='ignore')} | Output Size: {len(packed_bytes)} bytes[/dim]")
+    except Exception as e:
+        console.print(f"[bold red][X] Packing failed: {e}[/bold red]")
+
+
+def run_universal_lua_unpack(data_path: Path):
+    console.print(Panel(Align.center("[bold bright_cyan]🔓 UNIVERSAL LUA UNPACKER[/bold bright_cyan]"), border_style="cyan", box=ROUNDED))
+    res_dir = data_path / "RESULT"
+    lua_dir = data_path / "LUA"
+    
+    packed_file, _ = pick_file_from_folder("Universal Unpack Lua", res_dir, extensions=[".bin", ".lua", ".txt"])
+    if not packed_file:
+        packed_file, _ = pick_file_from_folder("Universal Unpack Lua", lua_dir, extensions=[".bin", ".lua", ".txt"])
+    if not packed_file:
+        custom_input = safe_input('-> Enter custom packed file path (or press Enter to cancel): ').strip().strip('"\'')
+        if not custom_input:
+            return
+        packed_file = Path(custom_input)
+        if not packed_file.exists() or not packed_file.is_file():
+            console.print(f'[bold red][X] File not found: {packed_file}[/bold red]')
+            return
+
+    try:
+        packed_bytes = packed_file.read_bytes()
+        unpacked_bytes = UniversalLuaPacker.unpack(packed_bytes)
+        
+        out_file = res_dir / f"{packed_file.stem}_unpacked.lua"
+        out_file.write_bytes(unpacked_bytes)
+        
+        tag_str = packed_bytes[:8].decode('ascii', errors='ignore')
+        console.print(f"[bold green][OK] Auto-detected Header Tag '{tag_str}' & unpacked successfully:[/bold green]")
+        console.print(f"     [bold white]{out_file}[/bold white]")
+        console.print(f"     [dim]Restored Original Size: {len(unpacked_bytes)} bytes[/dim]")
+    except Exception as e:
+        console.print(f"[bold red][X] Unpacking failed: {e}[/bold red]")
+
+
+def run_lua_string_obfuscator(data_path: Path):
+    console.print(Panel(Align.center("[bold bright_cyan]🔒 LUA STRING OBFUSCATOR & DUMPER ENGINE[/bold bright_cyan]"), border_style="cyan", box=ROUNDED))
+    
+    lua_dir = data_path / "LUA"
+    lua_dir.mkdir(parents=True, exist_ok=True)
+    lua_file, _ = pick_file_from_folder("Lua String Tool", lua_dir, extensions=[".lua", ".txt", ".luac"])
+    
+    if not lua_file:
+        custom_input = safe_input('-> Enter custom Lua file path (or press Enter to cancel): ').strip().strip('"\'')
+        if not custom_input:
+            return
+        lua_file = Path(custom_input)
+        if not lua_file.exists() or not lua_file.is_file():
+            console.print(f'[bold red][X] File not found: {lua_file}[/bold red]')
+            return
+
+    console.print("\n[bold bright_yellow]Select Tool Mode:[/bold bright_yellow]")
+    console.print(" [1] 🔒 Encrypt All Strings in Script (Hex / Base64 / XOR + Auto-Decoder Wrapper)")
+    console.print(" [2] 🔍 Extract & Dump All String Constants, URLs & Memory Offsets")
+    console.print(" [0] Cancel\n")
+
+    mode = safe_input('-> Select Option (0-2): ').strip()
+    if mode == '0' or not mode:
+        return
+
+    content = lua_file.read_text(encoding="utf-8", errors="ignore")
+    res_dir = data_path / "RESULT"
+    res_dir.mkdir(parents=True, exist_ok=True)
+
+    if mode == '1':
+        console.print("\n[bold bright_cyan][+] Obfuscating string literals...[/bold bright_cyan]")
+        
+        # Extract quoted strings (e.g. "hello", 'world')
+        str_pattern = re.compile(r'(".*?"|\'.*?\')')
+        
+        def encrypt_match(m):
+            s = m.group(1)[1:-1]
+            if len(s) < 2 or "function" in s or "local" in s or "return" in s or "gg." in s:
+                return m.group(1)
+            hex_encoded = s.encode("utf-8").hex()
+            # Wrap in Lua hex-decode function call
+            return f'_HEX("{hex_encoded}")'
+
+        obfuscated_code = str_pattern.sub(encrypt_match, content)
+
+        # Inject decoder runtime at the top
+        decoder_header = (
+            "-- [FEATURESTIC LEAKS OBFUSCATED SCRIPT]\n"
+            "local function _HEX(hex_str)\n"
+            "    return (hex_str:gsub('..', function(cc)\n"
+            "        return string.char(tonumber(cc, 16))\n"
+            "    end))\n"
+            "end\n\n"
+        )
+        final_code = decoder_header + obfuscated_code
+        
+        out_file = res_dir / f"{lua_file.stem}_obfuscated.lua"
+        out_file.write_text(final_code, encoding="utf-8")
+        
+        console.print(f"[bold green][OK] Obfuscated Lua script saved successfully:[/bold green]")
+        console.print(f"     [bold white]{out_file}[/bold white]")
+        
+        sd_res = Path("/sdcard/FeaturesticLeaks/RESULT")
+        if sd_res.exists():
+            try:
+                shutil.copy2(out_file, sd_res / out_file.name)
+                console.print(f"     [bold green]📲 Saved to SDCard: /sdcard/FeaturesticLeaks/RESULT/{out_file.name}[/bold green]")
+            except Exception:
+                pass
+
+    elif mode == '2':
+        dump_dir = data_path / "DUMP_LOGS"
+        dump_dir.mkdir(parents=True, exist_ok=True)
+        dump_file = dump_dir / f"{lua_file.stem}_strings_dump.txt"
+
+        # Regex for strings, URLs, Hex values
+        strings_found = re.findall(r'["\'](.*?)["\']', content)
+        urls = re.findall(r'https?://[^\s"\']+', content)
+        ips = re.findall(r'\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b', content)
+        hex_offsets = re.findall(r'0x[0-9a-fA-F]+', content)
+
+        with open(dump_file, "w", encoding="utf-8") as f:
+            f.write(f"=== FEATURESTIC LEAKS LUA STRING DUMP: {lua_file.name} ===\n\n")
+            f.write(f"--- URLs Identified ({len(urls)}) ---\n")
+            for u in set(urls):
+                f.write(f"  {u}\n")
+            f.write(f"\n--- IP Addresses Identified ({len(ips)}) ---\n")
+            for ip in set(ips):
+                f.write(f"  {ip}\n")
+            f.write(f"\n--- Memory Offsets Identified ({len(hex_offsets)}) ---\n")
+            for ho in sorted(set(hex_offsets)):
+                f.write(f"  {ho}\n")
+            f.write(f"\n--- Literal Strings Found ({len(strings_found)}) ---\n")
+            for s in set(strings_found):
+                if len(s.strip()) > 1:
+                    f.write(f"  {s}\n")
+
+        console.print(f"[bold green][OK] Extracted {len(strings_found)} strings, {len(urls)} URLs, {len(ips)} IPs, {len(hex_offsets)} memory offsets![/bold green]")
+        console.print(f" 📄 Report: [bold white]{dump_file}[/bold white]")
+        
+        sd_dump = Path("/sdcard/FeaturesticLeaks/DUMP_LOGS")
+        if sd_dump.parent.exists():
+            try:
+                sd_dump.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(dump_file, sd_dump / dump_file.name)
+                console.print(f" 📲 [bold green]Saved to SDCard: /sdcard/FeaturesticLeaks/DUMP_LOGS/[/bold green]")
+            except Exception:
+                pass
+
+
+def run_lua_anti_bypass_analyzer(data_path: Path):
+    console.print(Panel(Align.center("[bold bright_cyan]🛡️ LUA ANTI-BYPASS & SECURITY ANALYZER[/bold bright_cyan]"), border_style="cyan", box=ROUNDED))
+    
+    lua_dir = data_path / "LUA"
+    lua_file, _ = pick_file_from_folder("Lua Security Analyzer", lua_dir, extensions=[".lua", ".txt"])
+    
+    if not lua_file:
+        custom_input = safe_input('-> Enter custom Lua file path (or press Enter to cancel): ').strip().strip('"\'')
+        if not custom_input:
+            return
+        lua_file = Path(custom_input)
+        if not lua_file.exists() or not lua_file.is_file():
+            console.print(f'[bold red][X] File not found: {lua_file}[/bold red]')
+            return
+
+    content = lua_file.read_text(encoding="utf-8", errors="ignore")
+    lines = content.splitlines()
+
+    rules = [
+        ("HIGH", "Memory Edit Call", r'gg\.editAll|gg\.setValues|gg\.setRanges'),
+        ("HIGH", "Memory Search Hook", r'gg\.searchNumber|gg\.refineNumber'),
+        ("CRITICAL", "Anti-Cheat Clearance", r'gg\.clearResults|gg\.clearList'),
+        ("MEDIUM", "Process Termination", r'os\.exit|os\.execute|os\.remove'),
+        ("HIGH", "Dynamic Code Execution", r'loadstring|load|dofile|require'),
+        ("HIGH", "Bytecode Injection / Dump", r'string\.dump|debug\.getinfo|debug\.getupvalue'),
+        ("MEDIUM", "Memory Offset Pointer", r'0x[0-9a-fA-F]{4,}'),
+        ("INFO", "GameGuard Toast / Alert", r'gg\.toast|gg\.alert|gg\.prompt')
+    ]
+
+    findings = []
+    risk_score = 0
+
+    for idx, line in enumerate(lines, 1):
+        for severity, cat, pattern in rules:
+            matches = re.findall(pattern, line)
+            if matches:
+                findings.append({
+                    "line": idx,
+                    "severity": severity,
+                    "category": cat,
+                    "match": matches[0],
+                    "text": line.strip()[:80]
+                })
+                if severity == "CRITICAL": risk_score += 25
+                elif severity == "HIGH": risk_score += 15
+                elif severity == "MEDIUM": risk_score += 8
+                elif severity == "INFO": risk_score += 2
+
+    risk_score = min(100, risk_score)
+
+    table = Table(
+        title=f"[bold bright_cyan]📊 LUA AUDIT RESULTS: {lua_file.name} (Risk Score: {risk_score}/100)[/bold bright_cyan]",
+        border_style="bright_cyan",
+        box=ROUNDED
+    )
+    table.add_column("Line", style="bold yellow", justify="center", width=6)
+    table.add_column("Severity", style="bold white", width=10)
+    table.add_column("Category", style="bright_cyan", width=20)
+    table.add_column("Code Snippet", style="dim white")
+
+    for f in findings[:25]:
+        sev_color = "red" if f["severity"] in ["CRITICAL", "HIGH"] else "yellow" if f["severity"] == "MEDIUM" else "green"
+        table.add_row(
+            str(f["line"]),
+            f"[{sev_color}]{f['severity']}[/{sev_color}]",
+            f["category"],
+            f["text"]
+        )
+
+    console.print(table)
+
+    dump_dir = data_path / "DUMP_LOGS"
+    dump_dir.mkdir(parents=True, exist_ok=True)
+    report_file = dump_dir / f"{lua_file.stem}_security_audit.txt"
+
+    with open(report_file, "w", encoding="utf-8") as rf:
+        rf.write(f"=== FEATURESTIC LEAKS LUA SECURITY AUDIT REPORT ===\n")
+        rf.write(f"Target File: {lua_file.name}\n")
+        rf.write(f"Risk Score: {risk_score}/100\n")
+        rf.write(f"Total Detections: {len(findings)}\n")
+        rf.write("="*60 + "\n\n")
+        for f in findings:
+            rf.write(f"Line {f['line']:<5} | [{f['severity']:<8}] {f['category']:<22} | Match: {f['match']}\n  Code: {f['text']}\n\n")
+
+    console.print(f"\n[bold green][OK] Detailed audit report saved to:[/bold green] [bold white]{report_file}[/bold white]")
+    sd_dump = Path("/sdcard/FeaturesticLeaks/DUMP_LOGS")
+    if sd_dump.parent.exists():
+        try:
+            sd_dump.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(report_file, sd_dump / report_file.name)
+            console.print(f" 📲 [bold green]Saved to SDCard: /sdcard/FeaturesticLeaks/DUMP_LOGS/[/bold green]")
+        except Exception:
+            pass
+
+
+def run_lua_header_fixer(data_path: Path):
+    console.print(Panel(Align.center("[bold bright_cyan]🔧 LUA BYTECODE HEADER FIXER & DEBUG STRIPPER[/bold bright_cyan]"), border_style="cyan", box=ROUNDED))
+    
+    lua_dir = data_path / "LUA"
+    res_dir = data_path / "RESULT"
+    lua_file, _ = pick_file_from_folder("Lua Header Fixer", lua_dir, extensions=[".luac", ".lua", ".bytes", ".bytecode"])
+    
+    if not lua_file:
+        custom_input = safe_input('-> Enter custom compiled .luac file path (or press Enter to cancel): ').strip().strip('"\'')
+        if not custom_input:
+            return
+        lua_file = Path(custom_input)
+        if not lua_file.exists() or not lua_file.is_file():
+            console.print(f'[bold red][X] File not found: {lua_file}[/bold red]')
+            return
+
+    raw_bytes = lua_file.read_bytes()
+    if len(raw_bytes) < 12:
+        console.print("[bold red][X] File size too small to be a valid Lua bytecode file.[/bold red]")
+        return
+
+    console.print(f"[bold cyan][+] Current Header Magic Bytes (First 12 Bytes):[/bold cyan] [bold yellow]{raw_bytes[:12].hex(' ').upper()}[/bold yellow]")
+
+    console.print("\n[bold bright_yellow]Select Repair / Fix Action:[/bold bright_yellow]")
+    console.print(" [1] Restore Standard Lua 5.1 Bytecode Header (1B 4C 75 61 51 00...)")
+    console.print(" [2] Restore Standard LuaJIT Bytecode Header (1B 4C 4A 01/02...)")
+    console.print(" [3] Strip Debug Symbols & Local Variable Names")
+    console.print(" [0] Cancel\n")
+
+    act = safe_input("-> Select Action (0-3): ").strip()
+    if act == '0' or not act:
+        return
+
+    res_dir.mkdir(parents=True, exist_ok=True)
+    out_file = res_dir / f"{lua_file.stem}_header_fixed.luac"
+
+    if act == '1':
+        # Standard Lua 5.1 header
+        std_lua51_header = bytes([0x1B, 0x4C, 0x75, 0x61, 0x51, 0x00, 0x01, 0x04, 0x08, 0x04, 0x08, 0x00])
+        fixed_bytes = std_lua51_header + raw_bytes[12:]
+        out_file.write_bytes(fixed_bytes)
+        console.print(f"[bold green][OK] Fixed Lua 5.1 magic header & written to:[/bold green] [bold white]{out_file}[/bold white]")
+
+    elif act == '2':
+        # Standard LuaJIT 2.0 header
+        std_luajit_header = bytes([0x1B, 0x4C, 0x4A, 0x02])
+        fixed_bytes = std_luajit_header + raw_bytes[4:]
+        out_file.write_bytes(fixed_bytes)
+        console.print(f"[bold green][OK] Fixed LuaJIT magic header & written to:[/bold green] [bold white]{out_file}[/bold white]")
+
+    elif act == '3':
+        # Strip debug names if possible or invoke luac -s
+        if shutil.which("luac5.1") or shutil.which("luac"):
+            compiler = shutil.which("luac5.1") or shutil.which("luac")
+            cmd = [compiler, "-s", "-o", str(out_file), str(lua_file)]
+            try:
+                proc = subprocess.run(cmd, capture_output=True, text=True)
+                if proc.returncode == 0:
+                    console.print(f"[bold green][OK] Stripped debug symbols using '{compiler}':[/bold green] [bold white]{out_file}[/bold white]")
+                else:
+                    out_file.write_bytes(raw_bytes)
+                    console.print(f"[bold yellow][!] Compiler strip warning, copied original file.[/bold yellow]")
+            except Exception as e:
+                console.print(f"[bold red][X] Error stripping debug symbols: {e}[/bold red]")
+        else:
+            out_file.write_bytes(raw_bytes)
+            console.print(f"[bold yellow][!] No luac compiler found to strip debug info. Output saved.[/bold yellow]")
+
+    sd_res = Path("/sdcard/FeaturesticLeaks/RESULT")
+    if sd_res.exists():
+        try:
+            shutil.copy2(out_file, sd_res / out_file.name)
+            console.print(f" 📲 [bold green]Saved to SDCard: /sdcard/FeaturesticLeaks/RESULT/[/bold green]")
+        except Exception:
+            pass
+
+
+def run_lua_script_merger(data_path: Path):
+    console.print(Panel(Align.center("[bold bright_cyan]🔗 LUA MULTI-SCRIPT COMBINER & MERGER[/bold bright_cyan]"), border_style="cyan", box=ROUNDED))
+    
+    lua_dir = data_path / "LUA"
+    lua_files = [f for f in lua_dir.glob("*.lua") if f.is_file()] if lua_dir.exists() else []
+
+    if not lua_files:
+        console.print(f"[bold yellow][!] No .lua scripts found in {lua_dir}. Please add .lua scripts there first.[/bold yellow]")
+        return
+
+    console.print(f"[bold bright_cyan][+] Found {len(lua_files)} .lua script(s) in LUA/ folder to merge:[/bold bright_cyan]\n")
+    for idx, f in enumerate(lua_files, 1):
+        console.print(f"  [{idx}] [bold white]{f.name}[/bold white] ({f.stat().st_size} bytes)")
+
+    confirm = safe_input("\n-> Merge all these scripts into one Master Lua Script? (Y/n): ").strip().lower()
+    if confirm not in ['', 'y', 'yes']:
+        return
+
+    merged_lines = [
+        "-- ========================================================",
+        "-- FEATURESTIC LEAKS - MASTER MERGED LUA SCRIPT",
+        f"-- Generated on: {time.strftime('%Y-%m-%d %H:%M:%S')}",
+        "-- ========================================================\n\n"
+    ]
+
+    for f in lua_files:
+        merged_lines.append(f"-- >>> MODULE: {f.name} >>>")
+        merged_lines.append("do")
+        try:
+            content = f.read_text(encoding="utf-8", errors="ignore")
+            merged_lines.append(content)
+        except Exception as e:
+            merged_lines.append(f"-- Error reading {f.name}: {e}")
+        merged_lines.append("end")
+        merged_lines.append(f"-- <<< END MODULE: {f.name} <<<\n")
+
+    res_dir = data_path / "RESULT"
+    res_dir.mkdir(parents=True, exist_ok=True)
+    out_file = res_dir / "Master_Merged_Script.lua"
+
+    out_file.write_text("\n".join(merged_lines), encoding="utf-8")
+
+    console.print(f"\n[bold green][OK] Successfully merged {len(lua_files)} scripts into Master Lua File![/bold green]")
+    console.print(f" 📁 [bold white]{out_file}[/bold white]")
+
+    sd_res = Path("/sdcard/FeaturesticLeaks/RESULT")
+    if sd_res.exists():
+        try:
+            shutil.copy2(out_file, sd_res / out_file.name)
+            console.print(f" 📲 [bold green]Saved to SDCard: /sdcard/FeaturesticLeaks/RESULT/Master_Merged_Script.lua[/bold green]")
+        except Exception:
+            pass
+
+
 def run_lua_compiler(data_path: Path):
     console.print(Panel(Align.center("[bold bright_cyan]🌙 LUA COMPILER (.lua Source -> .luac Bytecode)[/bold bright_cyan]"), border_style="cyan", box=ROUNDED))
     
@@ -3110,25 +3635,27 @@ def print_banner():
     os.system('cls' if os.name == 'nt' else 'clear')
     
     ascii_banner = (
-        "[bold green]"
-        "  ______ _____    _ _____ _   _ ____  _____ _____ _____ ____  _     ______  _  _____\n"
-        " |  ____|  __ \\  / |  ___| | | |  _ \\|  ___|_   _|_   _/ ___|| |   |  ____|/ \\|  ___|\n"
-        " | |_   | |__) |/ /| |_  | | | | |_) | |_    | |   | | \\___ \\| |   | |__  / _ \\ |_  \n"
-        " |  _|  |  _  / /  |  _| | | | |  _ <|  _|   | |   | |  ___) | |___|  __|/ ___ \\  _| \n"
-        " |_|    |_| \\_\\/   |_|    \\___/|_| \\_\\_|     |_|   |_| |____/|_____|____/_/   \\_\\_|   \n"
-        "[/bold green]"
+        "[bold bright_cyan]"
+        " ⚡ ══════════════════════════════════════════════════════════════════════════ ⚡\n"
+        "   █▀▀ █▀▀ █▀█ ▀█▀ █  █ █▀▀█ █▀▀ ▀█▀ ▀█▀ █▀▀ █   █▀▀ █▀▀█ █  █ █▀▀ \n"
+        "   █▀▀ █▀▀ █▀█  █  █  █ █▄▄▀ █▀▀  █   █  ▀▀█ █   █▀▀ █▄▄█ █▀▀█ ▀▀█ \n"
+        "   ▀   ▀▀▀ ▀ ▀  ▀  ▀▀▀▀ ▀  ▀ ▀▀▀  ▀   ▀  ▀▀▀ ▀▀▀ ▀▀▀ ▀  ▀ ▀  ▀ ▀▀▀ \n"
+        " ⚡ ══════════════════════════════════════════════════════════════════════════ ⚡"
+        "[/bold bright_cyan]"
     )
     
     sub_title = (
-        "[bold bright_green]@L359D : -- TOOL DEVELOPER --[/bold bright_green]\n"
-        "[bold green]PAK TOOL v2.0 | BGMI | PUBG | KR | TW | JP | VNG ✓[/bold green]"
+        "[bold bright_white]🔥 ULTIMATE PAK & LUA SUITE v2.5 🔥[/bold bright_white]\n"
+        "[bold bright_yellow]BGMI • PUBG MOBILE • KR • TW • JP • VNG ✓[/bold bright_yellow]\n"
+        "[bold bright_cyan]DEVELOPER:[/bold bright_cyan] [bold bright_white]@L359D[/bold bright_white]  [dim white]│[/dim white]  "
+        "[bold bright_cyan]CHANNEL:[/bold bright_cyan] [bold bright_white]t.me/FeaturesticLeaks[/bold bright_white]"
     )
     
     top_box = Panel(
-        Align.center(f"{ascii_banner}\n{sub_title}"),
-        title="[bold green] MADE IN INDIA [/bold green]",
+        Align.center(f"{ascii_banner}\n\n{sub_title}"),
+        title="[bold bright_yellow] 👑 MADE IN INDIA | HIGH SPEED ENGINE 👑 [/bold bright_yellow]",
         title_align="center",
-        border_style="green",
+        border_style="bright_cyan",
         box=ROUNDED,
         padding=(0, 1)
     )
@@ -3136,16 +3663,16 @@ def print_banner():
 
     # USER INFO panel
     user_info_text = (
-        "[bold green]DEVELOPER  :[bold white] @L359D[/bold white]\n"
-        "CHANNEL    :[bold white] t.me/FeaturesticLeaks[/bold white]\n"
-        "TOOL       :[bold white] PAK & LUA SUITE v2.0[/bold white]\n"
-        "STATUS     :[bold green] 🟢 Running[/bold green][/bold green]"
+        "[bold bright_cyan]DEVELOPER  :[bold bright_white] @L359D (VIP DEV)[/bold bright_white]\n"
+        "TELEGRAM   :[bold bright_white] t.me/FeaturesticLeaks[/bold bright_white]\n"
+        "TOOL SUITE :[bold bright_white] PAK & LUA HIGH-SPEED EXPLOIT ENGINE[/bold bright_white]\n"
+        "STATUS     :[bold bright_green] 🟢 ACTIVE & READY[/bold bright_green]"
     )
     user_panel = Panel(
         user_info_text,
-        title="[bold green]🟢 USER INFO 🟢[/bold green]",
+        title="[bold bright_white]💎 SYSTEM INFORMATION 💎[/bold bright_white]",
         title_align="center",
-        border_style="green",
+        border_style="bright_cyan",
         box=ROUNDED,
         padding=(0, 2)
     )
@@ -4006,22 +4533,27 @@ def run_file_finder_tool(data_path: Path) -> None:
 
 def run_skin_id_modder(data_path: Path) -> None:
     console.print(Panel(
-        "[bold cyan]⚡ FEATURESTIC LEAKS — SKIN ID SWAP MODDER ⚡[/bold cyan]\n"
-        "[dim white]Swap skin IDs & offset indexes for Lobby, Ingame, Accessories, Hit Effect, Deadbox.[/dim white]",
-        border_style="cyan",
+        "[bold bright_cyan]⚡ FEATURESTIC LEAKS — SKIN ID MODDER & SKIN ASSET DUMPER ⚡[/bold bright_cyan]\n"
+        "[dim white]Swap skin IDs across binary assets or dump/extract all game skin assets (.uasset/.uexp).[/dim white]",
+        border_style="bright_cyan",
         box=ROUNDED,
         padding=(0, 2)
     ))
     
-    console.print("[bold yellow]1.[/bold yellow] [bold white]Skin Lobby ID Swap[/bold white]")
-    console.print("[bold yellow]2.[/bold yellow] [bold white]Skin Ingame ID Swap[/bold white]")
-    console.print("[bold yellow]3.[/bold yellow] [bold white]Gun Accessories ID Swap[/bold white]")
-    console.print("[bold yellow]4.[/bold yellow] [bold white]Hit Effect ID Swap[/bold white]")
-    console.print("[bold yellow]5.[/bold yellow] [bold white]Deadbox Weapon ID Swap[/bold white]")
-    console.print("[bold yellow]0.[/bold yellow] [dim white]Back to Main Menu[/dim white]")
+    console.print("[bold bright_yellow]1.[/bold bright_yellow] [bold bright_white]Skin Lobby ID Swap[/bold bright_white]")
+    console.print("[bold bright_yellow]2.[/bold bright_yellow] [bold bright_white]Skin Ingame ID Swap[/bold bright_white]")
+    console.print("[bold bright_yellow]3.[/bold bright_yellow] [bold bright_white]Gun Accessories ID Swap[/bold bright_white]")
+    console.print("[bold bright_yellow]4.[/bold bright_yellow] [bold bright_white]Hit Effect ID Swap[/bold bright_white]")
+    console.print("[bold bright_yellow]5.[/bold bright_yellow] [bold bright_white]Deadbox Weapon ID Swap[/bold bright_white]")
+    console.print("[bold bright_yellow]6.[/bold bright_yellow] [bold bright_cyan]🔍 Dump & Extract All Skin Assets from PAK/UNPACK[/bold bright_cyan]")
+    console.print("[bold bright_yellow]0.[/bold bright_yellow] [dim white]Back to Main Menu[/dim white]")
     
-    choice = safe_input("\n-> Select Skin Category (0-5): ").strip()
+    choice = safe_input("\n-> Select Option (0-6): ").strip()
     if choice == '0' or not choice:
+        return
+
+    if choice == '6':
+        run_skin_dumper(data_path)
         return
     
     orig_id_str = safe_input("-> Enter Original Skin ID (decimal, e.g. 101001): ").strip()
@@ -4045,7 +4577,7 @@ def run_skin_id_modder(data_path: Path) -> None:
         console.print(f"[bold red][X] No workspace files found in {search_dir}. Please unpack a PAK file first.[/bold red]")
         return
     
-    console.print(f"\n[bold cyan][+] Scanning workspace files for Skin ID {orig_id} ({orig_hex.hex().upper()})...[/bold cyan]")
+    console.print(f"\n[bold bright_cyan][+] Scanning workspace files for Skin ID {orig_id} ({orig_hex.hex().upper()})...[/bold bright_cyan]")
     
     modified_files = 0
     for root, _, files in os.walk(search_dir):
@@ -4061,7 +4593,7 @@ def run_skin_id_modder(data_path: Path) -> None:
                         with open(file_p, 'wb') as f:
                             f.write(new_data)
                         modified_files += 1
-                        console.print(f"  [bold green][OK] Swapped ID in:[/bold green] [cyan]{file_p.name}[/cyan]")
+                        console.print(f"  [bold green][OK] Swapped ID in:[/bold green] [bright_cyan]{file_p.name}[/bright_cyan]")
                 except Exception as e:
                     pass
     
@@ -4069,6 +4601,152 @@ def run_skin_id_modder(data_path: Path) -> None:
         console.print(f"\n[bold green][OK] Skin ID swap complete! Modified {modified_files} file(s).[/bold green]")
     else:
         console.print(f"\n[bold yellow][!] Skin ID {orig_id} not found in workspace binary files.[/bold yellow]")
+
+
+def run_skin_dumper(data_path: Path) -> None:
+    console.print(Panel(
+        "[bold bright_cyan]🎨 SKIN ASSETS DUMPER & EXTRACTOR 🎨[/bold bright_cyan]\n"
+        "[dim white]Scan PAK files or UNPACK directory to dump skin textures, meshes, uassets & uexps.[/dim white]",
+        border_style="bright_cyan",
+        box=ROUNDED,
+        padding=(0, 2)
+    ))
+
+    keywords = ["skin", "weapon", "outfit", "character", "vehicle", "item_", "gun_", "mesh", "texture", "material", "finish", "suit"]
+    
+    dump_dir = data_path / "DUMP_LOGS"
+    dump_dir.mkdir(parents=True, exist_ok=True)
+    skins_out = data_path / "RESULT" / "SKINS_DUMP"
+    skins_out.mkdir(parents=True, exist_ok=True)
+    
+    found_skins = []
+
+    # Check PAK folder first
+    pak_dir = data_path / "PAK"
+    pak_files = [f for f in pak_dir.glob("*.pak") if f.is_file()] if pak_dir.exists() else []
+
+    if pak_files:
+        console.print(f"\n[bold bright_cyan][+] Scanning {len(pak_files)} .pak file(s) for Skin Assets...[/bold bright_cyan]")
+        for pf in pak_files:
+            try:
+                pak = TencentPakFile(pf)
+                for dir_p, files in pak._index.items():
+                    for fname, entry in files.items():
+                        rel_path = (pak._mount_point / dir_p / fname).as_posix()
+                        path_lower = rel_path.lower()
+                        if any(kw in path_lower for kw in keywords):
+                            found_skins.append({
+                                "source": pf.name,
+                                "path": rel_path,
+                                "size": entry.size,
+                                "uncompressed_size": entry.uncompressed_size,
+                                "entry": entry,
+                                "pak": pak
+                            })
+            except Exception as e:
+                console.print(f"[dim yellow][!] Error reading {pf.name}: {e}[/dim yellow]")
+
+    # Check UNPACK folder
+    unpack_dir = data_path / "UNPACK"
+    if unpack_dir.exists():
+        for root, _, files in os.walk(unpack_dir):
+            for file in files:
+                full_p = Path(root) / file
+                rel_path = full_p.relative_to(unpack_dir).as_posix()
+                if any(kw in rel_path.lower() for kw in keywords):
+                    found_skins.append({
+                        "source": "UNPACK Workspace",
+                        "path": rel_path,
+                        "size": full_p.stat().st_size,
+                        "uncompressed_size": full_p.stat().st_size,
+                        "local_file": full_p
+                    })
+
+    if not found_skins:
+        console.print("[bold yellow][!] No skin assets matched keywords in PAK or UNPACK folder.[/bold yellow]")
+        return
+
+    table = Table(
+        title=f"[bold bright_cyan]🎯 FOUND {len(found_skins)} SKIN ASSETS 🎯[/bold bright_cyan]",
+        border_style="bright_cyan",
+        box=ROUNDED
+    )
+    table.add_column("No.", style="bold bright_yellow", justify="center", width=6)
+    table.add_column("Source", style="bold bright_white", width=18)
+    table.add_column("Asset Path", style="bright_cyan")
+    table.add_column("Size", style="bold bright_green", justify="right", width=10)
+
+    for idx, item in enumerate(found_skins[:25], 1):
+        table.add_row(str(idx), item["source"][:18], item["path"][-50:], human_size(item["size"]))
+
+    console.print(table)
+    if len(found_skins) > 25:
+        console.print(f"[dim white]... and {len(found_skins) - 25} more skin assets.[/dim white]")
+
+    console.print("\n[bold bright_yellow]Options:[/bold bright_yellow]")
+    console.print("  [1] Save Skin Assets Log (.txt & .json)")
+    console.print("  [2] Extract / Export All Found Skin Files to RESULT/SKINS_DUMP/")
+    console.print("  [0] Back")
+
+    act = safe_input("\n-> Select Action (0-2): ").strip()
+
+    if act in ['1', '2']:
+        # Save Log
+        txt_file = dump_dir / "Skins_Dump_Report.txt"
+        json_file = dump_dir / "Skins_Dump_Report.json"
+
+        with open(txt_file, "w", encoding="utf-8") as f:
+            f.write("=== FEATURESTIC LEAKS SKIN ASSETS DUMP REPORT ===\n")
+            f.write(f"Total Skin Assets Identified: {len(found_skins)}\n")
+            f.write("="*60 + "\n\n")
+            for item in found_skins:
+                f.write(f"Source: {item['source']}\nPath: {item['path']}\nSize: {item['size']} bytes\n\n")
+
+        with open(json_file, "w", encoding="utf-8") as f:
+            json.dump([{
+                "source": item["source"],
+                "path": item["path"],
+                "size": item["size"]
+            } for item in found_skins], f, indent=2)
+
+        console.print(f"\n[bold green][OK] Skin report saved successfully![/bold green]")
+        console.print(f" 📄 {txt_file}")
+        console.print(f" 📄 {json_file}")
+
+        sd_dump = Path("/sdcard/FeaturesticLeaks/DUMP_LOGS")
+        if sd_dump.parent.exists():
+            sd_dump.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(txt_file, sd_dump / txt_file.name)
+            shutil.copy2(json_file, sd_dump / json_file.name)
+            console.print(f" 📲 [bold green]Saved to SDCard:[/bold green] /sdcard/FeaturesticLeaks/DUMP_LOGS/")
+
+    if act == '2':
+        console.print(f"\n[bold bright_cyan][+] Exporting skin files to {skins_out}...[/bold bright_cyan]")
+        extracted_cnt = 0
+        for item in found_skins:
+            try:
+                dest_p = skins_out / item["path"].lstrip('/')
+                dest_p.parent.mkdir(parents=True, exist_ok=True)
+                if "local_file" in item:
+                    shutil.copy2(item["local_file"], dest_p)
+                    extracted_cnt += 1
+                elif "pak" in item:
+                    item["pak"].extract_entry(item["entry"], dest_p)
+                    extracted_cnt += 1
+            except Exception:
+                pass
+
+        console.print(f"[bold green][OK] Successfully exported {extracted_cnt} skin asset file(s) to:[/bold green]")
+        console.print(f" 📁 [bold bright_white]{skins_out}[/bold bright_white]")
+        sd_skins = Path("/sdcard/FeaturesticLeaks/RESULT/SKINS_DUMP")
+        if sd_skins.parent.parent.exists():
+            try:
+                if sd_skins.exists():
+                    shutil.rmtree(sd_skins)
+                shutil.copytree(skins_out, sd_skins)
+                console.print(f" 📲 [bold green]Saved to SDCard:[/bold green] /sdcard/FeaturesticLeaks/RESULT/SKINS_DUMP/")
+            except Exception:
+                pass
 
 def run_obb_manager(data_path: Path) -> None:
     console.print(Panel(
@@ -4382,16 +5060,16 @@ def pak_obb_tools_menu(data_path: Path):
     while True:
         print_banner()
         menu_table = Table(
-            title="[bold green]📦 PAK / OBB TOOLS 📦[/bold green]",
+            title="[bold bright_cyan]📦 PAK / OBB TOOLS 📦[/bold bright_cyan]",
             show_header=True,
-            header_style="bold green",
+            header_style="bold bright_cyan",
             box=ROUNDED,
-            border_style="green",
+            border_style="bright_cyan",
             expand=True
         )
-        menu_table.add_column("OPT", justify="center", width=8, style="bold green")
-        menu_table.add_column("COMMAND", justify="left", width=22, style="bold white")
-        menu_table.add_column("DESCRIPTION", justify="left", style="green")
+        menu_table.add_column("OPT", justify="center", width=8, style="bold bright_yellow")
+        menu_table.add_column("COMMAND", justify="left", width=22, style="bold bright_white")
+        menu_table.add_column("DESCRIPTION", justify="left", style="bright_cyan")
 
         menu_table.add_row("[1]", "Unpack", "Extract PAK / OBB package contents")
         menu_table.add_row("[2]", "Repack", "Rebuild workspace to PAK / OBB")
@@ -4405,7 +5083,7 @@ def pak_obb_tools_menu(data_path: Path):
 
         console.print(menu_table)
         console.print()
-        choice = safe_input('\033[1;32mSELECT OPTION [1-8] [0]: \033[0m').strip()
+        choice = safe_input('\033[1;36mSELECT OPTION [1-8] [0]: \033[0m').strip()
 
         if choice == '1':
             pak_dir = data_path / "PAK"
@@ -4653,26 +5331,32 @@ def lua_tools_menu(data_path: Path):
     while True:
         print_banner()
         menu_table = Table(
-            title="[bold green]🌙 LUA TOOLS 🌙[/bold green]",
+            title="[bold bright_cyan]🌙 LUA MASTER SUITE 🌙[/bold bright_cyan]",
             show_header=True,
-            header_style="bold green",
+            header_style="bold bright_cyan",
             box=ROUNDED,
-            border_style="green",
+            border_style="bright_cyan",
             expand=True
         )
-        menu_table.add_column("OPT", justify="center", width=8, style="bold green")
-        menu_table.add_column("COMMAND", justify="left", width=22, style="bold white")
-        menu_table.add_column("DESCRIPTION", justify="left", style="green")
+        menu_table.add_column("OPT", justify="center", width=8, style="bold bright_yellow")
+        menu_table.add_column("COMMAND", justify="left", width=24, style="bold bright_white")
+        menu_table.add_column("DESCRIPTION", justify="left", style="bright_cyan")
 
         menu_table.add_row("[1]", "Compile Lua", "Convert .lua source to .luac bytecode")
         menu_table.add_row("[2]", "Decompile Lua", "Convert .luac bytecode to .lua source")
         menu_table.add_row("[3]", "Extract PAK from Lua", "Extract embedded PAK/Hex/Base64 payload from GG script")
         menu_table.add_row("[4]", "Embed PAK into Lua", "Convert PAK to Base64 & embed in GG Lua installer script")
+        menu_table.add_row("[5]", "Universal Pack Lua", "Pack Lua file with 8-byte tag (b64/xor/zlib/raw)")
+        menu_table.add_row("[6]", "Universal Unpack Lua", "Auto-detect 8-byte tag & unpack Lua file")
+        menu_table.add_row("[7]", "String Obfuscator", "Encrypt strings or extract string constants/URLs")
+        menu_table.add_row("[8]", "Anti-Bypass Analyzer", "Audit script for GG memory calls & security risks")
+        menu_table.add_row("[9]", "Bytecode Header Fixer", "Repair broken magic headers (Lua 5.1/LuaJIT/Strip debug)")
+        menu_table.add_row("[10]", "Lua Script Merger", "Combine multiple .lua scripts into one master file")
         menu_table.add_row("[0]", "EXIT ✗", "Return to Main Menu")
 
         console.print(menu_table)
         console.print()
-        choice = safe_input('\033[1;32mSELECT OPTION [1-4] [0]: \033[0m').strip()
+        choice = safe_input('\033[1;36mSELECT OPTION [1-10] [0]: \033[0m').strip()
 
         if choice == '1':
             run_lua_compiler(data_path)
@@ -4686,6 +5370,24 @@ def lua_tools_menu(data_path: Path):
         elif choice == '4':
             run_pak_lua_embedder(data_path)
             safe_input('\nPress Enter to continue...')
+        elif choice == '5':
+            run_universal_lua_pack(data_path)
+            safe_input('\nPress Enter to continue...')
+        elif choice == '6':
+            run_universal_lua_unpack(data_path)
+            safe_input('\nPress Enter to continue...')
+        elif choice == '7':
+            run_lua_string_obfuscator(data_path)
+            safe_input('\nPress Enter to continue...')
+        elif choice == '8':
+            run_lua_anti_bypass_analyzer(data_path)
+            safe_input('\nPress Enter to continue...')
+        elif choice == '9':
+            run_lua_header_fixer(data_path)
+            safe_input('\nPress Enter to continue...')
+        elif choice == '10':
+            run_lua_script_merger(data_path)
+            safe_input('\nPress Enter to continue...')
         elif choice == '0':
             break
         else:
@@ -4696,16 +5398,16 @@ def utilities_menu(data_path: Path):
     while True:
         print_banner()
         menu_table = Table(
-            title="[bold green]🛠️ UTILITIES & HELP 🛠️[/bold green]",
+            title="[bold bright_cyan]🛠️ UTILITIES & HELP 🛠️[/bold bright_cyan]",
             show_header=True,
-            header_style="bold green",
+            header_style="bold bright_cyan",
             box=ROUNDED,
-            border_style="green",
+            border_style="bright_cyan",
             expand=True
         )
-        menu_table.add_column("OPT", justify="center", width=8, style="bold green")
-        menu_table.add_column("COMMAND", justify="left", width=22, style="bold white")
-        menu_table.add_column("DESCRIPTION", justify="left", style="green")
+        menu_table.add_column("OPT", justify="center", width=8, style="bold bright_yellow")
+        menu_table.add_column("COMMAND", justify="left", width=22, style="bold bright_white")
+        menu_table.add_column("DESCRIPTION", justify="left", style="bright_cyan")
 
         menu_table.add_row("[1]", "UE4 String Tool", "Extract & repack .uasset/.uexp strings")
         menu_table.add_row("[2]", "File Finder", "Search .uasset/.uexp/.ubulk by pattern")
@@ -4716,7 +5418,7 @@ def utilities_menu(data_path: Path):
 
         console.print(menu_table)
         console.print()
-        choice = safe_input('\033[1;32mSELECT OPTION [1-5] [0]: \033[0m').strip()
+        choice = safe_input('\033[1;36mSELECT OPTION [1-5] [0]: \033[0m').strip()
 
         if choice == '1':
             run_ue4_string_tool(data_path)
@@ -4765,16 +5467,16 @@ def main_menu():
         print_banner()
         display_workspace_summary(data_path)
         menu_table = Table(
-            title="[bold green]🟢 MAIN MENU 🟢[/bold green]",
+            title="[bold bright_cyan]⚡ MAIN MENU ⚡[/bold bright_cyan]",
             show_header=True,
-            header_style="bold green",
+            header_style="bold bright_cyan",
             box=ROUNDED,
-            border_style="green",
+            border_style="bright_cyan",
             expand=True
         )
-        menu_table.add_column("OPT", justify="center", width=8, style="bold green")
-        menu_table.add_column("COMMAND", justify="left", width=22, style="bold white")
-        menu_table.add_column("DESCRIPTION", justify="left", style="green")
+        menu_table.add_column("OPT", justify="center", width=8, style="bold bright_yellow")
+        menu_table.add_column("COMMAND", justify="left", width=22, style="bold bright_white")
+        menu_table.add_column("DESCRIPTION", justify="left", style="bright_cyan")
 
         menu_table.add_row("[1]", "PAK TOOL ✓", "Extract, Repack, Replace & Inject PAK/OBB")
         menu_table.add_row("[2]", "LUA TOOL ✓", "Compile, Decompile & PAK/Lua Embedder")
@@ -4783,7 +5485,7 @@ def main_menu():
 
         console.print(menu_table)
         console.print()
-        choice = safe_input('\033[1;32mSELECT OPTION [1-3] [0]: \033[0m').strip()
+        choice = safe_input('\033[1;36mSELECT OPTION [1-3] [0]: \033[0m').strip()
 
         if choice == '1':
             pak_obb_tools_menu(data_path)

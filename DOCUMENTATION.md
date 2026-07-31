@@ -1,11 +1,11 @@
-# 📖 FeaturesticLeaks PAK Tool v2.0-ULTIMATE — Complete Termux Usage Manual
+# 📖 FeaturesticLeaks PAK & LUA Master Suite v2.5 — Official Documentation & Technical Manual
 
-Is manual me **FeaturesticLeaks PAK Tool v2.0** ko Termux me setup karne aur iske sabhi features ko step-by-step use karne ka poora tareeka vistaar se bataya gaya hai.
+Is manual me **FeaturesticLeaks PAK & LUA Master Suite v2.5** ko Termux me setup karne aur iske sabhi features ko step-by-step use karne ka poora tareeka vistaar se bataya gaya hai.
 
 ---
 
 ## 👤 Developer & Official Contact
-* **Developer Telegram**: [@L359D](https://t.me/L359D)
+* **Developer Telegram**: [@L359D](https://t.me/L359D) (VIP Developer)
 * **Official Telegram Channel**: [https://t.me/FeaturesticLeaks](https://t.me/FeaturesticLeaks)
 
 ---
@@ -51,7 +51,7 @@ python FeaturesticLeaks.py
 Tool ko baar-baar poora path likhe bina launch karne ke liye:
 
 1. **`leak` Shortcut**:
-   Main menu me **Option 3 -> Option 4 (Termux Auto-Setup)** select karein. Iske baad Termux me kahin se bhi sirf yeh type karein:
+   Main menu me **Utilities & Help -> Option 4 (Termux Auto-Setup)** select karein. Iske baad Termux me kahin se bhi sirf yeh type karein:
    ```bash
    leak
    ```
@@ -75,9 +75,11 @@ Aap Termux ke internal folder ke ilawa direct SDCard / Internal Storage folder s
 
 * **`/sdcard/FeaturesticLeaks/PAK/`**: Apni original `.pak` ya `.obb` file yahan rakhein.
 * **`/sdcard/FeaturesticLeaks/UNPACK/`**: Unpack ki hui output files yahan aayengi.
-* **`/sdcard/FeaturesticLeaks/REPLACE/`**: Jo files aap replacement ke liye edit karein unhe yahan rakhein (Option 3 ke liye).
-* **`/sdcard/FeaturesticLeaks/INJECT/`**: Nayi files jo custom path par inject karni hon unhe yahan rakhein (Option 4 ke liye).
-* **`/sdcard/FeaturesticLeaks/RESULT/`**: Final modded `.pak` ya `.obb` file yahan milegi.
+* **`/sdcard/FeaturesticLeaks/REPLACE/`**: Jo files aap replacement ke liye edit karein unhe yahan rakhein.
+* **`/sdcard/FeaturesticLeaks/INJECT/`**: Nayi files jo custom path par inject karni hon unhe yahan rakhein.
+* **`/sdcard/FeaturesticLeaks/LUA/`**: Plain `.lua` ya compiled `.luac` scripts yahan rakhein.
+* **`/sdcard/FeaturesticLeaks/DUMP_LOGS/`**: Skin asset logs aur Lua security audit reports yahan save hoti hain.
+* **`/sdcard/FeaturesticLeaks/RESULT/`**: Final modded `.pak`, `.obb`, `.lua`, aur exported skin assets yahan milenge.
 
 ---
 
@@ -125,13 +127,14 @@ Aap Termux ke internal folder ke ilawa direct SDCard / Internal Storage folder s
   1. Unpack workspace tayar karein.
   2. Menu me `1` -> `5` chuniye aur target character mesh select karke white body mod apply karein.
 
-#### **[6] Skin ID Swap**
-* **Purpose**: `.uasset` / `.uexp` binaries me Lobby, Ingame, Weapon, Hit Effect, Deadbox skin IDs ko aapas me swap karna.
+#### **[6] Skin ID Swap & Skin Assets Dumper**
+* **Purpose**:
+  - Binary `.uasset`/`.uexp` files me Lobby, Ingame, Weapon, Hit Effect, Deadbox skin IDs swap karna.
+  - PAK ya UNPACK workspace se saari skin textures, meshes, aur uassets dump & export karna.
 * **Steps**:
-  1. Menu me `1` -> `6` select karein.
-  2. Category select karein (e.g., Skin Lobby ID Swap).
-  3. Original Skin ID (decimal, e.g. `101001`) aur Target Skin ID (decimal, e.g. `101002`) enter karein.
-  4. Tool pure workspace me matching hex values swap kar dega.
+  1. Option `6` select karein.
+  2. ID Swap ke liye categories 1-5 select karke Original ID aur Target ID enter karein.
+  3. Skin Assets Dumper ke liye Option `6` select karein. Tool saari skin files scan karke `.txt` & `.json` logs report generate karega aur Option `2` dabane par saare skin assets `RESULT/SKINS_DUMP/` me export kar dega.
 
 #### **[7] OBB Manager**
 * **Purpose**: OBB archive ko unzip karna aur re-zip karte waqt byte-exact size padding add karna.
@@ -141,13 +144,35 @@ Aap Termux ke internal folder ke ilawa direct SDCard / Internal Storage folder s
 
 ---
 
-### 🌙 CATEGORY 2: LUA TOOLS
+### 🌙 CATEGORY 2: LUA MASTER SUITE
 
 #### **[1] Compile Lua**
 * Plain text `.lua` source code file ko `.luac` bytecode file me convert karta hai.
 
 #### **[2] Decompile Lua**
-* Game `.luac` bytecode file ko readable `.lua` source text me convert karta hai (luadec / unluac / internal Python Lua engine se).
+* Game `.luac` bytecode file ko readable `.lua` source text me convert karta hai.
+
+#### **[3] Embed PAK into Lua**
+* Any `.pak` file ko Base64 payload me stringify karke GameGuard Lua script installer generated code me embed kar deta hai.
+
+#### **[4] Universal Pack Lua**
+* Lua file ko standard 8-byte ASCII magic tag ke saath encode karta hai (`B64_____`, `XOR_____`, `ZLIB____`, `RAW_____`).
+
+#### **[5] Universal Unpack Lua**
+* Packed file me se 8-byte header auto-read karke, encoding pattern identify karta hai aur lossless unpack karke `.lua` recover karta hai.
+
+#### **[6] String Obfuscator & Dumper Engine**
+* **Obfuscate**: Script ke sabhi string literals ko Hex/Base64/XOR me encode karke `_HEX()` runtime decoder wrapper top par inject kar deta hai.
+* **Dump**: Script se saari URLs, IP addresses, memory offsets (0x...), aur string constants extract karke `DUMP_LOGS/` me detailed report save karta hai.
+
+#### **[7] Anti-Bypass & Security Analyzer**
+* Lua script me GameGuard memory calls (`gg.editAll`, `gg.searchNumber`), clearance hooks, dynamic code execution (`loadstring`), aur byte dumps audit karta hai aur 0-100 risk score matrix ke sath detailed line-by-line audit report generate karta hai.
+
+#### **[8] Bytecode Header Fixer & Debug Stripper**
+* Corrupted magic headers ko repair karta hai (Lua 5.1 `1B 4C 75 61 51 00...` ya LuaJIT `1B 4C 4A 02...`), aur debug symbols/local variable names strip karke script size chota karta hai.
+
+#### **[9] Lua Script Merger**
+* `LUA/` folder me maujood multiple `.lua` scripts ko scope collision bina kiye modular `do...end` blocks me single `Master_Merged_Script.lua` file me merge kar deta hai.
 
 ---
 
@@ -159,13 +184,10 @@ Aap Termux ke internal folder ke ilawa direct SDCard / Internal Storage folder s
 #### **[2] File Finder**
 * Search pattern dwara workspace ke andar target files search karne ke liye.
 
-#### **[3] Workspace Summary & Guide**
-* Live file counts, folder sizes aur step-by-step usage tips dekhne ke liye.
-
-#### **[4] Termux Auto-Setup**
+#### **[3] Termux Auto-Setup**
 * Termux me global `leak` shortcut setup karta hai aur SDCard folders create karta hai.
 
-#### **[5] Cleanup Workspace**
+#### **[4] Cleanup Workspace**
 * Extra temporary working folders ko delete karke storage space free karta hai.
 
 ---
@@ -188,6 +210,6 @@ Aap Termux ke internal folder ke ilawa direct SDCard / Internal Storage folder s
 
 ## 👤 Credits & Contact
 
-* **Developer**: **[@L359D](https://t.me/L359D)**
+* **Developer**: **[@L359D](https://t.me/L359D)** (VIP Developer)
 * **Telegram Channel**: **[https://t.me/FeaturesticLeaks](https://t.me/FeaturesticLeaks)**
-* **Platform**: Termux / Android Linux
+* **Platform**: Termux / Android Linux / Windows / Linux

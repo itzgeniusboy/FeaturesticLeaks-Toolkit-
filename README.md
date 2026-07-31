@@ -1,22 +1,22 @@
-# ⚡ FEATURESTIC LEAKS PAK TOOL v2.0-ULTIMATE
+# ⚡ FEATURESTIC LEAKS PAK & LUA MASTER SUITE v2.5
 
-> **Termux / Android Game Reverse Engineering & PAK Manipulation Toolkit**  
-> Complete high-performance reverse engineering suite for unpacking, repacking, path-injecting, and rebuilding Unreal Engine / Tencent `.pak` and `.obb` containers natively on Termux / Android.
+> **Termux / Android Game Reverse Engineering, PAK Manipulation & Universal Lua Suite**  
+> Complete high-performance reverse engineering suite for unpacking, repacking, path-injecting, rebuilding Unreal Engine / Tencent `.pak` & `.obb` containers, dumping skin assets, and managing Lua bytecode natively on Termux, Android Linux, and PC.
 
 ---
 
 ## 👤 Developer & Official Credits
 
-* **Developer Telegram**: [@L359D](https://t.me/L359D)
+* **Developer Telegram**: [@L359D](https://t.me/L359D) (VIP Developer)
 * **Official Telegram Channel**: [https://t.me/FeaturesticLeaks](https://t.me/FeaturesticLeaks)
-* **Tool Version**: `FeaturesticLeaks PAK Tool v2.0-ULTIMATE`
-* **Supported Platform**: Termux / Android Linux / PC
+* **Tool Version**: `FeaturesticLeaks PAK & LUA Master Suite v2.5`
+* **Supported Platform**: Termux / Android Linux / Windows / Linux
 
 ---
 
 ## 🚀 Termux Installation & Quick Start
 
-Termux open karke is one-line command ko copy-paste karke Enter dabayein:
+Termux open karke is single command ko copy-paste karke Enter press karein:
 
 ### ⚡ Express One-Line Command (Fresh Setup & Launch)
 
@@ -24,13 +24,13 @@ Termux open karke is one-line command ko copy-paste karke Enter dabayein:
 cd ~ && rm -rf FeaturesticLeaks-Toolkit- && pkg update -y && pkg install -y git python clang libffi zlib make nano && git clone https://github.com/itzgeniusboy/FeaturesticLeaks-Toolkit-.git && cd FeaturesticLeaks-Toolkit- && pip install rich requests pycryptodome zstandard pytz gmalg && python FeaturesticLeaks.py
 ```
 
-📖 **Detailed Guide**: Sabhi options aur complete workflow sikhne ke liye **[HOW_TO_USE.md](./HOW_TO_USE.md)** dekhein.
+📖 **Detailed Usage Manual**: Detailed feature guides and step-by-step instructions ke liye **[DOCUMENTATION.md](./DOCUMENTATION.md)** dekhein.
 
 ---
 
 ## 🛠️ Step-by-Step Manual Setup
 
-Agar aap har command ek-ek karke run karna chahte hain:
+Agar aap single-command ki bajaye step-by-step setup karna chahte hain:
 
 ### **Step 1: Storage Permission Dijiye**
 ```bash
@@ -66,9 +66,9 @@ python FeaturesticLeaks.py
 
 ## 💡 Quick Launch Shortcuts
 
-Aap tool ko kisi bhi location se launching shortcuts dwara chala sakte hain:
+Shortcut commands through tool ko Termux me kisi bhi location se launch kar sakte hain:
 
-1. **`leak` Command** (Global Termux Shortcut):
+1. **`leak` Command** (Global Termux Terminal Shortcut):
    ```bash
    leak
    ```
@@ -83,23 +83,25 @@ Aap tool ko kisi bhi location se launching shortcuts dwara chala sakte hain:
 
 ---
 
-## 📁 Automatic Directory Hierarchy
+## 📁 Automatic Workspace Structure
 
-Tool run hote hi local repository aur SDCard (`/sdcard/FeaturesticLeaks/`) me automatic workspace ban jata hai:
+Tool launch hote hi local folder aur SDCard (`/sdcard/FeaturesticLeaks/`) me automatic workspace paths generate ho jate hain:
 
 ```text
 FeaturesticLeaks-Toolkit-/
-├── FeaturesticLeaks.py       <-- Main Termux Python Tool
+├── FeaturesticLeaks.py       <-- Main Termux Python Tool Engine
 ├── run.sh                    <-- Shell Auto-Launcher
 ├── setup.sh                  <-- Termux Shortcut & Folder Setup
-├── verify.php                <-- Optional License API
 ├── README.md                 <-- Tool Summary & Credits
-├── HOW_TO_USE.md             <-- Detailed Step-by-Step Manual
+├── DOCUMENTATION.md          <-- Complete Step-by-Step Manual
 │
-├── PAK/                      <-- Original .pak / .obb files rakhein
+├── PAK/                      <-- Original .pak / .obb files yahan rakhein
 ├── UNPACK/                   <-- Extracted files & debug logs
-├── REPACK/                   <-- Repack workspace
-├── RESULT/                   <-- Final modded .pak / .obb output
+├── REPLACE/                  <-- Modified files for size-independent replacement
+├── INJECT/                   <-- Custom files for direct path injection
+├── LUA/                      <-- .lua / .luac scripts for Lua tools
+├── DUMP_LOGS/                <-- Skin asset logs & Lua audit reports
+├── RESULT/                   <-- Final modded .pak, .obb, .lua & skin dumps output
 │
 └── PAK TOOL/                 <-- Path Injector Workspace
     ├── PAK/                  <-- Target .pak files
@@ -108,11 +110,11 @@ FeaturesticLeaks-Toolkit-/
     └── RESULT/               <-- Final output PAK
 ```
 
-> 💡 **SDCard Storage Shortcut**: Files ko aap direct `/sdcard/FeaturesticLeaks/` ke subfolders (`PAK`, `REPLACE`, `INJECT`, `RESULT`) me bhi rakh kar process kar sakte hain.
+> 💡 **SDCard Direct Access**: Files ko aap direct `/sdcard/FeaturesticLeaks/` ke subfolders (`PAK`, `UNPACK`, `REPLACE`, `INJECT`, `LUA`, `RESULT`, `DUMP_LOGS`) me rakh kar process kar sakte hain (ZArchiver me direct dikhega).
 
 ---
 
-## 🧰 Core Capabilities & Features
+## 🧰 Complete Feature Overview
 
 ### 📦 1. PAK / OBB Tools
 1. **Unpack All Types PAKs**: Decrypts SM4/AES crypts, decompresses Zstandard / OBB compression, and outputs extracted files with detailed debug logs.
@@ -120,12 +122,23 @@ FeaturesticLeaks-Toolkit-/
 3. **Replace Existing Files**: Replaces existing PAK files regardless of file size differences without crash or header corruption issues.
 4. **Inject Path (New Files)**: Injects brand new files/folders directly into target internal paths (e.g. `Content/Lua/GameLua/Mod/...`).
 5. **White Body Mod**: One-click character asset nuller tool.
-6. **Skin ID Swap**: Swaps Lobby, Ingame, Weapon, Hit Effect & Deadbox skin IDs inside `.uasset` / `.uexp` binaries.
+6. **Skin ID Swap & Skin Asset Dumper**:
+   - Swaps Lobby, Ingame, Weapon, Hit Effect & Deadbox skin IDs inside `.uasset` / `.uexp` binaries.
+   - **Skin Assets Dumper**: Scans PAK files or UNPACK folders for skin textures, meshes, uassets/uexps, generates `.txt` and `.json` reports, and exports raw skin assets directly to `RESULT/SKINS_DUMP/`.
 7. **OBB Manager**: Unzips OBB containers and rezips with byte-exact padding to match original file sizes.
 
-### 🌙 2. Lua Bytecode Tools
+### 🌙 2. Lua Master Suite
 1. **Compile Lua**: Converts `.lua` source code into `.luac` bytecode.
 2. **Decompile Lua**: Converts `.luac` bytecode back to readable `.lua` source text.
+3. **Embed PAK into Lua**: Converts `.pak` into Base64 payload and embeds it directly into a GameGuard Lua installer script.
+4. **Universal Pack Lua**: Encodes Lua scripts using extensible plugin architecture with fixed 8-byte ASCII tags (`B64_____`, `XOR_____`, `ZLIB____`, `RAW_____`).
+5. **Universal Unpack Lua**: Reads 8-byte magic tag, auto-detects algorithm, and decodes byte-for-byte losslessly.
+6. **Lua String Obfuscator & Dumper Engine**:
+   - Encrypts all string literals with Hex/Base64/XOR and injects a runtime decoder wrapper.
+   - Extracts and dumps all string constants, URLs, IP addresses, and memory offsets into `DUMP_LOGS/`.
+7. **Anti-Bypass & Security Analyzer**: Audits Lua scripts for GameGuard memory calls (`gg.editAll`, `gg.searchNumber`), clearance hooks, and security risks with a 0-100 risk score report.
+8. **Bytecode Header Fixer & Debug Stripper**: Repairs corrupted magic headers for Lua 5.1 (`1B 4C 75 61 51 00...`) or LuaJIT (`1B 4C 4A 02...`), and strips debug local symbols.
+9. **Lua Script Merger**: Merges multiple `.lua` scripts into a clean, modular `Master_Merged_Script.lua` file wrapped in `do...end` blocks.
 
 ### 🛠️ 3. Utilities & Help
 1. **UE4 String Tool**: Extract and repack readable string literals inside `.uasset` / `.uexp` binary files.
@@ -135,7 +148,7 @@ FeaturesticLeaks-Toolkit-/
 
 ---
 
-## 👤 Developer Contact & Credits
+## 👤 Developer Contact & Official Credits
 
 * **Main Developer**: **[@L359D](https://t.me/L359D)**
 * **Official Telegram Channel**: **[t.me/FeaturesticLeaks](https://t.me/FeaturesticLeaks)**
