@@ -19,6 +19,7 @@ import base64
 import zlib
 import json
 import zipfile
+import re
 from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import PurePath, Path
@@ -2204,15 +2205,20 @@ def _pseudo_decompile_lua(proto, depth: int = 0, func_name: str = "main") -> str
     return "\n".join(lines)
 
 def fix_lua_syntax_for_lua51(lua_file: Path) -> Path:
-    """Preprocesses .lua file to fix standard Lua 5.1 incompatible syntax like 'continue' and bitwise '|'."""
+    """Preprocesses .lua file to fix standard Lua 5.1 incompatible syntax like 'continue', bitwise '|', and excessive 'local' declarations (>200 limits)."""
     try:
         text = lua_file.read_text(encoding="utf-8", errors="ignore")
-        # Replace standalone 'continue' with 'do break end' or 'goto continue_lbl'
+        # Replace standalone 'continue' with 'do break end'
         fixed_text = re.sub(r'\bcontinue\b', 'do break end', text)
         
-        # Replace bitwise OR pipe operator 'a | b' with 'bit.bor(a, b)' if simple regex matches, or clean trailing pipes
+        # Replace bitwise OR pipe operator 'a | b' with 'bit.bor(a, b)' if simple regex matches
         fixed_text = re.sub(r'(\b[\w_.]+\b|\d+)\s*\|\s*(\b[\w_.]+\b|\d+)', r'bit.bor(\1, \2)', fixed_text)
         
+        # Strip redundant 'local' declarations in auto-decompiled files to stay within the 200 local variable limit per function
+        # e.g. converts 'local r1 = ...' or 'local r1, r2' to 'r1 = ...'
+        fixed_text = re.sub(r'^\s*local\s+([a-zA-Z0-9_,\s]+)=', r'\1=', fixed_text, flags=re.MULTILINE)
+        fixed_text = re.sub(r'^\s*local\s+([a-zA-Z0-9_]+)\s*$', r'-- \1', fixed_text, flags=re.MULTILINE)
+
         out_file = lua_file.parent / f"{lua_file.stem}_fixed51.lua"
         out_file.write_text(fixed_text, encoding="utf-8")
         return out_file
@@ -2220,7 +2226,7 @@ def fix_lua_syntax_for_lua51(lua_file: Path) -> Path:
         return lua_file
 
 def analyze_and_display_lua_error(lua_file: Path, stderr_text: str):
-    """Analyzes luac stderr to print line snippets and explain Lua 5.1 incompatibilities."""
+    """Analyzes luac stderr to print line snippets and explain Lua 5.1/5.3/LuaJIT incompatibilities."""
     console.print(f"[bold red][X] Compilation failed:[/bold red]\n[white]{stderr_text.strip()}[/white]\n")
     
     file_lines = []
@@ -2241,17 +2247,21 @@ def analyze_and_display_lua_error(lua_file: Path, stderr_text: str):
                 snippet = file_lines[line_no - 1].strip()
                 console.print(f"  [dim white]👉 Code at Line {line_no}:[/dim white] [bold cyan]{snippet}[/bold cyan]")
 
-            if "'continue'" in err_msg or "near 'continue'" in err_msg:
+            if "too many local variables" in err_msg or "limit is 200" in err_msg:
+                found_known_issue = True
+                console.print("  [bold yellow]💡 Diagnosis:[/bold yellow] Lua compilers allow a MAXIMUM of 200 local variables per function scope.")
+                console.print("  [bold green]💡 Solution:[/bold green] Decompiled pseudo-code has too many 'local' declarations. Select Option [1] below to auto-convert local variables into standard scope variables!")
+            elif "'continue'" in err_msg or "near 'continue'" in err_msg:
                 found_known_issue = True
                 console.print("  [bold yellow]💡 Diagnosis:[/bold yellow] Standard Lua 5.1 compiler (`luac5.1`) does not support the 'continue' keyword.")
-                console.print("  [bold green]💡 Solution:[/bold green] Standard Lua 5.1 uses 'break' or loop wrappers instead of 'continue', or run 'pkg install luajit' in Termux.")
+                console.print("  [bold green]💡 Solution:[/bold green] Standard Lua 5.1 uses 'break' or loop wrappers instead of 'continue'. Option [1] fixes this, or run Option [2] to install LuaJIT.")
             elif "'|'" in err_msg or "near '|'" in err_msg:
                 found_known_issue = True
                 console.print("  [bold yellow]💡 Diagnosis:[/bold yellow] Bitwise operator '|' or pipe syntax is not supported in standard Lua 5.1.")
                 console.print("  [bold green]💡 Solution:[/bold green] Lua 5.1 requires `bit.bor()` functions or a Lua 5.3+ / LuaJIT compiler.")
 
     if not found_known_issue:
-        console.print("[bold yellow]💡 Tip:[/bold yellow] Check for missing closing braces '}', quotes, or invalid decompiled pseudo-code.")
+        console.print("[bold yellow]💡 Tip:[/bold yellow] Check for missing closing braces '}', quotes, syntax errors, or select Option [1] to attempt auto-patching.")
 
 def run_lua_compiler(data_path: Path):
     console.print(Panel(Align.center("[bold bright_cyan]🌙 LUA COMPILER (.lua Source -> .luac Bytecode)[/bold bright_cyan]"), border_style="cyan", box=ROUNDED))
