@@ -2739,6 +2739,247 @@ def run_lua_decompiler(data_path: Path):
             border_style="red", box=ROUNDED
         ))
 
+def extract_pak_from_lua(lua_file_path: Path, output_pak_path: Path, output_clean_lua_path: Path) -> dict:
+    """
+    Reads a .lua script, uses pattern matching/regex to extract high-density Base64/Hex strings
+    representing embedded .pak binary data, writes the decoded .pak file, and saves a clean .lua script.
+    """
+    if not lua_file_path.exists():
+        return {"success": False, "message": f"File not found: {lua_file_path}"}
+
+    try:
+        content = lua_file_path.read_text(encoding="utf-8", errors="replace")
+    except Exception as e:
+        return {"success": False, "message": f"Failed to read Lua file: {e}"}
+
+    b64_matches = re.findall(r'["\']([A-Za-z0-9+/=]{100,})["\']', content)
+    hex_matches = re.findall(r'["\']([0-9a-fA-F]{100,})["\']', content)
+    hex_escaped_matches = re.findall(r'((?:\\x[0-9a-fA-F]{2}){50,})', content)
+
+    extracted_bytes = None
+    matched_string = None
+    encoding_used = None
+
+    if b64_matches:
+        for candidate in sorted(b64_matches, key=len, reverse=True):
+            try:
+                decoded = base64.b64decode(candidate)
+                if len(decoded) > 100:
+                    extracted_bytes = decoded
+                    matched_string = candidate
+                    encoding_used = "Base64"
+                    break
+            except Exception:
+                continue
+
+    if not extracted_bytes and hex_matches:
+        for candidate in sorted(hex_matches, key=len, reverse=True):
+            try:
+                decoded = bytes.fromhex(candidate)
+                if len(decoded) > 100:
+                    extracted_bytes = decoded
+                    matched_string = candidate
+                    encoding_used = "Hex"
+                    break
+            except Exception:
+                continue
+
+    if not extracted_bytes and hex_escaped_matches:
+        for candidate in sorted(hex_escaped_matches, key=len, reverse=True):
+            try:
+                raw_hex = candidate.replace("\\x", "")
+                decoded = bytes.fromhex(raw_hex)
+                if len(decoded) > 100:
+                    extracted_bytes = decoded
+                    matched_string = candidate
+                    encoding_used = "Escaped Hex"
+                    break
+            except Exception:
+                continue
+
+    if not extracted_bytes:
+        return {"success": False, "message": "No embedded PAK payload (Base64 or Hex >= 100 chars) found in Lua script."}
+
+    output_pak_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(output_pak_path, "wb") as f:
+        f.write(extracted_bytes)
+
+    clean_content = content.replace(matched_string, "-- [EMBEDDED_PAK_PAYLOAD_REMOVED]")
+    output_clean_lua_path.parent.mkdir(parents=True, exist_ok=True)
+    output_clean_lua_path.write_text(clean_content, encoding="utf-8")
+
+    return {
+        "success": True,
+        "encoding": encoding_used,
+        "pak_size": len(extracted_bytes),
+        "pak_path": output_pak_path,
+        "clean_lua_path": output_clean_lua_path,
+        "message": "Extraction Successful"
+    }
+
+def embed_pak_into_lua(pak_file_path: Path, output_lua_path: Path, target_filename_in_gg: str = "game_mod.pak") -> dict:
+    """
+    Reads a binary .pak file, encodes it as Base64, and builds a standalone GameGuardian/Android LUA script
+    that automatically unpacks/writes the .pak file to disk at runtime using io.open/file:write.
+    """
+    if not pak_file_path.exists():
+        return {"success": False, "message": f"PAK file not found: {pak_file_path}"}
+
+    try:
+        with open(pak_file_path, "rb") as f:
+            pak_bytes = f.read()
+    except Exception as e:
+        return {"success": False, "message": f"Failed to read PAK file: {e}"}
+
+    pak_size = len(pak_bytes)
+    if pak_size == 0:
+        return {"success": False, "message": "PAK file is empty (0 bytes)."}
+
+    b64_payload = base64.b64encode(pak_bytes).decode("ascii")
+
+    lua_template = f"""-- =======================================================
+-- FEATURESTIC LEAKS - EMBEDDED PAK INSTALLER LUA SCRIPT
+-- Generated for GameGuardian / Android Runtime
+-- Target File: {target_filename_in_gg}
+-- Payload Size: {pak_size} bytes
+-- =======================================================
+
+local target_path = gg.EXT_STORAGE .. "/FeaturesticLeaks/RESULT/{target_filename_in_gg}"
+if not gg.EXT_STORAGE then
+    target_path = "/sdcard/FeaturesticLeaks/RESULT/{target_filename_in_gg}"
+end
+
+gg.toast("⚡ Extracting embedded PAK payload ({pak_size} bytes)...")
+
+local b64_payload = "{b64_payload}"
+
+local b = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
+local function base64_decode(data)
+    data = string.gsub(data, '[^'..b..'=]', '')
+    return (data:gsub('.', function(x)
+        if (x == '=') then return '' end
+        local r,f='',(b:find(x)-1)
+        for i=6,1,-1 do r=r..(f%2^i - f%2^(i-1) >= 2^(i-1) and '1' or '0') end
+        return r
+    end):gsub('%d%d%d%d%d%d%d%d', function(x)
+        local c=0
+        for i=1,8 do c=c+(x:sub(i,i)=='1' and 2^(8-i) or 0) end
+        return string.char(c)
+    end))
+end
+
+local decoded_bytes = base64_decode(b64_payload)
+
+local file = io.open(target_path, "wb")
+if file then
+    file:write(decoded_bytes)
+    file:close()
+    gg.alert("✅ PAK Payload extracted successfully!\\nSaved to: " .. target_path)
+    gg.toast("✅ PAK Unpacked Successfully!")
+else
+    gg.alert("❌ Error: Failed to write PAK file to storage.\\nPlease check SDCard storage permissions.")
+end
+"""
+
+    output_lua_path.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        output_lua_path.write_text(lua_template, encoding="utf-8")
+    except Exception as e:
+        return {"success": False, "message": f"Failed to write LUA script: {e}"}
+
+    return {
+        "success": True,
+        "pak_size": pak_size,
+        "lua_path": output_lua_path,
+        "message": "Embedding Successful"
+    }
+
+def run_lua_pak_extractor(data_path: Path):
+    console.print(Panel(Align.center("[bold bright_cyan]📦 LUA-to-PAK EXTRACTOR (Extract Embedded PAK from .lua Script)[/bold bright_cyan]"), border_style="cyan", box=ROUNDED))
+    lua_dir = data_path / "LUA"
+    lua_dir.mkdir(parents=True, exist_ok=True)
+
+    lua_file, _ = pick_file_from_folder("Select Lua Script", lua_dir, extensions=[".lua", ".txt"])
+    if not lua_file:
+        custom_input = safe_input('-> Enter custom .lua script path (or press Enter to cancel): ').strip().strip('"\'')
+        if not custom_input:
+            return
+        lua_file = Path(custom_input)
+        if not lua_file.exists():
+            console.print(f'[bold red][X] File not found: {lua_file}[/bold red]')
+            return
+
+    res_dir = data_path / "RESULT"
+    res_dir.mkdir(parents=True, exist_ok=True)
+    out_pak = res_dir / f"extracted_{lua_file.stem}.pak"
+    out_clean_lua = res_dir / f"clean_{lua_file.name}"
+
+    console.print(f"\n[bold cyan][+] Scanning {lua_file.name} for embedded Base64/Hex PAK data...[/bold cyan]")
+    res = extract_pak_from_lua(lua_file, out_pak, out_clean_lua)
+
+    if res["success"]:
+        console.print(Panel(
+            f"[bold green]✅ {res['message']}![/bold green]\n\n"
+            f"[bold white]Encoding Found:[/bold white] [bold cyan]{res['encoding']}[/bold cyan]\n"
+            f"[bold white]Extracted PAK Size:[/bold white] [bold yellow]{human_size(res['pak_size'])}[/bold yellow]\n\n"
+            f"📄 [bold white]Extracted PAK File:[/bold white] {out_pak}\n"
+            f"📄 [bold white]Cleaned Lua Script:[/bold white] {out_clean_lua}",
+            title="Extraction Complete",
+            border_style="green",
+            box=ROUNDED
+        ))
+        sd_res = Path("/sdcard/FeaturesticLeaks/RESULT")
+        if sd_res.exists():
+            try:
+                shutil.copy2(out_pak, sd_res / out_pak.name)
+                shutil.copy2(out_clean_lua, sd_res / out_clean_lua.name)
+                console.print(f"📲 [bold green]Saved to SDCard:[/bold green] /sdcard/FeaturesticLeaks/RESULT/")
+            except Exception:
+                pass
+    else:
+        console.print(f"[bold red][X] {res['message']}[/bold red]")
+
+def run_pak_lua_embedder(data_path: Path):
+    console.print(Panel(Align.center("[bold bright_cyan]📦 PAK-to-LUA EMBEDDER (Convert .pak to Base64 & Embed in GG Script)[/bold bright_cyan]"), border_style="cyan", box=ROUNDED))
+    pak_dir = data_path / "PAK"
+    pak_dir.mkdir(parents=True, exist_ok=True)
+
+    pak_file, _ = pick_file_from_folder("Select PAK File to Embed", pak_dir, extensions=[".pak", ".obb"])
+    if not pak_file:
+        custom_input = safe_input('-> Enter custom .pak file path (or press Enter to cancel): ').strip().strip('"\'')
+        if not custom_input:
+            return
+        pak_file = Path(custom_input)
+        if not pak_file.exists():
+            console.print(f'[bold red][X] File not found: {pak_file}[/bold red]')
+            return
+
+    res_dir = data_path / "RESULT"
+    res_dir.mkdir(parents=True, exist_ok=True)
+    out_lua = res_dir / f"installer_{pak_file.stem}.lua"
+
+    console.print(f"\n[bold cyan][+] Encoding {pak_file.name} ({human_size(pak_file.stat().st_size)}) into GameGuardian Lua script...[/bold cyan]")
+    res = embed_pak_into_lua(pak_file, out_lua, target_filename_in_gg=pak_file.name)
+
+    if res["success"]:
+        console.print(Panel(
+            f"[bold green]✅ {res['message']}![/bold green]\n\n"
+            f"[bold white]PAK Payload Size:[/bold white] [bold yellow]{human_size(res['pak_size'])}[/bold yellow]\n"
+            f"📄 [bold white]Generated GG Installer Script:[/bold white] {out_lua}",
+            title="Embedding Complete",
+            border_style="green",
+            box=ROUNDED
+        ))
+        sd_res = Path("/sdcard/FeaturesticLeaks/RESULT")
+        if sd_res.exists():
+            try:
+                shutil.copy2(out_lua, sd_res / out_lua.name)
+                console.print(f"📲 [bold green]Saved to SDCard:[/bold green] /sdcard/FeaturesticLeaks/RESULT/{out_lua.name}")
+            except Exception:
+                pass
+    else:
+        console.print(f"[bold red][X] {res['message']}[/bold red]")
+
 def show_workflow_guide():
     console.print(Panel(Align.center("[bold bright_cyan]📖 FEATURESTIC LEAKS - EASY STEP-BY-STEP WORKFLOW GUIDE[/bold bright_cyan]"), border_style="cyan", box=ROUNDED))
     
@@ -4363,17 +4604,25 @@ def lua_tools_menu(data_path: Path):
 
         menu_table.add_row("[bold cyan]1[/bold cyan]", "[bold cyan]Compile Lua[/bold cyan]", "[dim cyan]Convert .lua source to .luac bytecode[/dim cyan]")
         menu_table.add_row("[bold green]2[/bold green]", "[bold green]Decompile Lua[/bold green]", "[dim green]Convert .luac bytecode to .lua source[/dim green]")
+        menu_table.add_row("[bold yellow]3[/bold yellow]", "[bold yellow]Extract PAK from Lua[/bold yellow]", "[dim yellow]Extract embedded PAK/Hex/Base64 payload from GG script[/dim yellow]")
+        menu_table.add_row("[bold magenta]4[/bold magenta]", "[bold magenta]Embed PAK into Lua[/bold magenta]", "[dim magenta]Convert PAK to Base64 & embed in GG Lua installer script[/dim magenta]")
         menu_table.add_row("[dim]0[/dim]", "[dim]Back[/dim]", "[dim]Return to Main Menu[/dim]")
 
         console.print(menu_table)
         console.print()
-        choice = safe_input('-> Select Lua option (0-2): ').strip()
+        choice = safe_input('-> Select Lua option (0-4): ').strip()
 
         if choice == '1':
             run_lua_compiler(data_path)
             safe_input('\nPress Enter to continue...')
         elif choice == '2':
             run_lua_decompiler(data_path)
+            safe_input('\nPress Enter to continue...')
+        elif choice == '3':
+            run_lua_pak_extractor(data_path)
+            safe_input('\nPress Enter to continue...')
+        elif choice == '4':
+            run_pak_lua_embedder(data_path)
             safe_input('\nPress Enter to continue...')
         elif choice == '0':
             break
