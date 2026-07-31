@@ -10,8 +10,8 @@ if command -v termux-setup-storage > /dev/null 2>&1; then
     termux-setup-storage
 fi
 
-echo "[2/4] Updating package manager & installing tools (python, lua51, luajit, zstd)..."
-pkg update -y && pkg install -y python python-pip lua51 luajit zstd git clang libffi zlib make nano unzip
+echo "[2/4] Updating package manager & installing tools (python, termux-api, jq, lua51, luajit, zstd)..."
+pkg update -y && pkg install -y python python-pip termux-api jq lua51 luajit zstd git clang libffi zlib make nano unzip
 
 echo "[3/4] Installing Python requirements..."
 pip install rich requests pytz gmalg pycryptodome zstandard
@@ -39,7 +39,7 @@ if [ -n "$BIN_DIR" ]; then
     for CMD in leak paktool; do
         cat <<EOF > "$BIN_DIR/$CMD"
 #!/data/data/com.termux/files/usr/bin/sh
-cd "$SCRIPT_DIR" && python3 "$SCRIPT_PATH" "\$@"
+cd "$SCRIPT_DIR" && bash "$SCRIPT_DIR/run.sh" "\$@"
 EOF
         chmod +x "$BIN_DIR/$CMD"
     done

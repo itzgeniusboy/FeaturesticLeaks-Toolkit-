@@ -1,0 +1,8 @@
+{
+  "name": "FeaturesticLeaks PAK Tool",
+  "description": "High-Performance Android PAK/OBB & Lua Processing Suite with Termux-API GUI & Web Control Panel.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
