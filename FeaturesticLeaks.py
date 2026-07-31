@@ -2203,6 +2203,56 @@ def _pseudo_decompile_lua(proto, depth: int = 0, func_name: str = "main") -> str
     lines.append(f"{indent}end")
     return "\n".join(lines)
 
+def fix_lua_syntax_for_lua51(lua_file: Path) -> Path:
+    """Preprocesses .lua file to fix standard Lua 5.1 incompatible syntax like 'continue' and bitwise '|'."""
+    try:
+        text = lua_file.read_text(encoding="utf-8", errors="ignore")
+        # Replace standalone 'continue' with 'do break end' or 'goto continue_lbl'
+        fixed_text = re.sub(r'\bcontinue\b', 'do break end', text)
+        
+        # Replace bitwise OR pipe operator 'a | b' with 'bit.bor(a, b)' if simple regex matches, or clean trailing pipes
+        fixed_text = re.sub(r'(\b[\w_.]+\b|\d+)\s*\|\s*(\b[\w_.]+\b|\d+)', r'bit.bor(\1, \2)', fixed_text)
+        
+        out_file = lua_file.parent / f"{lua_file.stem}_fixed51.lua"
+        out_file.write_text(fixed_text, encoding="utf-8")
+        return out_file
+    except Exception:
+        return lua_file
+
+def analyze_and_display_lua_error(lua_file: Path, stderr_text: str):
+    """Analyzes luac stderr to print line snippets and explain Lua 5.1 incompatibilities."""
+    console.print(f"[bold red][X] Compilation failed:[/bold red]\n[white]{stderr_text.strip()}[/white]\n")
+    
+    file_lines = []
+    try:
+        file_lines = lua_file.read_text(encoding="utf-8", errors="ignore").splitlines()
+    except Exception:
+        pass
+
+    found_known_issue = False
+    for line in stderr_text.splitlines():
+        m = re.search(r':(\d+):\s*(.*)', line)
+        if m:
+            line_no = int(m.group(1))
+            err_msg = m.group(2)
+            console.print(f"[bold yellow]🔍 Line {line_no} Analysis:[/bold yellow] [red]{err_msg}[/red]")
+            
+            if 1 <= line_no <= len(file_lines):
+                snippet = file_lines[line_no - 1].strip()
+                console.print(f"  [dim white]👉 Code at Line {line_no}:[/dim white] [bold cyan]{snippet}[/bold cyan]")
+
+            if "'continue'" in err_msg or "near 'continue'" in err_msg:
+                found_known_issue = True
+                console.print("  [bold yellow]💡 Diagnosis:[/bold yellow] Standard Lua 5.1 compiler (`luac5.1`) does not support the 'continue' keyword.")
+                console.print("  [bold green]💡 Solution:[/bold green] Standard Lua 5.1 uses 'break' or loop wrappers instead of 'continue', or run 'pkg install luajit' in Termux.")
+            elif "'|'" in err_msg or "near '|'" in err_msg:
+                found_known_issue = True
+                console.print("  [bold yellow]💡 Diagnosis:[/bold yellow] Bitwise operator '|' or pipe syntax is not supported in standard Lua 5.1.")
+                console.print("  [bold green]💡 Solution:[/bold green] Lua 5.1 requires `bit.bor()` functions or a Lua 5.3+ / LuaJIT compiler.")
+
+    if not found_known_issue:
+        console.print("[bold yellow]💡 Tip:[/bold yellow] Check for missing closing braces '}', quotes, or invalid decompiled pseudo-code.")
+
 def run_lua_compiler(data_path: Path):
     console.print(Panel(Align.center("[bold bright_cyan]🌙 LUA COMPILER (.lua Source -> .luac Bytecode)[/bold bright_cyan]"), border_style="cyan", box=ROUNDED))
     
@@ -2225,42 +2275,110 @@ def run_lua_compiler(data_path: Path):
             console.print(f'[bold red][X] File not found: {lua_file}[/bold red]')
             return
 
-    compilers = ["luac5.1", "luac51", "luac", "luac5.2", "luac5.3", "luac5.4"]
-    found_compiler = None
-    for c in compilers:
-        if shutil.which(c):
-            found_compiler = c
-            break
+    all_compilers = ["luac5.1", "luac51", "luac", "luajit", "luac5.2", "luac5.3", "luac5.4"]
+    available_compilers = [c for c in all_compilers if shutil.which(c)]
 
-    if not found_compiler:
+    if not available_compilers:
         console.print(Panel(
-            "[bold red][X] Lua Compiler (luac) is not installed in Termux![/bold red]\n\n"
-            "[bold cyan]👉 To compile .lua scripts, run this command in Termux:[/bold cyan]\n"
-            "[bold yellow]   pkg install lua51[/bold yellow]  or  [bold yellow]pkg install lua[/bold yellow]\n\n"
-            "[dim white]Tip: 'lua51' provides 'luac5.1' matching Unreal Engine / PUBG Lua version.[/dim white]",
+            "[bold red][X] No Lua Compiler (luac or luajit) is installed in Termux![/bold red]\n\n"
+            "[bold cyan]👉 Click 'Auto-Install' below or run this command in Termux:[/bold cyan]\n"
+            "[bold yellow]   pkg install -y lua51 luajit[/bold yellow]",
             border_style="red", box=ROUNDED
         ))
+        auto_inst = safe_input('\n-> Auto-install lua51 & luajit now via Termux pkg? (Y/n): ').strip().lower()
+        if auto_inst in ['', 'y', 'yes']:
+            console.print("[bold cyan][+] Running: pkg update -y && pkg install -y lua51 luajit...[/bold cyan]")
+            try:
+                subprocess.run("pkg update -y && pkg install -y lua51 luajit", shell=True, check=True)
+                console.print("[bold green][OK] Package installation completed![/bold green]")
+                available_compilers = [c for c in all_compilers if shutil.which(c)]
+            except Exception as e:
+                console.print(f"[bold red][X] Auto-installation failed: {e}[/bold red]")
+                return
+        else:
+            return
+
+    if not available_compilers:
+        console.print("[bold red][X] No Lua compiler available. Please install lua51 or luajit manually.[/bold red]")
         return
 
     res_dir = data_path / "RESULT"
     res_dir.mkdir(parents=True, exist_ok=True)
     out_luac = res_dir / f"{lua_file.stem}.luac"
 
-    console.print(f"[bold cyan][+] Compiling {lua_file.name} using {found_compiler}...[/bold cyan]")
-    try:
-        proc = subprocess.run([found_compiler, "-o", str(out_luac), str(lua_file)], capture_output=True, text=True)
-        if proc.returncode == 0:
-            console.print(f"[bold green][OK] Compiled successfully: {out_luac}[/bold green]")
-            if sd_lua.exists():
-                try:
-                    shutil.copy2(out_luac, sd_lua / out_luac.name)
-                    console.print(f"[bold green][+] Saved to SDCard: {sd_lua / out_luac.name}[/bold green]")
-                except Exception:
-                    pass
+    success = False
+    last_stderr = ""
+    last_compiler = ""
+
+    for compiler in available_compilers:
+        console.print(f"[bold cyan][+] Attempting compile with '{compiler}'...[/bold cyan]")
+        if compiler == "luajit":
+            cmd = ["luajit", "-b", str(lua_file), str(out_luac)]
         else:
-            console.print(f"[bold red][X] Compilation failed:[/bold red]\n[white]{proc.stderr}[/white]")
-    except Exception as e:
-        console.print(f"[bold red][X] Error executing compiler: {e}[/bold red]")
+            cmd = [compiler, "-o", str(out_luac), str(lua_file)]
+
+        try:
+            proc = subprocess.run(cmd, capture_output=True, text=True)
+            if proc.returncode == 0:
+                console.print(f"[bold green][OK] Compiled successfully with '{compiler}': {out_luac}[/bold green]")
+                success = True
+                if sd_lua.exists():
+                    try:
+                        shutil.copy2(out_luac, sd_lua / out_luac.name)
+                        console.print(f"[bold green][+] Saved to SDCard: {sd_lua / out_luac.name}[/bold green]")
+                    except Exception:
+                        pass
+                break
+            else:
+                last_stderr = proc.stderr
+                last_compiler = compiler
+        except Exception as e:
+            last_stderr = str(e)
+
+    if not success:
+        analyze_and_display_lua_error(lua_file, last_stderr)
+        
+        console.print("\n[bold yellow]🛠️ Options to Fix & Compile:[/bold yellow]")
+        console.print("  [bold cyan][1][/bold cyan] Auto-Fix Syntax for Lua 5.1 (Removes 'continue' / fixes '|' bitwise)")
+        console.print("  [bold cyan][2][/bold cyan] Auto-Install LuaJIT Compiler (Supports 'continue' & modern syntax)")
+        console.print("  [bold cyan][0][/bold cyan] Skip / Back to Menu")
+        fix_choice = safe_input('\n-> Select option (0-2): ').strip()
+
+        if fix_choice == '1':
+            fixed_lua = fix_lua_syntax_for_lua51(lua_file)
+            console.print(f"\n[bold cyan][+] Created patched file: {fixed_lua.name}[/bold cyan]")
+            console.print(f"[bold cyan][+] Re-attempting compilation...[/bold cyan]")
+            
+            for compiler in available_compilers:
+                if compiler == "luajit":
+                    cmd = ["luajit", "-b", str(fixed_lua), str(out_luac)]
+                else:
+                    cmd = [compiler, "-o", str(out_luac), str(fixed_lua)]
+                
+                proc = subprocess.run(cmd, capture_output=True, text=True)
+                if proc.returncode == 0:
+                    console.print(f"[bold green][OK] Fixed file compiled successfully with '{compiler}': {out_luac}[/bold green]")
+                    success = True
+                    break
+            
+            if not success:
+                console.print(f"[bold red][X] Re-compilation of fixed file failed as well:[/bold red]\n[white]{proc.stderr}[/white]")
+                console.print("[bold yellow]💡 Tip:[/bold yellow] Try Option 2 to auto-install LuaJIT!")
+
+        elif fix_choice == '2':
+            console.print("[bold cyan][+] Installing LuaJIT via Termux pkg...[/bold cyan]")
+            try:
+                subprocess.run("pkg install -y luajit", shell=True, check=True)
+                console.print("[bold green][OK] LuaJIT installed successfully![/bold green]")
+                if shutil.which("luajit"):
+                    cmd = ["luajit", "-b", str(lua_file), str(out_luac)]
+                    proc = subprocess.run(cmd, capture_output=True, text=True)
+                    if proc.returncode == 0:
+                        console.print(f"[bold green][OK] Compiled successfully with 'luajit': {out_luac}[/bold green]")
+                    else:
+                        console.print(f"[bold red][X] LuaJIT compilation error:[/bold red]\n[white]{proc.stderr}[/white]")
+            except Exception as e:
+                console.print(f"[bold red][X] LuaJIT installation error: {e}[/bold red]")
 
 def run_lua_decompiler(data_path: Path):
     console.print(Panel(Align.center("[bold bright_cyan]🌙 LUA DECOMPILER (.luac Bytecode -> .lua Source)[/bold bright_cyan]"), border_style="cyan", box=ROUNDED))

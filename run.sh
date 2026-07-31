@@ -22,7 +22,7 @@ fi
 
 # Quick Dependency Check
 MISSING_PKGS=()
-for pkg in python git clang libffi zlib make nano; do
+for pkg in python git clang libffi zlib make nano lua51 luajit zstd; do
     if ! command -v $pkg &> /dev/null; then
         MISSING_PKGS+=($pkg)
     fi
