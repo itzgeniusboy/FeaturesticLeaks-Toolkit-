@@ -3057,7 +3057,32 @@ def install_termux_shortcut_and_sdcard(data_path: Path):
             if shortcuts_created:
                 break
     
-    # Backup/Always ensure bashrc / zshrc aliases exist
+    # Ensure decompilation dependencies (openjdk-17, luadec, unluac.jar) are set up automatically in Termux
+    unluac_path = data_path / "unluac.jar"
+    if not unluac_path.exists():
+        unluac_home = Path.home() / "unluac.jar"
+        if unluac_home.exists():
+            unluac_path = unluac_home
+
+    is_termux = "com.termux" in os.environ.get("PREFIX", "") or Path("/data/data/com.termux").exists()
+    if is_termux:
+        needs_pkg = False
+        if not shutil.which("java") or not shutil.which("luadec"):
+            needs_pkg = True
+        
+        if needs_pkg:
+            console.print("[bold yellow][+] Auto-installing openjdk-17 & luadec for full Lua decompilation...[/bold yellow]")
+            try:
+                subprocess.run(["pkg", "install", "-y", "openjdk-17", "luadec"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            except Exception:
+                pass
+
+        if not unluac_path.exists():
+            console.print("[bold yellow][+] Downloading unluac.jar for 100% full Lua decompiler support...[/bold yellow]")
+            try:
+                subprocess.run(["curl", "-L", "-o", str(data_path / "unluac.jar"), "https://github.com/tech23-bot/unluac/releases/download/v1.0/unluac.jar"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            except Exception:
+                pass
     shell_files = [Path.home() / ".bashrc", Path.home() / ".zshrc"]
     aliases_to_add = [
         f"alias leak='cd \"{script_dir}\" && python3 \"{script_file}\"'",
