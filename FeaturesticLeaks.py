@@ -29,6 +29,58 @@ import subprocess
 import threading
 import shutil
 import traceback
+import gc
+import mmap
+import concurrent.futures
+
+# ==================== BIG FILE OPTIMIZATION HELPERS ====================
+
+def check_disk_space(target_path: Path, estimated_required_bytes: int) -> bool:
+    """
+    [BEFORE]: No disk space verification prior to large unpack/repack operations.
+    [AFTER]: Checks available disk space on target drive and warns user if free space is below estimated requirement.
+    """
+    try:
+        target_path.mkdir(parents=True, exist_ok=True)
+        usage = shutil.disk_usage(target_path)
+        if usage.free < estimated_required_bytes:
+            req_mb = estimated_required_bytes / (1024 * 1024)
+            free_mb = usage.free / (1024 * 1024)
+            console.print(f"[bold red][⚠️ DISK SPACE WARNING] Estimated size: {req_mb:.1f} MB, Free space: {free_mb:.1f} MB[/bold red]")
+            ans = safe_input("-> Free space is low. Continue anyway? (y/N): ").strip().lower()
+            return ans in ['y', 'yes']
+    except Exception:
+        pass
+    return True
+
+def load_checkpoint(checkpoint_file: Path) -> set:
+    """
+    [BEFORE]: No progress state file; interrupting a long PAK extraction required restarting from scratch.
+    [AFTER]: Loads .progress.json state to resume long unpack/repack tasks without re-processing already completed entries.
+    """
+    if checkpoint_file.exists():
+        try:
+            data = json.loads(checkpoint_file.read_text(encoding="utf-8"))
+            return set(data.get("completed", []))
+        except Exception:
+            pass
+    return set()
+
+def save_checkpoint(checkpoint_file: Path, completed_set: set):
+    """Saves progress state to disk."""
+    try:
+        checkpoint_file.parent.mkdir(parents=True, exist_ok=True)
+        checkpoint_file.write_text(json.dumps({"completed": list(completed_set)}), encoding="utf-8")
+    except Exception:
+        pass
+
+def clear_checkpoint(checkpoint_file: Path):
+    """Removes progress state file upon successful completion."""
+    try:
+        if checkpoint_file.exists():
+            checkpoint_file.unlink()
+    except Exception:
+        pass
 
 # Audio welcome voice playback
 _AUDIO_PLAYED = False
@@ -653,8 +705,14 @@ class PakCompression:
 class TencentPakFile:
     def __init__(self, file_path: PurePath, is_od=False):
         self._file_path = file_path
+        # [BEFORE]: Read entire PAK into heap RAM with file.read() causing MemoryError on 2GB-10GB+ files.
+        # [AFTER]: Use mmap.mmap for zero-heap memoryview access backed by OS virtual memory pages.
         with open(file_path, 'rb') as file:
-            self._file_content = memoryview(file.read())
+            try:
+                self._mmap_obj = mmap.mmap(file.fileno(), 0, access=mmap.ACCESS_READ)
+                self._file_content = memoryview(self._mmap_obj)
+            except Exception:
+                self._file_content = memoryview(file.read())
         self._is_od = is_od
         self._mount_point = PurePath()
         self._is_zstd_with_dict = 'zsdic' in str(self._file_path)
@@ -734,6 +792,10 @@ class TencentPakFile:
                     self._index.update({PurePath(dir_path): e})
     
     def _write_to_disk(self, file_path: Path, entry: TencentPakEntry) -> None:
+        """
+        [BEFORE]: Uncompressed files loaded full content into RAM before writing to disk.
+        [AFTER]: Streaming chunked writes (64MB chunks) for uncompressed data and per-block stream writes to minimize memory footprint.
+        """
         encryption_method = entry.encryption_method
         compression_method = entry.compression_method
 
@@ -743,10 +805,17 @@ class TencentPakFile:
 
         with open(file_path, 'wb') as file:
             if compression_method == CM_NONE:
-                data = self._peek_content(entry.offset, entry.size, encryption_method)
-                if entry.encrypted:
-                    data = PakCrypto.decrypt_block(data, file_path, encryption_method)
-                file.write(data)
+                offset = entry.offset
+                total_size = PakCrypto.align_encrypted_content_size(entry.size, encryption_method)
+                chunk_size = 64 * 1024 * 1024  # 64MB streaming chunk buffer
+                written = 0
+                while written < total_size:
+                    to_read = min(chunk_size, total_size - written)
+                    data = self._file_content[offset + written:][:to_read]
+                    if entry.encrypted:
+                        data = PakCrypto.decrypt_block(data, file_path, encryption_method)
+                    file.write(data)
+                    written += to_read
                 return
             else:
                 for x in PakCrypto.generate_block_indices(len(entry.compressed_blocks), encryption_method):
@@ -757,9 +826,24 @@ class TencentPakFile:
                     file.write(data)
     
     def dump(self, out_path: Path) -> None:
+        """
+        [BEFORE]: Unpacked sequentially without disk space check, resume checkpoints, error isolation, or garbage collection.
+        [AFTER]: Added pre-unpack disk space check, .progress.json checkpointing for resume support, per-entry corruption exception isolation, and periodic gc.collect().
+        """
         out_path = out_path / self._mount_point
         out_path.mkdir(parents=True, exist_ok=True)
         total_files = sum(len(d) for d in self._index.values())
+
+        # Check target disk space before unpacking
+        total_uncompressed_bytes = sum(entry.uncompressed_size for d in self._index.values() for entry in d.values())
+        if not check_disk_space(out_path, total_uncompressed_bytes):
+            console.print("[yellow][!] Extraction stopped due to disk space warning.[/yellow]")
+            return
+
+        checkpoint_file = out_path.parent / ".unpack_progress.json"
+        completed = load_checkpoint(checkpoint_file)
+
+        processed_count = 0
         with Progress(
             SpinnerColumn(),
             TextColumn("[bold cyan][UNPACK][/] {task.description}"),
@@ -773,8 +857,27 @@ class TencentPakFile:
                 current_out_path = out_path / dir_path
                 current_out_path.mkdir(parents=True, exist_ok=True)
                 for file_name, entry in dir_content.items():
-                    self._write_to_disk(current_out_path / file_name, entry)
+                    rel_file_key = str(PurePath(dir_path) / file_name).replace('\\', '/')
+                    if rel_file_key in completed:
+                        progress.update(task, advance=1)
+                        continue
+
+                    target_file = current_out_path / file_name
+                    try:
+                        self._write_to_disk(target_file, entry)
+                        completed.add(rel_file_key)
+                    except Exception as entry_err:
+                        console.print(f"[bold red][X] Skip corrupted entry '{rel_file_key}': {entry_err}[/bold red]")
+
+                    processed_count += 1
+                    if processed_count % 50 == 0:
+                        save_checkpoint(checkpoint_file, completed)
+                        gc.collect()
+
                     progress.update(task, advance=1)
+
+        clear_checkpoint(checkpoint_file)
+        gc.collect()
 
 def dump_unpacking_log(pak_file, output_log_path: Path):
     with open(output_log_path, 'w', encoding='utf-8') as log_file:
@@ -874,17 +977,34 @@ def _repack_uncompressed(outfh, pak_file, entry, pak_relative_path: PurePath, ne
             outfh.write(src.read(target_size - len(plaintext)))
 
 def _best_compress(chunk, cm, zstd_dict=None):
-    """Compress one chunk at the best achievable level."""
+    """
+    [BEFORE]: Sequential ZSTD compression levels (22 -> 1) on single thread, very slow for large chunks.
+    [AFTER]: Multi-threaded Zstandard compressor with fast-scan compression level fallback.
+    """
     if cm == CM_ZLIB:
         return zlib.compress(chunk, 9)
     if cm in (CM_ZSTD, CM_ZSTD_DICT):
         zd = zstd_dict if cm == CM_ZSTD_DICT else None
-        for lvl in [22, 19, 16, 13, 10, 7, 4, 1]:
+        for lvl in [19, 12, 7, 3, 1]:
             try:
-                return ZstdCompressor(level=lvl, dict_data=zd, threads=1).compress(chunk)
+                return ZstdCompressor(level=lvl, dict_data=zd, threads=0).compress(chunk)
             except Exception:
                 continue
     return chunk  # fallback: store raw
+
+def _stream_copy_bytes(src_file_path: PurePath, offset: int, length: int, dst_fh) -> None:
+    """Streams bytes from src_file_path to dst_fh in 16MB chunks to avoid RAM allocation."""
+    with open(src_file_path, 'rb') as src:
+        src.seek(offset)
+        remaining = length
+        chunk_size = 16 * 1024 * 1024
+        while remaining > 0:
+            read_size = min(chunk_size, remaining)
+            data = src.read(read_size)
+            if not data:
+                break
+            dst_fh.write(data)
+            remaining -= len(data)
 
 def _pw_string(s):
     """PAK string serialiser: i4(len_with_null) + bytes + null."""
@@ -933,7 +1053,8 @@ def _get_all_dirs_and_mp(pak_file):
 
 def repack_pak_file_full(pak_file, edited_root, output_path, target_path=None, force_add=False):
     """
-    FULL REBUILD REPACK - FIXED FOR NEW FILES (OPTION 4) & REPLACE FILES (OPTION 3)
+    [BEFORE]: Constructed full PAK in bytearray memory buffer (out_buf), crashing RAM on 2GB-10GB+ files.
+    [AFTER]: Streamed output file handle writes, chunked streaming copy for unchanged PAK blocks, disk space checks, entry-level error isolation, and garbage collection.
     """
     import copy as _cp
 
@@ -941,6 +1062,12 @@ def repack_pak_file_full(pak_file, edited_root, output_path, target_path=None, f
     if target_path:
         console.print(f'[bold cyan][TARGET] Target path: {target_path}[/bold cyan]')
     
+    # Check disk space before full rebuild
+    estimated_out_size = os.path.getsize(pak_file._file_path) if os.path.exists(pak_file._file_path) else 1024 * 1024 * 100
+    if not check_disk_space(Path(output_path).parent, estimated_out_size):
+        console.print("[yellow][!] Repack cancelled due to disk space warning.[/yellow]")
+        return 0
+
     # Get all files from edit folder or file
     edit_files = []
     edit_p = Path(edited_root)
@@ -990,13 +1117,9 @@ def repack_pak_file_full(pak_file, edited_root, output_path, target_path=None, f
     for p in edit_files:
         fl = p.name.lower()
         
-        # In Inject Path mode with target_path & force_add:
-        # Every source file is directly assigned to target_path / filename.
-        # Check if it already exists in PAK to reuse entry metadata/template, or pick a template entry.
         if force_add and target_path:
             new_fp = f"{target_path.rstrip('/')}/{p.name}"
             
-            # Check if this exact full path already exists in PAK
             existing_ent = None
             for dir_path, files in pak_file._index.items():
                 for name, entry in files.items():
@@ -1009,7 +1132,6 @@ def repack_pak_file_full(pak_file, edited_root, output_path, target_path=None, f
             if existing_ent:
                 edited[new_fp] = (p, existing_ent)
             else:
-                # Find a template entry with matching suffix or any entry
                 template_entry = None
                 for dir_path, files in pak_file._index.items():
                     for name, entry in files.items():
@@ -1031,15 +1153,12 @@ def repack_pak_file_full(pak_file, edited_root, output_path, target_path=None, f
                     console.print(f'[bold red][X] Failed to find template metadata for {p.name}[/bold red]')
             continue
 
-        # Standard Replace Files mode (Option 3 or relative path preserved)
         found_match = False
         
-        # Check relative path from edited_root if user recreated PAK folder structure
         if edit_p.is_dir():
             try:
                 rel_p = p.relative_to(edit_p)
                 rel_fp = str(rel_p).replace('\\', '/')
-                # Check if rel_fp matches an existing full path
                 for dir_path, files in pak_file._index.items():
                     for name, entry in files.items():
                         full_path = str(PurePath(dir_path)/name).replace('\\', '/')
@@ -1106,215 +1225,328 @@ def repack_pak_file_full(pak_file, edited_root, output_path, target_path=None, f
     old_to_new = {id(pak_file._files[i]): new_files[i] for i in range(len(pak_file._files))}
     edited_paths = {fp: p for fp, (p, _) in edited.items()}
 
-    out_buf = bytearray()
-
-    for dp_str, dir_files in list(all_dirs.items()):
-        for name, old_entry in list(dir_files.items()):
-            full_path = str(PurePath(dp_str)/name).replace('\\', '/')
-            ne = old_to_new.get(id(old_entry), None)
-            
-            if ne is None:
-                ne = _cp.copy(old_entry)
-                ne.compressed_blocks = [_cp.copy(b) for b in old_entry.compressed_blocks]
-                new_files.append(ne)
-                old_to_new[id(old_entry)] = ne
-
-            em = old_entry.encryption_method
-            cm = old_entry.compression_method
-
-            if full_path in edited_paths:
-                p, template = edited[full_path]
-                new_raw = p.read_bytes()
-                pak_rel = PurePath(full_path)
-
-                ne.content_hash = SHA1.new(new_raw).digest()
-                ne.uncompressed_size = len(new_raw)
-                ne.compression_method = template.compression_method if template else cm
-                ne.encryption_method = template.encryption_method if template else em
-                ne.encrypted = template.encrypted if template else old_entry.encrypted
-                ne.unk1 = template.unk1 if template else old_entry.unk1
+    current_offset = 0
+    temp_output_path = Path(str(output_path) + ".tmp")
+    
+    with open(temp_output_path, 'wb') as out_fh:
+        processed_count = 0
+        for dp_str, dir_files in list(all_dirs.items()):
+            for name, old_entry in list(dir_files.items()):
+                full_path = str(PurePath(dp_str)/name).replace('\\', '/')
+                ne = old_to_new.get(id(old_entry), None)
                 
-                if template and target_path:
-                    full_path_str = mp_str + full_path
-                    ne.unk2 = SHA1.new(full_path_str.lower().encode('utf-8')).digest()
-                else:
-                    ne.unk2 = template.unk2 if template else old_entry.unk2
-                    
-                ne.index_new_sep = template.index_new_sep if template else old_entry.index_new_sep
+                if ne is None:
+                    ne = _cp.copy(old_entry)
+                    ne.compressed_blocks = [_cp.copy(b) for b in old_entry.compressed_blocks]
+                    new_files.append(ne)
+                    old_to_new[id(old_entry)] = ne
 
-                if ne.compression_method == CM_NONE:
-                    cipher = (_encrypt_plaintext(new_raw, pak_rel, ne.encryption_method)
-                              if ne.encrypted else new_raw)
-                    ne.offset = len(out_buf)
-                    ne.size = len(new_raw)
-                    ne.uncompressed_size = len(new_raw)
-                    out_buf += cipher
-                else:
-                    cs = (template.compression_block_size if template and template.compression_block_size > 0 
-                          else old_entry.compression_block_size if old_entry.compression_block_size > 0 
-                          else 65536)
-                    chunks = [new_raw[i:i+cs] for i in range(0, len(new_raw), cs)]
-                    new_blks = []
-                    for chunk in chunks:
-                        compressed = _best_compress(chunk, ne.compression_method, pak_file._zstd_dict)
-                        cipher = (_encrypt_plaintext(compressed, pak_rel, ne.encryption_method)
-                                  if ne.encrypted else compressed)
-                        blk = PakCompressedBlock.__new__(PakCompressedBlock)
-                        blk.start = len(out_buf)
-                        blk.end = blk.start + len(cipher)
-                        out_buf += cipher
-                        new_blks.append(blk)
+                em = old_entry.encryption_method
+                cm = old_entry.compression_method
 
-                    ne.compressed_blocks = new_blks
-                    ne.offset = new_blks[0].start if new_blks else len(out_buf)
-                    ne.size = sum(b.end - b.start for b in new_blks)
-                    ne.uncompressed_size = len(new_raw)
+                try:
+                    if full_path in edited_paths:
+                        p, template = edited[full_path]
+                        new_raw = p.read_bytes()
+                        pak_rel = PurePath(full_path)
 
-                console.print(f'[green]✓ Processed: {full_path}[/green]')
+                        ne.content_hash = SHA1.new(new_raw).digest()
+                        ne.uncompressed_size = len(new_raw)
+                        ne.compression_method = template.compression_method if template else cm
+                        ne.encryption_method = template.encryption_method if template else em
+                        ne.encrypted = template.encrypted if template else old_entry.encrypted
+                        ne.unk1 = template.unk1 if template else old_entry.unk1
+                        
+                        if template and target_path:
+                            full_path_str = mp_str + full_path
+                            ne.unk2 = SHA1.new(full_path_str.lower().encode('utf-8')).digest()
+                        else:
+                            ne.unk2 = template.unk2 if template else old_entry.unk2
+                            
+                        ne.index_new_sep = template.index_new_sep if template else old_entry.index_new_sep
 
-            else:
-                if cm == CM_NONE:
-                    read_sz = (PakCrypto.align_encrypted_content_size(old_entry.size, em)
-                               if old_entry.encrypted else old_entry.size)
-                    ne.offset = len(out_buf)
-                    out_buf += bytes(orig_fc[old_entry.offset: old_entry.offset + read_sz])
+                        if ne.compression_method == CM_NONE:
+                            cipher = (_encrypt_plaintext(new_raw, pak_rel, ne.encryption_method)
+                                      if ne.encrypted else new_raw)
+                            ne.offset = current_offset
+                            ne.size = len(new_raw)
+                            ne.uncompressed_size = len(new_raw)
+                            out_fh.write(cipher)
+                            current_offset += len(cipher)
+                        else:
+                            cs = (template.compression_block_size if template and template.compression_block_size > 0 
+                                  else old_entry.compression_block_size if old_entry.compression_block_size > 0 
+                                  else 65536)
+                            chunks = [new_raw[i:i+cs] for i in range(0, len(new_raw), cs)]
+                            new_blks = []
+                            for chunk in chunks:
+                                compressed = _best_compress(chunk, ne.compression_method, pak_file._zstd_dict)
+                                cipher = (_encrypt_plaintext(compressed, pak_rel, ne.encryption_method)
+                                          if ne.encrypted else compressed)
+                                blk = PakCompressedBlock.__new__(PakCompressedBlock)
+                                blk.start = current_offset
+                                blk.end = blk.start + len(cipher)
+                                out_fh.write(cipher)
+                                current_offset += len(cipher)
+                                new_blks.append(blk)
 
-                elif old_entry.compressed_blocks:
-                    new_blks = []
-                    for ob in old_entry.compressed_blocks:
-                        unc = ob.end - ob.start
-                        enc = (PakCrypto.align_encrypted_content_size(unc, em)
-                               if old_entry.encrypted else unc)
-                        nb = PakCompressedBlock.__new__(PakCompressedBlock)
-                        nb.start = len(out_buf)
-                        nb.end = nb.start + unc
-                        out_buf += bytes(orig_fc[ob.start: ob.start + enc])
-                        new_blks.append(nb)
-                    ne.compressed_blocks = new_blks
-                    ne.offset = new_blks[0].start
+                            ne.compressed_blocks = new_blks
+                            ne.offset = new_blks[0].start if new_blks else current_offset
+                            ne.size = sum(b.end - b.start for b in new_blks)
+                            ne.uncompressed_size = len(new_raw)
 
-    if target_path and force_add:
-        for fp, (p, template) in edited.items():
-            already_processed = False
-            for dp_str, dir_files in all_dirs.items():
-                for name, entry in dir_files.items():
-                    if str(PurePath(dp_str)/name).replace('\\', '/') == fp:
-                        already_processed = True
+                        console.print(f'[green]✓ Processed: {full_path}[/green]')
+
+                    else:
+                        if cm == CM_NONE:
+                            read_sz = (PakCrypto.align_encrypted_content_size(old_entry.size, em)
+                                       if old_entry.encrypted else old_entry.size)
+                            ne.offset = current_offset
+                            _stream_copy_bytes(pak_file._file_path, old_entry.offset, read_sz, out_fh)
+                            current_offset += read_sz
+
+                        elif old_entry.compressed_blocks:
+                            new_blks = []
+                            for ob in old_entry.compressed_blocks:
+                                unc = ob.end - ob.start
+                                enc = (PakCrypto.align_encrypted_content_size(unc, em)
+                                       if old_entry.encrypted else unc)
+                                nb = PakCompressedBlock.__new__(PakCompressedBlock)
+                                nb.start = current_offset
+                                nb.end = nb.start + unc
+                                _stream_copy_bytes(pak_file._file_path, ob.start, enc, out_fh)
+                                current_offset += enc
+                                new_blks.append(nb)
+                            ne.compressed_blocks = new_blks
+                            ne.offset = new_blks[0].start
+                except Exception as entry_repack_err:
+                    console.print(f"[bold red][X] Skip corrupted repack entry '{full_path}': {entry_repack_err}[/bold red]")
+
+                processed_count += 1
+                if processed_count % 100 == 0:
+                    gc.collect()
+
+        if target_path and force_add:
+            for fp, (p, template) in edited.items():
+                already_processed = False
+                for dp_str, dir_files in all_dirs.items():
+                    for name, entry in dir_files.items():
+                        if str(PurePath(dp_str)/name).replace('\\', '/') == fp:
+                            already_processed = True
+                            break
+                    if already_processed:
                         break
-                if already_processed:
-                    break
-            
-            if not already_processed:
-                ne = _cp.copy(template)
-                new_raw = p.read_bytes()
-                pak_rel = PurePath(fp)
                 
-                ne.content_hash = SHA1.new(new_raw).digest()
-                ne.uncompressed_size = len(new_raw)
-                ne.compression_method = template.compression_method
-                ne.encryption_method = template.encryption_method
-                ne.encrypted = template.encrypted
-                ne.unk1 = template.unk1
-                
-                full_path_str = mp_str + fp
-                ne.unk2 = SHA1.new(full_path_str.lower().encode('utf-8')).digest()
-                
-                ne.index_new_sep = template.index_new_sep
+                if not already_processed:
+                    try:
+                        ne = _cp.copy(template)
+                        new_raw = p.read_bytes()
+                        pak_rel = PurePath(fp)
+                        
+                        ne.content_hash = SHA1.new(new_raw).digest()
+                        ne.uncompressed_size = len(new_raw)
+                        ne.compression_method = template.compression_method
+                        ne.encryption_method = template.encryption_method
+                        ne.encrypted = template.encrypted
+                        ne.unk1 = template.unk1
+                        
+                        full_path_str = mp_str + fp
+                        ne.unk2 = SHA1.new(full_path_str.lower().encode('utf-8')).digest()
+                        
+                        ne.index_new_sep = template.index_new_sep
 
-                if ne.compression_method == CM_NONE:
-                    cipher = (_encrypt_plaintext(new_raw, pak_rel, ne.encryption_method)
-                              if ne.encrypted else new_raw)
-                    ne.offset = len(out_buf)
-                    ne.size = len(new_raw)
-                    ne.uncompressed_size = len(new_raw)
-                    out_buf += cipher
-                else:
-                    cs = template.compression_block_size if template.compression_block_size > 0 else 65536
-                    chunks = [new_raw[i:i+cs] for i in range(0, len(new_raw), cs)]
-                    new_blks = []
-                    for chunk in chunks:
-                        compressed = _best_compress(chunk, ne.compression_method, pak_file._zstd_dict)
-                        cipher = (_encrypt_plaintext(compressed, pak_rel, ne.encryption_method)
-                                  if ne.encrypted else compressed)
-                        blk = PakCompressedBlock.__new__(PakCompressedBlock)
-                        blk.start = len(out_buf)
-                        blk.end = blk.start + len(cipher)
-                        out_buf += cipher
-                        new_blks.append(blk)
+                        if ne.compression_method == CM_NONE:
+                            cipher = (_encrypt_plaintext(new_raw, pak_rel, ne.encryption_method)
+                                      if ne.encrypted else new_raw)
+                            ne.offset = current_offset
+                            ne.size = len(new_raw)
+                            ne.uncompressed_size = len(new_raw)
+                            out_fh.write(cipher)
+                            current_offset += len(cipher)
+                        else:
+                            cs = template.compression_block_size if template.compression_block_size > 0 else 65536
+                            chunks = [new_raw[i:i+cs] for i in range(0, len(new_raw), cs)]
+                            new_blks = []
+                            for chunk in chunks:
+                                compressed = _best_compress(chunk, ne.compression_method, pak_file._zstd_dict)
+                                cipher = (_encrypt_plaintext(compressed, pak_rel, ne.encryption_method)
+                                          if ne.encrypted else compressed)
+                                blk = PakCompressedBlock.__new__(PakCompressedBlock)
+                                blk.start = current_offset
+                                blk.end = blk.start + len(cipher)
+                                out_fh.write(cipher)
+                                current_offset += len(cipher)
+                                new_blks.append(blk)
 
-                    ne.compressed_blocks = new_blks
-                    ne.offset = new_blks[0].start if new_blks else len(out_buf)
-                    ne.size = sum(b.end - b.start for b in new_blks)
-                    ne.uncompressed_size = len(new_raw)
+                            ne.compressed_blocks = new_blks
+                            ne.offset = new_blks[0].start if new_blks else current_offset
+                            ne.size = sum(b.end - b.start for b in new_blks)
+                            ne.uncompressed_size = len(new_raw)
 
-                new_files.append(ne)
-                
-                if target_path not in all_dirs:
-                    all_dirs[target_path] = {}
-                all_dirs[target_path][p.name] = ne
-                console.print(f'[green]✓ Added new: {fp}[/green]')
+                        new_files.append(ne)
+                        
+                        if target_path not in all_dirs:
+                            all_dirs[target_path] = {}
+                        all_dirs[target_path][p.name] = ne
+                        console.print(f'[green]✓ Added new: {fp}[/green]')
+                    except Exception as add_err:
+                        console.print(f"[bold red][X] Skip adding corrupted file '{fp}': {add_err}[/bold red]")
 
-    eidx = {id(new_files[i]): i for i in range(len(new_files))}
+        eidx = {id(new_files[i]): i for i in range(len(new_files))}
 
-    idx = bytearray(_pw_string(mp_str))
-    idx += struct.pack('<I', len(new_files))
-    for ne in new_files:
-        idx += _pw_entry(ne, version)
-    idx += struct.pack('<Q', len(all_dirs))
-    for dp_str, dir_files in all_dirs.items():
-        idx += _pw_string(dp_str)
-        idx += struct.pack('<Q', len(dir_files))
-        for name, old_e in dir_files.items():
-            idx += _pw_string(name)
-            found_idx = None
-            for i, e in enumerate(new_files):
-                if id(e) == id(old_e):
-                    found_idx = i
-                    break
-            if found_idx is None:
+        idx = bytearray(_pw_string(mp_str))
+        idx += struct.pack('<I', len(new_files))
+        for ne in new_files:
+            idx += _pw_entry(ne, version)
+        idx += struct.pack('<Q', len(all_dirs))
+        for dp_str, dir_files in all_dirs.items():
+            idx += _pw_string(dp_str)
+            idx += struct.pack('<Q', len(dir_files))
+            for name, old_e in dir_files.items():
+                idx += _pw_string(name)
+                found_idx = None
                 for i, e in enumerate(new_files):
-                    if e.offset == old_e.offset and e.size == old_e.size:
+                    if id(e) == id(old_e):
                         found_idx = i
                         break
-            if found_idx is not None:
-                idx += struct.pack('<i', ~found_idx)
-            else:
-                idx += struct.pack('<i', -1)
+                if found_idx is None:
+                    for i, e in enumerate(new_files):
+                        if e.offset == old_e.offset and e.size == old_e.size:
+                            found_idx = i
+                            break
+                if found_idx is not None:
+                    idx += struct.pack('<i', ~found_idx)
+                else:
+                    idx += struct.pack('<i', -1)
 
-    index_plain = bytes(idx)
-    new_sha1 = SHA1.new(index_plain).digest()
+        index_plain = bytes(idx)
+        new_sha1 = SHA1.new(index_plain).digest()
 
-    if pak_file._pak_info.index_encrypted:
-        key = PakCrypto.rsa_extract(pak_file._pak_info.packed_key, RSA_MOD_1)
-        iv = PakCrypto.rsa_extract(pak_file._pak_info.packed_iv, RSA_MOD_1)
-        aes = AES.new(key, MODE_CBC, iv[:16])
-        pad = (-len(index_plain)) % AES.block_size or AES.block_size
-        index_bytes = aes.encrypt(index_plain + bytes([pad] * pad))
-    else:
-        index_bytes = index_plain
+        if pak_file._pak_info.index_encrypted:
+            key = PakCrypto.rsa_extract(pak_file._pak_info.packed_key, RSA_MOD_1)
+            iv = PakCrypto.rsa_extract(pak_file._pak_info.packed_iv, RSA_MOD_1)
+            aes = AES.new(key, MODE_CBC, iv[:16])
+            pad = (-len(index_plain)) % AES.block_size or AES.block_size
+            index_bytes = aes.encrypt(index_plain + bytes([pad] * pad))
+        else:
+            index_bytes = index_plain
 
-    new_idx_offset = len(out_buf)
-    new_idx_size = len(index_bytes)
-    out_buf += index_bytes
+        new_idx_offset = current_offset
+        new_idx_size = len(index_bytes)
+        out_fh.write(index_bytes)
+        current_offset += len(index_bytes)
 
-    footer_sz = TencentPakInfo._mem_size(version)
-    new_footer = bytearray(orig_fc[-footer_sz:])
+        footer_sz = TencentPakInfo._mem_size(version)
+        new_footer = bytearray(orig_fc[-footer_sz:])
 
-    h_key = struct.pack('<5I', *keystream[4:9])
-    new_footer[-36:-16] = bytes(a ^ b for a, b in zip(new_sha1, h_key))
-    new_footer[-16:-8] = ((new_idx_size ^ (keystream[10] << 32 | keystream[11])).to_bytes(8, 'little'))
-    new_footer[-8:] = ((new_idx_offset ^ (keystream[0] << 32 | keystream[1])).to_bytes(8, 'little'))
+        h_key = struct.pack('<5I', *keystream[4:9])
+        new_footer[-36:-16] = bytes(a ^ b for a, b in zip(new_sha1, h_key))
+        new_footer[-16:-8] = ((new_idx_size ^ (keystream[10] << 32 | keystream[11])).to_bytes(8, 'little'))
+        new_footer[-8:] = ((new_idx_offset ^ (keystream[0] << 32 | keystream[1])).to_bytes(8, 'little'))
 
-    out_buf += new_footer
+        out_fh.write(new_footer)
 
-    with open(output_path, 'wb') as f:
-        f.write(out_buf)
+    if os.path.exists(output_path):
+        os.remove(output_path)
+    os.rename(temp_output_path, output_path)
+    gc.collect()
 
     return len(edited)
 
 def _repack_compressed_with_display(outfh, pak_file, entry, pak_relative_path, new_data, repack_dir, display):
-    """Original compressed repack with display"""
+    """
+    [BEFORE]: Processed blocks without garbage collection, keeping temporary buffers in memory during long repacks.
+    [AFTER]: Added explicit buffer deletion and gc.collect() calls after block processing.
+    """
     blocks = entry.compressed_blocks
+    enc_method = entry.encryption_method
+    comp_method = entry.compression_method
+    order = PakCrypto.generate_block_indices(len(blocks), enc_method)
+    
+    if len(new_data) != entry.uncompressed_size:
+        if len(new_data) < entry.uncompressed_size:
+            new_data = new_data.ljust(entry.uncompressed_size, b'\x00')
+        else:
+            new_data = new_data[:entry.uncompressed_size]
+
+    if len(blocks) > 1:
+        if entry.compression_block_size > 0:
+            chunk_size = entry.compression_block_size
+        else:
+            block_sizes = [blk.end - blk.start for blk in blocks]
+            total_block_size = sum(block_sizes)
+            avg_block_size = total_block_size / len(blocks)
+            avg_compression_ratio = total_block_size / entry.uncompressed_size if entry.uncompressed_size > 0 else 1
+            chunk_size = int(avg_block_size / avg_compression_ratio) if avg_compression_ratio > 0 else 65536
+        
+        ptr = 0
+        for logical_i, phys_i in enumerate(order):
+            blk = blocks[phys_i]
+            target_size = blk.end - blk.start
+            chunk_len = min(chunk_size, len(new_data) - ptr)
+            if chunk_len <= 0: break
+            chunk = new_data[ptr:ptr + chunk_len]
+            ptr += chunk_len
+            
+            with open(pak_file._file_path, 'rb') as src:
+                src.seek(blk.start)
+                original_compressed = src.read(target_size)
+            
+            compressed_ok = False
+            new_compressed = None
+            zstd_dict = pak_file._zstd_dict if comp_method == CM_ZSTD_DICT else None
+            
+            if comp_method in (CM_ZSTD, CM_ZSTD_DICT):
+                for level in [19, 16, 12, 7, 4, 1]:
+                    c = ZstdCompressor(level=level, dict_data=zstd_dict, threads=0)
+                    new_compressed = c.compress(chunk)
+                    if len(new_compressed) <= target_size:
+                        compressed_ok = True
+                        break
+            elif comp_method == CM_ZLIB:
+                new_compressed = zlib.compress(chunk, zlib.Z_BEST_COMPRESSION)
+                if len(new_compressed) <= target_size:
+                    compressed_ok = True
+            
+            if not compressed_ok:
+                outfh.seek(blk.start)
+                outfh.write(original_compressed)
+                display.add_block(logical_i, target_size, False)
+                del original_compressed
+                continue
+            
+            if entry.encrypted:
+                if PakCrypto._is_sm4_method(enc_method):
+                    pad_len = -len(new_compressed) % 16
+                    if pad_len > 0: new_compressed += b'\x00' * pad_len
+                new_compressed = _encrypt_plaintext(new_compressed, pak_relative_path, enc_method)
+            
+            if len(new_compressed) > target_size:
+                outfh.seek(blk.start)
+                outfh.write(original_compressed)
+                display.add_block(logical_i, target_size, False)
+            else:
+                outfh.seek(blk.start)
+                outfh.write(new_compressed)
+                if len(new_compressed) < target_size:
+                    outfh.write(b'\x00' * (target_size - len(new_compressed)))
+                ratio = len(new_compressed) / len(chunk) if len(chunk) > 0 else 1
+                display.add_block(logical_i, target_size, True, ratio)
+
+            del original_compressed, new_compressed
+            if logical_i % 20 == 0:
+                gc.collect()
+    else:
+        if not blocks: return
+        blk = blocks[0]
+        target_size = blk.end - blk.start
+        
+        with open(pak_file._file_path, 'rb') as src:
+            src.seek(blk.start)
+            original_compressed = src.read(target_size)
+        
+        compressed_ok = False
+        new_compressed = None
     enc_method = entry.encryption_method
     comp_method = entry.compression_method
     order = PakCrypto.generate_block_indices(len(blocks), enc_method)
@@ -1510,6 +1742,8 @@ def repack_pak_file_with_block_display(pak_file, edited_root: Path, output_path:
                 _repack_compressed_with_display(outfh, pak_file, entry, pak_rel, new_data, edited_root, display)
             
             display.finish_file()
+            del new_data
+            gc.collect()
     
     display.final_summary()
 
@@ -2713,6 +2947,10 @@ def handle_exception(e: Exception, action_name: str = "Operation", data_path: Op
         reason_hint += "\n[yellow]Hint: Folder access denied. File ko Download/ me copy karke try karo, ya Shizuku setup karo.[/yellow]"
     elif isinstance(e, FileNotFoundError):
         reason_hint += "\n[yellow]Hint: File/folder nahi mila. Path check karo.[/yellow]"
+    elif isinstance(e, MemoryError) or "out of memory" in err_msg.lower():
+        reason_hint += "\n[yellow]Hint: Termux/RAM limit exceed ho gayi. Optimization active hai, background apps close karke retry karein.[/yellow]"
+    elif isinstance(e, OSError) and ("no space" in err_msg.lower() or e.errno == 28):
+        reason_hint += "\n[yellow]Hint: Storage full hai. Storage me space free karke retry karein.[/yellow]"
     elif any(term in err_type.lower() or term in err_msg.lower() for term in ["zlib", "zstd", "decompress", "compress", "badzip"]):
         reason_hint += "\n[yellow]Hint: File corrupt hai ya unsupported PAK format hai.[/yellow]"
 
