@@ -20,6 +20,7 @@ import zlib
 import json
 import zipfile
 import re
+import logging
 from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import PurePath, Path
@@ -756,7 +757,9 @@ class TencentPakFile:
                     logging.warning("RSA index hash check soft-failed (custom/modified PAK signature). Proceeding...")
             except Exception as e:
                 logging.warning(f"RSA index hash extraction skipped: {e}")
-        assert expected_hash == SHA1.new(index_data).digest(), "SHA1 index hash mismatch — PAK header or key corrupt"
+        computed_hash = SHA1.new(index_data).digest()
+        if expected_hash != computed_hash:
+            logging.warning("SHA1 index hash mismatch — PAK header/key may be modified. Attempting unpack anyway...")
     @staticmethod
     def _construct_mount_point(mount_point: str) -> PurePath:
         result = PurePath()
