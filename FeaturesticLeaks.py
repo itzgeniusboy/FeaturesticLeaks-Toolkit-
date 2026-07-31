@@ -1835,26 +1835,26 @@ def display_workspace_summary(data_path: Path):
     result_cnt = get_cnt("RESULT")
 
     table = Table(
-        title="[bold bright_cyan]🗺️ WORKSPACE FOLDER GUIDE & LIVE FILE COUNT[/bold bright_cyan]",
-        border_style="dim cyan",
+        title="[bold green]🟢 WORKSPACE STATUS & FILES 🟢[/bold green]",
+        border_style="green",
         box=ROUNDED,
         show_header=True,
-        header_style="bold yellow",
+        header_style="bold green",
         expand=True
     )
-    table.add_column("Folder Name", justify="left", style="bold white", width=14)
-    table.add_column("Where to Put / Purpose", justify="left", style="dim white")
-    table.add_column("Files Found", justify="center", style="bold cyan", width=12)
+    table.add_column("Folder Name", justify="left", style="bold green", width=14)
+    table.add_column("Where to Put / Purpose", justify="left", style="bold white")
+    table.add_column("Files Found", justify="center", style="bold bright_green", width=12)
 
-    table.add_row("📥 PAK/", "Put original game .pak / .obb files here", f"[bold cyan]{pak_cnt}[/bold cyan]")
-    table.add_row("📂 UNPACK/", "Extracted files from Unpack tool", f"[bold cyan]{unpack_cnt}[/bold cyan]")
-    table.add_row("✏️ REPLACE/", "Put edited files here to replace existing PAK files", f"[bold yellow]{replace_cnt}[/bold yellow]")
-    table.add_row("💉 INJECT/", "Put custom files here for Inject Path mode", f"[bold magenta]{inject_cnt}[/bold magenta]")
-    table.add_row("🌙 LUA/", "Put .lua / .luac scripts here for Lua tools", f"[bold cyan]{lua_cnt}[/bold cyan]")
-    table.add_row("🚀 RESULT/", "Final repacked PAK, OBB & compiled files saved here", f"[bold green]{result_cnt}[/bold green]")
+    table.add_row("📥 PAK/", "Put original game .pak / .obb files here", f"[bold bright_green]{pak_cnt}[/bold bright_green]")
+    table.add_row("📂 UNPACK/", "Extracted files from Unpack tool", f"[bold bright_green]{unpack_cnt}[/bold bright_green]")
+    table.add_row("✏️ REPLACE/", "Put edited files here to replace existing PAK files", f"[bold bright_green]{replace_cnt}[/bold bright_green]")
+    table.add_row("💉 INJECT/", "Put custom files here for Inject Path mode", f"[bold bright_green]{inject_cnt}[/bold bright_green]")
+    table.add_row("🌙 LUA/", "Put .lua / .luac scripts here for Lua tools", f"[bold bright_green]{lua_cnt}[/bold bright_green]")
+    table.add_row("🚀 RESULT/", "Final repacked PAK, OBB & compiled files saved here", f"[bold bright_green]{result_cnt}[/bold bright_green]")
 
     console.print(table)
-    console.print("[dim white]💡 SDCard Location: [bold cyan]/sdcard/FeaturesticLeaks/[/bold cyan] (ZArchiver / File Manager me direct dikhega)[/dim white]\n")
+    console.print("[bold green]💡 SDCard Location: [bold white]/sdcard/FeaturesticLeaks/[/bold white] (ZArchiver / File Manager me direct dikhega)[/bold green]\n")
 
 # ============================================================================
 # LUA ENGINE & PSEUDO-DECOMPILER (Pure Python + External Tools Fallback)
@@ -3074,20 +3074,47 @@ def install_termux_shortcut_and_sdcard(data_path: Path):
 def print_banner():
     os.system('cls' if os.name == 'nt' else 'clear')
     
-    banner_content = (
-        "[bold bright_cyan]⚡ FEATURESTIC LEAKS ⚡[/bold bright_cyan]\n"
-        "[dim cyan]────────────────────────────────────────────────[/dim cyan]\n"
-        "[bold white]PAK TOOL v2.0 — Termux Suite[/bold white]\n"
-        "[bold yellow]Developer:[bold white] @L359D[/bold white][/bold yellow] [dim cyan]|[/dim cyan] [bold yellow]Channel:[bold white] t.me/FeaturesticLeaks[/bold white][/bold yellow]"
+    ascii_banner = (
+        "[bold green]"
+        "  ______ _____    _ _____ _   _ ____  _____ _____ _____ ____  _     ______  _  _____\n"
+        " |  ____|  __ \\  / |  ___| | | |  _ \\|  ___|_   _|_   _/ ___|| |   |  ____|/ \\|  ___|\n"
+        " | |_   | |__) |/ /| |_  | | | | |_) | |_    | |   | | \\___ \\| |   | |__  / _ \\ |_  \n"
+        " |  _|  |  _  / /  |  _| | | | |  _ <|  _|   | |   | |  ___) | |___|  __|/ ___ \\  _| \n"
+        " |_|    |_| \\_\\/   |_|    \\___/|_| \\_\\_|     |_|   |_| |____/|_____|____/_/   \\_\\_|   \n"
+        "[/bold green]"
     )
     
-    banner_panel = Panel(
-        Align.center(banner_content),
-        border_style="cyan",
+    sub_title = (
+        "[bold bright_green]@L359D : -- TOOL DEVELOPER --[/bold bright_green]\n"
+        "[bold green]PAK TOOL v2.0 | BGMI | PUBG | KR | TW | JP | VNG ✓[/bold green]"
+    )
+    
+    top_box = Panel(
+        Align.center(f"{ascii_banner}\n{sub_title}"),
+        title="[bold green] MADE IN INDIA [/bold green]",
+        title_align="center",
+        border_style="green",
+        box=ROUNDED,
+        padding=(0, 1)
+    )
+    console.print(top_box)
+
+    # USER INFO panel
+    user_info_text = (
+        "[bold green]DEVELOPER  :[bold white] @L359D[/bold white]\n"
+        "CHANNEL    :[bold white] t.me/FeaturesticLeaks[/bold white]\n"
+        "TOOL       :[bold white] PAK & LUA SUITE v2.0[/bold white]\n"
+        "STATUS     :[bold green] 🟢 Running[/bold green][/bold green]"
+    )
+    user_panel = Panel(
+        user_info_text,
+        title="[bold green]🟢 USER INFO 🟢[/bold green]",
+        title_align="center",
+        border_style="green",
         box=ROUNDED,
         padding=(0, 2)
     )
-    console.print(banner_panel)
+    console.print(user_panel)
 
 def boot_sequence():
     """
@@ -4320,30 +4347,30 @@ def pak_obb_tools_menu(data_path: Path):
     while True:
         print_banner()
         menu_table = Table(
-            title="[bold bright_cyan]📦 PAK / OBB TOOLS[/bold bright_cyan]",
+            title="[bold green]📦 PAK / OBB TOOLS 📦[/bold green]",
             show_header=True,
-            header_style="bold cyan",
+            header_style="bold green",
             box=ROUNDED,
-            border_style="dim cyan",
+            border_style="green",
             expand=True
         )
-        menu_table.add_column("Option", justify="center", width=8)
-        menu_table.add_column("Action", justify="left", width=18)
-        menu_table.add_column("Description", justify="left")
+        menu_table.add_column("OPT", justify="center", width=8, style="bold green")
+        menu_table.add_column("COMMAND", justify="left", width=22, style="bold white")
+        menu_table.add_column("DESCRIPTION", justify="left", style="green")
 
-        menu_table.add_row("[bold cyan]1[/bold cyan]", "[bold cyan]Unpack[/bold cyan]", "[dim cyan]Extract PAK / OBB package contents[/dim cyan]")
-        menu_table.add_row("[bold green]2[/bold green]", "[bold green]Repack[/bold green]", "[dim green]Rebuild workspace to PAK / OBB[/dim green]")
-        menu_table.add_row("[bold yellow]3[/bold yellow]", "[bold yellow]Replace Files[/bold yellow]", "[dim yellow]Inject edited files into existing structure[/dim yellow]")
-        menu_table.add_row("[bold magenta]4[/bold magenta]", "[bold magenta]Inject Path[/bold magenta]", "[dim magenta]Inject files into custom PAK target path[/dim magenta]")
-        menu_table.add_row("[bold cyan]5[/bold cyan]", "[bold cyan]White Body Mod[/bold cyan]", "[dim cyan]One-click character & gear asset nuller[/dim cyan]")
-        menu_table.add_row("[bold magenta]6[/bold magenta]", "[bold magenta]Skin ID Swap[/bold magenta]", "[dim magenta]Swap Lobby, Ingame & Weapon skin IDs[/dim magenta]")
-        menu_table.add_row("[bold blue]7[/bold blue]", "[bold blue]OBB Manager[/bold blue]", "[dim blue]Unzip & Rezip OBB with size padding[/dim blue]")
-        menu_table.add_row("[bold yellow]8[/bold yellow]", "[bold yellow]PAK Compare & Dumper[/bold yellow]", "[dim yellow]Compare 2 PAKs or dump index/offsets/hashes[/dim yellow]")
-        menu_table.add_row("[dim]0[/dim]", "[dim]Back[/dim]", "[dim]Return to Main Menu[/dim]")
+        menu_table.add_row("[1]", "Unpack", "Extract PAK / OBB package contents")
+        menu_table.add_row("[2]", "Repack", "Rebuild workspace to PAK / OBB")
+        menu_table.add_row("[3]", "Replace Files", "Inject edited files into existing structure")
+        menu_table.add_row("[4]", "Inject Path", "Inject files into custom PAK target path")
+        menu_table.add_row("[5]", "White Body Mod", "One-click character & gear asset nuller")
+        menu_table.add_row("[6]", "Skin ID Swap", "Swap Lobby, Ingame & Weapon skin IDs")
+        menu_table.add_row("[7]", "OBB Manager", "Unzip & Rezip OBB with size padding")
+        menu_table.add_row("[8]", "PAK Compare & Dumper", "Compare 2 PAKs or dump index/offsets/hashes")
+        menu_table.add_row("[0]", "EXIT ✗", "Return to Main Menu")
 
         console.print(menu_table)
         console.print()
-        choice = safe_input('-> Select PAK/OBB option (0-8): ').strip()
+        choice = safe_input('\033[1;32mSELECT OPTION [1-8] [0]: \033[0m').strip()
 
         if choice == '1':
             pak_dir = data_path / "PAK"
@@ -4591,26 +4618,26 @@ def lua_tools_menu(data_path: Path):
     while True:
         print_banner()
         menu_table = Table(
-            title="[bold bright_cyan]🌙 LUA TOOLS[/bold bright_cyan]",
+            title="[bold green]🌙 LUA TOOLS 🌙[/bold green]",
             show_header=True,
-            header_style="bold cyan",
+            header_style="bold green",
             box=ROUNDED,
-            border_style="dim cyan",
+            border_style="green",
             expand=True
         )
-        menu_table.add_column("Option", justify="center", width=8)
-        menu_table.add_column("Action", justify="left", width=18)
-        menu_table.add_column("Description", justify="left")
+        menu_table.add_column("OPT", justify="center", width=8, style="bold green")
+        menu_table.add_column("COMMAND", justify="left", width=22, style="bold white")
+        menu_table.add_column("DESCRIPTION", justify="left", style="green")
 
-        menu_table.add_row("[bold cyan]1[/bold cyan]", "[bold cyan]Compile Lua[/bold cyan]", "[dim cyan]Convert .lua source to .luac bytecode[/dim cyan]")
-        menu_table.add_row("[bold green]2[/bold green]", "[bold green]Decompile Lua[/bold green]", "[dim green]Convert .luac bytecode to .lua source[/dim green]")
-        menu_table.add_row("[bold yellow]3[/bold yellow]", "[bold yellow]Extract PAK from Lua[/bold yellow]", "[dim yellow]Extract embedded PAK/Hex/Base64 payload from GG script[/dim yellow]")
-        menu_table.add_row("[bold magenta]4[/bold magenta]", "[bold magenta]Embed PAK into Lua[/bold magenta]", "[dim magenta]Convert PAK to Base64 & embed in GG Lua installer script[/dim magenta]")
-        menu_table.add_row("[dim]0[/dim]", "[dim]Back[/dim]", "[dim]Return to Main Menu[/dim]")
+        menu_table.add_row("[1]", "Compile Lua", "Convert .lua source to .luac bytecode")
+        menu_table.add_row("[2]", "Decompile Lua", "Convert .luac bytecode to .lua source")
+        menu_table.add_row("[3]", "Extract PAK from Lua", "Extract embedded PAK/Hex/Base64 payload from GG script")
+        menu_table.add_row("[4]", "Embed PAK into Lua", "Convert PAK to Base64 & embed in GG Lua installer script")
+        menu_table.add_row("[0]", "EXIT ✗", "Return to Main Menu")
 
         console.print(menu_table)
         console.print()
-        choice = safe_input('-> Select Lua option (0-4): ').strip()
+        choice = safe_input('\033[1;32mSELECT OPTION [1-4] [0]: \033[0m').strip()
 
         if choice == '1':
             run_lua_compiler(data_path)
@@ -4634,27 +4661,27 @@ def utilities_menu(data_path: Path):
     while True:
         print_banner()
         menu_table = Table(
-            title="[bold bright_cyan]🛠️ UTILITIES & HELP[/bold bright_cyan]",
+            title="[bold green]🛠️ UTILITIES & HELP 🛠️[/bold green]",
             show_header=True,
-            header_style="bold cyan",
+            header_style="bold green",
             box=ROUNDED,
-            border_style="dim cyan",
+            border_style="green",
             expand=True
         )
-        menu_table.add_column("Option", justify="center", width=8)
-        menu_table.add_column("Action", justify="left", width=22)
-        menu_table.add_column("Description", justify="left")
+        menu_table.add_column("OPT", justify="center", width=8, style="bold green")
+        menu_table.add_column("COMMAND", justify="left", width=22, style="bold white")
+        menu_table.add_column("DESCRIPTION", justify="left", style="green")
 
-        menu_table.add_row("[bold cyan]1[/bold cyan]", "[bold cyan]UE4 String Tool[/bold cyan]", "[dim cyan]Extract & repack .uasset/.uexp strings[/dim cyan]")
-        menu_table.add_row("[bold green]2[/bold green]", "[bold green]File Finder[/bold green]", "[dim green]Search .uasset/.uexp/.ubulk by pattern[/dim green]")
-        menu_table.add_row("[bold yellow]3[/bold yellow]", "[bold yellow]Workspace Summary & Guide[/bold yellow]", "[dim yellow]Folder guide & live file count summary[/dim yellow]")
-        menu_table.add_row("[bold bright_magenta]4[/bold bright_magenta]", "[bold bright_magenta]Termux Auto-Setup[/bold bright_magenta]", "[dim bright_magenta]Setup 'leak' direct command & SDCard folders[/dim bright_magenta]")
-        menu_table.add_row("[bold red]5[/bold red]", "[bold red]Cleanup Workspace[/bold red]", "[dim red]Delete workspace folders[/dim red]")
-        menu_table.add_row("[dim]0[/dim]", "[dim]Back[/dim]", "[dim]Return to Main Menu[/dim]")
+        menu_table.add_row("[1]", "UE4 String Tool", "Extract & repack .uasset/.uexp strings")
+        menu_table.add_row("[2]", "File Finder", "Search .uasset/.uexp/.ubulk by pattern")
+        menu_table.add_row("[3]", "Workspace Summary", "Folder guide & live file count summary")
+        menu_table.add_row("[4]", "Termux Auto-Setup", "Setup 'leak' direct command & SDCard folders")
+        menu_table.add_row("[5]", "Cleanup Workspace", "Delete workspace folders")
+        menu_table.add_row("[0]", "EXIT ✗", "Return to Main Menu")
 
         console.print(menu_table)
         console.print()
-        choice = safe_input('-> Select Utility option (0-5): ').strip()
+        choice = safe_input('\033[1;32mSELECT OPTION [1-5] [0]: \033[0m').strip()
 
         if choice == '1':
             run_ue4_string_tool(data_path)
@@ -4703,25 +4730,25 @@ def main_menu():
         print_banner()
         display_workspace_summary(data_path)
         menu_table = Table(
-            title="[bold bright_cyan]⚡ MAIN MENU — CATEGORIES[/bold bright_cyan]",
+            title="[bold green]🟢 MAIN MENU 🟢[/bold green]",
             show_header=True,
-            header_style="bold cyan",
+            header_style="bold green",
             box=ROUNDED,
-            border_style="dim cyan",
+            border_style="green",
             expand=True
         )
-        menu_table.add_column("Category", justify="center", width=10)
-        menu_table.add_column("Title", justify="left", width=22)
-        menu_table.add_column("Features / Tools Included", justify="left")
+        menu_table.add_column("OPT", justify="center", width=8, style="bold green")
+        menu_table.add_column("COMMAND", justify="left", width=22, style="bold white")
+        menu_table.add_column("DESCRIPTION", justify="left", style="green")
 
-        menu_table.add_row("[bold cyan]1[/bold cyan]", "[bold cyan]📦 PAK / OBB Tools[/bold cyan]", "[dim cyan]Unpack, Repack, Replace Files, Inject Path, Mods, OBB[/dim cyan]")
-        menu_table.add_row("[bold green]2[/bold green]", "[bold green]🌙 Lua Tools[/bold green]", "[dim green]Compile (.lua -> .luac) & Decompile (.luac -> .lua)[/dim green]")
-        menu_table.add_row("[bold yellow]3[/bold yellow]", "[bold yellow]🛠️ Utilities & Help[/bold yellow]", "[dim yellow]UE4 String Tool, File Finder, Summary, Setup, Cleanup[/dim yellow]")
-        menu_table.add_row("[dim]0[/dim]", "[dim]Exit[/dim]", "[dim]Close application[/dim]")
+        menu_table.add_row("[1]", "PAK TOOL ✓", "Extract, Repack, Replace & Inject PAK/OBB")
+        menu_table.add_row("[2]", "LUA TOOL ✓", "Compile, Decompile & PAK/Lua Embedder")
+        menu_table.add_row("[3]", "UTILITIES ✓", "UE4 String Tool, File Finder & Setup")
+        menu_table.add_row("[0]", "EXIT ✗", "Close application")
 
         console.print(menu_table)
         console.print()
-        choice = safe_input('-> Select category (0-3): ').strip()
+        choice = safe_input('\033[1;32mSELECT OPTION [1-3] [0]: \033[0m').strip()
 
         if choice == '1':
             pak_obb_tools_menu(data_path)
