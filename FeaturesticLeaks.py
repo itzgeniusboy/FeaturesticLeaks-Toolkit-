@@ -824,6 +824,7 @@ class TencentPakFile:
                         data = PakCrypto.decrypt_block(data, file_path, encryption_method)
                     file.write(data)
                     written += to_read
+                file.truncate(entry.size)
                 return
             else:
                 for x in PakCrypto.generate_block_indices(len(entry.compressed_blocks), encryption_method):
@@ -832,6 +833,7 @@ class TencentPakFile:
                         data = PakCrypto.decrypt_block(data, file_path, encryption_method)
                     data = PakCompression.decompress_block(data, self._zstd_dict, compression_method)
                     file.write(data)
+                file.truncate(entry.uncompressed_size)
     
     def dump(self, out_path: Path) -> None:
         """
