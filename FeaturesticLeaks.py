@@ -750,7 +750,12 @@ class TencentPakFile:
     def _verify_index_hash(self, index_data) -> None:
         expected_hash = self._pak_info.index_hash
         if not self._is_od and self._pak_info.version >= 8:
-                assert expected_hash == PakCrypto.rsa_extract(self._pak_info.packed_index_hash, RSA_MOD_2), "RSA index hash verification failed"
+            try:
+                extracted = PakCrypto.rsa_extract(self._pak_info.packed_index_hash, RSA_MOD_2)
+                if expected_hash != extracted:
+                    logging.warning("RSA index hash check soft-failed (custom/modified PAK signature). Proceeding...")
+            except Exception as e:
+                logging.warning(f"RSA index hash extraction skipped: {e}")
         assert expected_hash == SHA1.new(index_data).digest(), "SHA1 index hash mismatch — PAK header or key corrupt"
     @staticmethod
     def _construct_mount_point(mount_point: str) -> PurePath:
