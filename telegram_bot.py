@@ -271,8 +271,19 @@ def run_bot():
     token = config.get("telegram_token") or os.environ.get("TELEGRAM_BOT_TOKEN")
 
     if not token:
-        logger.error("❌ Telegram Bot Token is required!")
-        return
+        logger.warning("⚠️ Telegram Bot Token not found in config or environment.")
+        try:
+            token = input("\n👉 Enter Telegram Bot Token from @BotFather: ").strip()
+            if token:
+                save_config(token)
+                os.environ["TELEGRAM_BOT_TOKEN"] = token
+                logger.info("✅ Bot Token saved to config successfully!")
+            else:
+                logger.error("❌ No token entered. Exiting.")
+                return
+        except Exception:
+            logger.error("❌ Telegram Bot Token is required!")
+            return
 
     def get_main_keyboard():
         keyboard = [

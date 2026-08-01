@@ -1889,13 +1889,6 @@ def ensure_directories(base_dir: Path):
     (lua_ws / "2_DECOMPILED").mkdir(parents=True, exist_ok=True)
     (lua_ws / "3_COMPILED").mkdir(parents=True, exist_ok=True)
     (lua_ws / "4_RESULT").mkdir(parents=True, exist_ok=True)
-    
-    # Backwards compatibility legacy paths
-    pak_tool_dir = base_dir / "PAK TOOL"
-    (pak_tool_dir / "EDIT").mkdir(parents=True, exist_ok=True)
-    (pak_tool_dir / "UNPACK").mkdir(parents=True, exist_ok=True)
-    (pak_tool_dir / "RESULT").mkdir(parents=True, exist_ok=True)
-    (pak_tool_dir / "PAK").mkdir(parents=True, exist_ok=True)
 
     sdcard_path = Path("/sdcard/FeaturesticLeaks")
     try:
