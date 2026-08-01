@@ -2542,18 +2542,20 @@ def fix_lua_syntax_for_lua51(lua_file: Path) -> Path:
         masked_text = re.sub(r'\blocal\s+function\b', 'function', masked_text)
 
         # Convert 'local var1, var2 = val1, val2' -> 'var1, var2 = val1, val2'
-        var_list = r'[a-zA-Z_][a-zA-Z0-9_]*(?:\s*,\s*[a-zA-Z_][a-zA-Z0-9_]*)*'
-        masked_text = re.sub(rf'\blocal\s+({var_list})\s*=', r'\1 =', masked_text)
+        masked_text = re.sub(r'\blocal\s+([a-zA-Z_][a-zA-Z0-9_\s,]*?)\s*=', r'\1 =', masked_text)
 
-        # Convert standalone 'local var1, var2' -> 'var1, var2 = nil, nil' (NEVER comment out code with '--'!)
+        # Convert standalone 'local var1, var2' -> 'var1, var2 = nil, nil'
         def fix_standalone_local(m):
             vars_str = m.group(1).strip()
-            v_list = [v.strip() for v in vars_str.split(',') if v.strip()]
+            v_list = [v.strip() for v in vars_str.split(',') if v.strip() and v.strip() != 'nil']
             if not v_list:
                 return ""
             return f"{', '.join(v_list)} = {', '.join(['nil']*len(v_list))}"
 
-        masked_text = re.sub(rf'\blocal\s+({var_list})\b(?!\s*=)', fix_standalone_local, masked_text)
+        masked_text = re.sub(r'\blocal\s+([a-zA-Z_][a-zA-Z0-9_\s,]+)\b(?!\s*=)', fix_standalone_local, masked_text)
+
+        # Safety net: remove any leftover 'local ' keyword before variable names to prevent >200 local variables limit error
+        masked_text = re.sub(r'\blocal\s+(?=[a-zA-Z_])', '', masked_text)
 
         # Restore comments & strings
         for i in range(len(tokens) - 1, -1, -1):
@@ -3617,49 +3619,56 @@ def run_lua_compiler(data_path: Path):
             last_stderr = str(e)
 
     if not success:
-        analyze_and_display_lua_error(lua_file, last_stderr)
+        console.print("\n[bold yellow]⚡ [Auto-Fix Mode Activated] Preprocessing Lua code to fix syntax & >200 local variable limits...[/bold yellow]")
+        fixed_lua = fix_lua_syntax_for_lua51(lua_file)
         
-        console.print("\n[bold yellow]🛠️ Options to Fix & Compile:[/bold yellow]")
-        console.print("  [bold cyan][1][/bold cyan] Auto-Fix Syntax for Lua 5.1 (Removes 'continue' / fixes '|' bitwise)")
-        console.print("  [bold cyan][2][/bold cyan] Auto-Install LuaJIT Compiler (Supports 'continue' & modern syntax)")
-        console.print("  [bold cyan][0][/bold cyan] Skip / Back to Menu")
-        fix_choice = safe_input('\n-> Select option (0-2): ').strip()
-
-        if fix_choice == '1':
-            fixed_lua = fix_lua_syntax_for_lua51(lua_file)
-            console.print(f"\n[bold cyan][+] Created patched file: {fixed_lua.name}[/bold cyan]")
-            console.print(f"[bold cyan][+] Re-attempting compilation...[/bold cyan]")
+        for compiler in available_compilers:
+            if compiler == "luajit":
+                cmd = ["luajit", "-b", str(fixed_lua), str(out_luac)]
+            else:
+                cmd = [compiler, "-o", str(out_luac), str(fixed_lua)]
             
-            for compiler in available_compilers:
-                if compiler == "luajit":
-                    cmd = ["luajit", "-b", str(fixed_lua), str(out_luac)]
-                else:
-                    cmd = [compiler, "-o", str(out_luac), str(fixed_lua)]
-                
-                proc = subprocess.run(cmd, capture_output=True, text=True)
-                if proc.returncode == 0:
-                    console.print(f"[bold green][OK] Fixed file compiled successfully with '{compiler}': {out_luac}[/bold green]")
-                    success = True
-                    break
-            
-            if not success:
-                console.print(f"[bold red][X] Re-compilation of fixed file failed as well:[/bold red]\n[white]{proc.stderr}[/white]")
-                console.print("[bold yellow]💡 Tip:[/bold yellow] Try Option 2 to auto-install LuaJIT!")
+            proc = subprocess.run(cmd, capture_output=True, text=True)
+            if proc.returncode == 0:
+                console.print(f"[bold green]✅ Auto-fixed and compiled successfully with '{compiler}': {out_luac.name} ({out_luac.stat().st_size:,} bytes)[/bold green]")
+                success = True
+                break
 
-        elif fix_choice == '2':
-            console.print("[bold cyan][+] Installing LuaJIT via Termux pkg...[/bold cyan]")
+        if not success and not shutil.which("luajit"):
+            console.print("[bold cyan][+] Auto-installing LuaJIT via Termux pkg to retry...[/bold cyan]")
             try:
                 subprocess.run("pkg install -y luajit", shell=True, check=True)
-                console.print("[bold green][OK] LuaJIT installed successfully![/bold green]")
                 if shutil.which("luajit"):
-                    cmd = ["luajit", "-b", str(lua_file), str(out_luac)]
+                    cmd = ["luajit", "-b", str(fixed_lua), str(out_luac)]
                     proc = subprocess.run(cmd, capture_output=True, text=True)
                     if proc.returncode == 0:
-                        console.print(f"[bold green][OK] Compiled successfully with 'luajit': {out_luac}[/bold green]")
-                    else:
-                        console.print(f"[bold red][X] LuaJIT compilation error:[/bold red]\n[white]{proc.stderr}[/white]")
-            except Exception as e:
-                console.print(f"[bold red][X] LuaJIT installation error: {e}[/bold red]")
+                        console.print(f"[bold green]✅ Auto-fixed and compiled successfully with 'luajit': {out_luac.name}[/bold green]")
+                        success = True
+            except Exception:
+                pass
+
+        if not success:
+            analyze_and_display_lua_error(lua_file, last_stderr)
+            console.print(f"\n[bold yellow]💡 Fallback: Saved cleaned patched script as {fixed_lua.name}[/bold yellow]")
+
+    if success:
+        target_dirs = [
+            data_path / "LUA",
+            data_path / "RESULT",
+            data_path / "REPLACE",
+            data_path / "INJECT",
+            Path("/sdcard/FeaturesticLeaks/LUA"),
+            Path("/sdcard/FeaturesticLeaks/RESULT"),
+            Path("/sdcard/FeaturesticLeaks/REPLACE"),
+            Path("/sdcard/FeaturesticLeaks/INJECT")
+        ]
+        for td in target_dirs:
+            try:
+                td.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(out_luac, td / out_luac.name)
+            except Exception:
+                pass
+        console.print(f"[bold green]🎉 Output synced across all workspace & SDCard folders![/bold green]")
 
 def run_lua_decompiler(data_path: Path):
     console.print(Panel(Align.center("[bold bright_cyan]🌙 LUA AUTO-DECOMPILER (.luac Bytecode / Custom -> .lua Source)[/bold bright_cyan]"), border_style="cyan", box=ROUNDED))
@@ -6206,6 +6215,29 @@ def lua_tools_menu(data_path: Path):
             console.print('[bold red][X] Invalid choice.[/bold red]')
             time.sleep(1)
 
+def run_telegram_bot_launcher(data_path: Path):
+    console.print(Panel(Align.center("[bold bright_cyan]🤖 TELEGRAM AI VISION BOT LAUNCHER 🤖[/bold bright_cyan]\n[dim white]Launch an AI Telegram Bot that analyzes user screenshots and guides everyone on how to use FeaturesticLeaks![/dim white]"), border_style="cyan", box=ROUNDED))
+    
+    bot_script = Path(__file__).parent / "telegram_bot.py"
+    if not bot_script.exists():
+        console.print("[bold red][X] telegram_bot.py not found in working directory.[/bold red]")
+        return
+        
+    console.print("\n[bold cyan]Checking / installing required packages (python-telegram-bot requests)...[/bold cyan]")
+    try:
+        subprocess.run([sys.executable, "-m", "pip", "install", "-q", "python-telegram-bot", "requests"], check=False)
+    except Exception:
+        pass
+        
+    console.print("\n[bold green]🚀 Launching Telegram AI Bot...[/bold green]")
+    console.print("[dim white]Press Ctrl+C inside Termux anytime to return to main menu.[/dim white]\n")
+    try:
+        subprocess.run([sys.executable, str(bot_script)])
+    except KeyboardInterrupt:
+        console.print("\n[bold yellow]Stopped Telegram Bot.[/bold yellow]")
+    except Exception as e:
+        console.print(f"\n[bold red][X] Error running Telegram Bot: {e}[/bold red]")
+
 def utilities_menu(data_path: Path):
     while True:
         print_banner()
@@ -6227,11 +6259,12 @@ def utilities_menu(data_path: Path):
         menu_table.add_row("[4]", "Termux Auto-Setup", "Setup 'leak' direct command & SDCard folders")
         menu_table.add_row("[5]", "File Resizer & Equalizer", "Match exact byte size of any file (PAK, OBB, LUA)")
         menu_table.add_row("[6]", "Cleanup Workspace", "Delete workspace folders")
+        menu_table.add_row("[7]", "Telegram AI Vision Bot", "Launch Telegram AI bot that analyzes user screenshots")
         menu_table.add_row("[0]", "EXIT ✗", "Return to Main Menu")
 
         console.print(menu_table)
         console.print()
-        choice = safe_input('\033[1;36mSELECT OPTION [1-6] [0]: \033[0m').strip()
+        choice = safe_input('\033[1;36mSELECT OPTION [1-7] [0]: \033[0m').strip()
 
         if choice == '1':
             run_ue4_string_tool(data_path)
@@ -6252,6 +6285,9 @@ def utilities_menu(data_path: Path):
             safe_input('\nPress Enter to continue...')
         elif choice == '6':
             delete_folder(data_path)
+            safe_input('\nPress Enter to continue...')
+        elif choice == '7':
+            run_telegram_bot_launcher(data_path)
             safe_input('\nPress Enter to continue...')
         elif choice == '0':
             break
