@@ -1865,17 +1865,7 @@ def repack_gamepatch(pak, repack_dir, output_pak):
     repack_pak_file_with_block_display(pak_file=pak, edited_root=repack_dir, output_path=output_pak)
 
 def ensure_directories(base_dir: Path):
-    # Main Root folders (Backward compatibility)
-    (base_dir / "PAK").mkdir(parents=True, exist_ok=True)
-    (base_dir / "UNPACK").mkdir(parents=True, exist_ok=True)
-    (base_dir / "REPLACE").mkdir(parents=True, exist_ok=True)
-    (base_dir / "INJECT").mkdir(parents=True, exist_ok=True)
-    (base_dir / "LUA").mkdir(parents=True, exist_ok=True)
-    (base_dir / "REPACK").mkdir(parents=True, exist_ok=True)
-    (base_dir / "RESULT").mkdir(parents=True, exist_ok=True)
-    (base_dir / "LOGS").mkdir(parents=True, exist_ok=True)
-
-    # Organized Subfolder System for PAK
+    # Clean Organized PAK Workspace
     pak_ws = base_dir / "PAK_WORKSPACE"
     (pak_ws / "1_PAK_INPUT").mkdir(parents=True, exist_ok=True)
     (pak_ws / "2_UNPACK").mkdir(parents=True, exist_ok=True)
@@ -1883,25 +1873,19 @@ def ensure_directories(base_dir: Path):
     (pak_ws / "4_INJECT").mkdir(parents=True, exist_ok=True)
     (pak_ws / "5_RESULT").mkdir(parents=True, exist_ok=True)
 
-    # Organized Subfolder System for LUA
+    # Clean Organized LUA Workspace
     lua_ws = base_dir / "LUA_WORKSPACE"
-    (lua_ws / "1_INPUT_SCRIPTS").mkdir(parents=True, exist_ok=True)
+    (lua_ws / "1_LUA_INPUT").mkdir(parents=True, exist_ok=True)
     (lua_ws / "2_DECOMPILED").mkdir(parents=True, exist_ok=True)
     (lua_ws / "3_COMPILED").mkdir(parents=True, exist_ok=True)
     (lua_ws / "4_RESULT").mkdir(parents=True, exist_ok=True)
+
+    (base_dir / "LOGS").mkdir(parents=True, exist_ok=True)
 
     sdcard_path = Path("/sdcard/FeaturesticLeaks")
     try:
         if sdcard_path.parent.exists():
             sdcard_path.mkdir(parents=True, exist_ok=True)
-            (sdcard_path / "PAK").mkdir(parents=True, exist_ok=True)
-            (sdcard_path / "UNPACK").mkdir(parents=True, exist_ok=True)
-            (sdcard_path / "REPLACE").mkdir(parents=True, exist_ok=True)
-            (sdcard_path / "INJECT").mkdir(parents=True, exist_ok=True)
-            (sdcard_path / "LUA").mkdir(parents=True, exist_ok=True)
-            (sdcard_path / "RESULT").mkdir(parents=True, exist_ok=True)
-            (sdcard_path / "LOGS").mkdir(parents=True, exist_ok=True)
-
             s_pak_ws = sdcard_path / "PAK_WORKSPACE"
             (s_pak_ws / "1_PAK_INPUT").mkdir(parents=True, exist_ok=True)
             (s_pak_ws / "2_UNPACK").mkdir(parents=True, exist_ok=True)
@@ -1910,10 +1894,24 @@ def ensure_directories(base_dir: Path):
             (s_pak_ws / "5_RESULT").mkdir(parents=True, exist_ok=True)
 
             s_lua_ws = sdcard_path / "LUA_WORKSPACE"
-            (s_lua_ws / "1_INPUT_SCRIPTS").mkdir(parents=True, exist_ok=True)
+            (s_lua_ws / "1_LUA_INPUT").mkdir(parents=True, exist_ok=True)
             (s_lua_ws / "2_DECOMPILED").mkdir(parents=True, exist_ok=True)
             (s_lua_ws / "3_COMPILED").mkdir(parents=True, exist_ok=True)
             (s_lua_ws / "4_RESULT").mkdir(parents=True, exist_ok=True)
+
+            (sdcard_path / "LOGS").mkdir(parents=True, exist_ok=True)
+
+            # Auto-cleanup empty legacy folders from SDCard & workspace so File Manager is kept clean
+            legacy_dirs = ["PAK", "UNPACK", "REPLACE", "INJECT", "LUA", "REPACK", "RESULT", "PAK TOOL"]
+            for target in [base_dir, sdcard_path]:
+                for leg in legacy_dirs:
+                    leg_p = target / leg
+                    if leg_p.exists() and leg_p.is_dir():
+                        try:
+                            if not any(leg_p.iterdir()):
+                                leg_p.rmdir()
+                        except Exception:
+                            pass
     except Exception:
         pass
 
@@ -1940,12 +1938,16 @@ def display_workspace_summary(data_path: Path):
                     pass
         return cnt
 
-    pak_cnt = get_cnt("PAK") + get_cnt("PAK_WORKSPACE", "1_PAK_INPUT")
-    unpack_cnt = get_cnt("UNPACK") + get_cnt("PAK_WORKSPACE", "2_UNPACK")
-    replace_cnt = get_cnt("REPLACE") + get_cnt("PAK TOOL", "EDIT") + get_cnt("PAK_WORKSPACE", "3_REPLACE")
-    inject_cnt = get_cnt("INJECT") + get_cnt("PAK_WORKSPACE", "4_INJECT")
-    lua_cnt = get_cnt("LUA") + get_cnt("LUA_WORKSPACE", "1_INPUT_SCRIPTS")
-    result_cnt = get_cnt("RESULT") + get_cnt("PAK_WORKSPACE", "5_RESULT") + get_cnt("LUA_WORKSPACE", "4_RESULT")
+    pak_cnt = get_cnt("PAK_WORKSPACE", "1_PAK_INPUT") + get_cnt("PAK")
+    unpack_cnt = get_cnt("PAK_WORKSPACE", "2_UNPACK") + get_cnt("UNPACK")
+    replace_cnt = get_cnt("PAK_WORKSPACE", "3_REPLACE") + get_cnt("REPLACE")
+    inject_cnt = get_cnt("PAK_WORKSPACE", "4_INJECT") + get_cnt("INJECT")
+    result_pak_cnt = get_cnt("PAK_WORKSPACE", "5_RESULT")
+
+    lua_input_cnt = get_cnt("LUA_WORKSPACE", "1_LUA_INPUT") + get_cnt("LUA")
+    lua_decomp_cnt = get_cnt("LUA_WORKSPACE", "2_DECOMPILED")
+    lua_comp_cnt = get_cnt("LUA_WORKSPACE", "3_COMPILED")
+    lua_result_cnt = get_cnt("LUA_WORKSPACE", "4_RESULT") + get_cnt("RESULT")
 
     table = Table(
         title="[bold bright_cyan]📂 ORGANIZED WORKSPACE STATUS 📂[/bold bright_cyan]",
@@ -1955,24 +1957,24 @@ def display_workspace_summary(data_path: Path):
         header_style="bold bright_cyan",
         expand=True
     )
-    table.add_column("Folder System", justify="left", style="bold bright_cyan", width=22)
+    table.add_column("Workspace Folder", justify="left", style="bold bright_cyan", width=24)
     table.add_column("Purpose / Direct Path", justify="left", style="bold bright_white")
     table.add_column("Files", justify="center", style="bold bright_yellow", width=10)
 
     # Section 1: PAK Tools Workspace
-    table.add_row("[bold yellow]📦 PAK SYSTEM[/bold yellow]", "[dim]Subfolders in PAK_WORKSPACE/ or PAK/[/dim]", "")
-    table.add_row("  └ 📥 1_PAK_INPUT", "Put original game .pak / .obb files here", f"[bold bright_yellow]{pak_cnt}[/bold bright_yellow]")
-    table.add_row("  └ 📂 2_UNPACK", "Extracted files from Unpack tool", f"[bold bright_yellow]{unpack_cnt}[/bold bright_yellow]")
-    table.add_row("  └ ✏️ 3_REPLACE", "Put edited files here to replace PAK files", f"[bold bright_yellow]{replace_cnt}[/bold bright_yellow]")
-    table.add_row("  └ 💉 4_INJECT", "Put custom files here for Inject Path mode", f"[bold bright_yellow]{inject_cnt}[/bold bright_yellow]")
-    table.add_row("  └ 🚀 5_RESULT", "Final repacked .pak files saved here", f"[bold bright_yellow]{result_cnt}[/bold bright_yellow]")
+    table.add_row("[bold yellow]📦 PAK_WORKSPACE/[/bold yellow]", "[dim]Subfolders for PAK & OBB Modding[/dim]", "")
+    table.add_row("  ├ 📥 1_PAK_INPUT", "Put original game .pak / .obb files here", f"[bold bright_yellow]{pak_cnt}[/bold bright_yellow]")
+    table.add_row("  ├ 📂 2_UNPACK", "Extracted files from Unpack tool", f"[bold bright_yellow]{unpack_cnt}[/bold bright_yellow]")
+    table.add_row("  ├ ✏️ 3_REPLACE", "Put edited files here to replace PAK files", f"[bold bright_yellow]{replace_cnt}[/bold bright_yellow]")
+    table.add_row("  ├ 💉 4_INJECT", "Put custom files here for Inject Path mode", f"[bold bright_yellow]{inject_cnt}[/bold bright_yellow]")
+    table.add_row("  └ 🚀 5_RESULT", "Final repacked .pak files saved here", f"[bold bright_yellow]{result_pak_cnt}[/bold bright_yellow]")
 
     # Section 2: LUA Tools Workspace
-    table.add_row("[bold cyan]🌙 LUA SYSTEM[/bold cyan]", "[dim]Subfolders in LUA_WORKSPACE/ or LUA/[/dim]", "")
-    table.add_row("  └ 📜 1_INPUT_SCRIPTS", "Put .lua / .luac scripts here for Lua tools", f"[bold bright_yellow]{lua_cnt}[/bold bright_yellow]")
-    table.add_row("  └ 🔓 2_DECOMPILED", "Decompiled .lua source files saved here", f"[bold dim_white]Auto[/bold dim_white]")
-    table.add_row("  └ ⚙️ 3_COMPILED", "Compiled .luac bytecode saved here", f"[bold dim_white]Auto[/bold dim_white]")
-    table.add_row("  └ 🎉 4_RESULT", "Final processed & auto-fixed scripts saved here", f"[bold dim_white]Auto[/bold dim_white]")
+    table.add_row("[bold cyan]🌙 LUA_WORKSPACE/[/bold cyan]", "[dim]Subfolders for Lua Scripts Modding[/dim]", "")
+    table.add_row("  ├ 📜 1_LUA_INPUT", "Put .lua / .luac scripts here for Lua tools", f"[bold bright_yellow]{lua_input_cnt}[/bold bright_yellow]")
+    table.add_row("  ├ 🔓 2_DECOMPILED", "Decompiled .lua source files saved here", f"[bold bright_yellow]{lua_decomp_cnt}[/bold bright_yellow]")
+    table.add_row("  ├ ⚙️ 3_COMPILED", "Compiled .luac bytecode saved here", f"[bold bright_yellow]{lua_comp_cnt}[/bold bright_yellow]")
+    table.add_row("  └ 🎉 4_RESULT", "Final processed & auto-fixed scripts saved here", f"[bold bright_yellow]{lua_result_cnt}[/bold bright_yellow]")
 
     console.print(table)
     console.print("[bold bright_cyan]💡 Workspace Location: [bold bright_white]/sdcard/FeaturesticLeaks/[/bold bright_white] (ZArchiver me direct dikhega)[/bold bright_cyan]\n")
@@ -3719,14 +3721,14 @@ def run_lua_compiler(data_path: Path):
 
     if success:
         target_dirs = [
-            data_path / "LUA",
-            data_path / "RESULT",
-            data_path / "REPLACE",
-            data_path / "INJECT",
-            Path("/sdcard/FeaturesticLeaks/LUA"),
-            Path("/sdcard/FeaturesticLeaks/RESULT"),
-            Path("/sdcard/FeaturesticLeaks/REPLACE"),
-            Path("/sdcard/FeaturesticLeaks/INJECT")
+            data_path / "LUA_WORKSPACE" / "4_RESULT",
+            data_path / "LUA_WORKSPACE" / "3_COMPILED",
+            data_path / "PAK_WORKSPACE" / "3_REPLACE",
+            data_path / "PAK_WORKSPACE" / "4_INJECT",
+            Path("/sdcard/FeaturesticLeaks/LUA_WORKSPACE/4_RESULT"),
+            Path("/sdcard/FeaturesticLeaks/LUA_WORKSPACE/3_COMPILED"),
+            Path("/sdcard/FeaturesticLeaks/PAK_WORKSPACE/3_REPLACE"),
+            Path("/sdcard/FeaturesticLeaks/PAK_WORKSPACE/4_INJECT")
         ]
         for td in target_dirs:
             try:
@@ -4187,16 +4189,9 @@ def show_workflow_guide():
 def install_termux_shortcut_and_sdcard(data_path: Path):
     console.print("\n[bold cyan][+] Setting up Termux Shortcuts ('leak', 'paktool') & SDCard Workspace...[/bold cyan]")
     
-    sdcard_path = Path("/sdcard/FeaturesticLeaks")
     try:
-        sdcard_path.mkdir(parents=True, exist_ok=True)
-        (sdcard_path / "PAK").mkdir(parents=True, exist_ok=True)
-        (sdcard_path / "REPLACE").mkdir(parents=True, exist_ok=True)
-        (sdcard_path / "INJECT").mkdir(parents=True, exist_ok=True)
-        (sdcard_path / "RESULT").mkdir(parents=True, exist_ok=True)
-        (sdcard_path / "UNPACK").mkdir(parents=True, exist_ok=True)
-        (sdcard_path / "LUA").mkdir(parents=True, exist_ok=True)
-        console.print(f"[bold green][OK] SDCard Workspace Created: /sdcard/FeaturesticLeaks/[/bold green]")
+        ensure_directories(data_path)
+        console.print(f"[bold green][OK] SDCard Workspace Created cleanly: /sdcard/FeaturesticLeaks/[/bold green]")
     except Exception:
         console.print(f"[yellow][!] Notice: SDCard folder permission check skipped.[/yellow]")
     
