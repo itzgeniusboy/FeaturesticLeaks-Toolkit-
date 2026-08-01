@@ -562,28 +562,37 @@ class PakCrypto:
             return result
     @staticmethod
     def _meowmeow(buffer) -> bytes:
-        def unpad(x):
-            skip = 1 + next((i for i in range(len(x)) if x[i]!= 0))
-            return x[skip:]
+        def safe_unpad_inner(x):
+            try:
+                skip = 1 + next((i for i in range(len(x)) if x[i] != 0))
+                return x[skip:]
+            except (StopIteration, Exception):
+                return x.strip(b'\x00')
         if len(buffer) < 43:
             return bytes()
         else:
-            x1 = buffer[1:][:SHA1.digest_size]
-            x2 = buffer[SHA1.digest_size + 1:]
-            x1 = PakCrypto._xorxor(x1, PakCrypto._hashhash(x2, len(x1)))
-            x2 = PakCrypto._xorxor(x2, PakCrypto._hashhash(x1, len(x2)))
-            part1, m = (x2[:SHA1.digest_size], x2[SHA1.digest_size:])
-            if part1!= SHA1.new(b'\x00' * SHA1.digest_size).digest():
+            try:
+                x1 = buffer[1:][:SHA1.digest_size]
+                x2 = buffer[SHA1.digest_size + 1:]
+                x1 = PakCrypto._xorxor(x1, PakCrypto._hashhash(x2, len(x1)))
+                x2 = PakCrypto._xorxor(x2, PakCrypto._hashhash(x1, len(x2)))
+                part1, m = (x2[:SHA1.digest_size], x2[SHA1.digest_size:])
+                if part1 != SHA1.new(b'\x00' * SHA1.digest_size).digest():
+                    return bytes()
+                else:
+                    return safe_unpad_inner(m)
+            except Exception:
                 return bytes()
-            else:
-                return unpad(m)
     @staticmethod
     def rsa_extract(signature: bytes, modulus: bytes) -> bytes:
-        c = int.from_bytes(signature, 'little')
-        n = int.from_bytes(modulus, 'little')
-        e = 65537
-        m = pow(c, e, n).to_bytes(256, 'little').rstrip(b'\x00')
-        return PakCrypto._meowmeow(Misc.pad_to_n(m, 4))
+        try:
+            c = int.from_bytes(signature, 'little')
+            n = int.from_bytes(modulus, 'little')
+            e = 65537
+            m = pow(c, e, n).to_bytes(256, 'little').rstrip(b'\x00')
+            return PakCrypto._meowmeow(Misc.pad_to_n(m, 4))
+        except Exception:
+            return bytes()
     @staticmethod
     def _decrypt_simple1(ciphertext) -> bytes:
         return bytes((x ^ SIMPLE1_DECRYPT_KEY for x in ciphertext))
@@ -626,14 +635,19 @@ class PakCrypto:
     @staticmethod
     def decrypt_index(ciphertext, pak_info: TencentPakInfo) -> bytes:
         if pak_info.version > 7:
-            key = PakCrypto.rsa_extract(pak_info.packed_key, RSA_MOD_1)
-            iv = PakCrypto.rsa_extract(pak_info.packed_iv, RSA_MOD_1)
-            assert len(key) == 32 and len(iv) == 32, "SM4 key and IV length must be 32 bytes"
-            aes = AES.new(key, MODE_CBC, iv[:16])
-            decrypted = aes.decrypt(ciphertext)
+            try:
+                key = PakCrypto.rsa_extract(pak_info.packed_key, RSA_MOD_1)
+                iv = PakCrypto.rsa_extract(pak_info.packed_iv, RSA_MOD_1)
+                if len(key) != 32 or len(iv) != 32:
+                    return ciphertext
+                aes = AES.new(key, MODE_CBC, iv[:16])
+                decrypted = aes.decrypt(ciphertext)
+            except Exception:
+                return ciphertext
+
             try:
                 return unpad(decrypted, AES.block_size)
-            except ValueError:
+            except Exception:
                 if len(decrypted) > 0:
                     last_byte = decrypted[-1]
                     if 1 <= last_byte <= AES.block_size:
