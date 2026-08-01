@@ -4555,10 +4555,17 @@ def pick_file_from_folder(action_title: str, default_folder: Path, extensions: L
         if sd_twin.exists() and sd_twin != target_path:
             scan_dirs.append(sd_twin)
             
+        sd_base = Path("/sdcard/FeaturesticLeaks")
+        if sd_base.exists() and sd_base != target_path and sd_base not in scan_dirs:
+            # Also add /sdcard/FeaturesticLeaks/LUA or PAK if target_path ends with LUA/PAK
+            sd_sub = sd_base / target_path.name
+            if sd_sub.exists() and sd_sub not in scan_dirs:
+                scan_dirs.append(sd_sub)
+            
         for sdir in scan_dirs:
             if sdir.exists() and sdir.is_dir():
                 for p in sdir.iterdir():
-                    if p.is_file() and any(p.name.lower().endswith(ext) for ext in extensions):
+                    if p.is_file() and any(p.name.lower().endswith(ext.lower()) for ext in extensions):
                         if not any(existing.name.lower() == p.name.lower() for existing in found_files):
                             found_files.append(p)
         
