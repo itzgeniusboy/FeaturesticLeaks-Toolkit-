@@ -1099,15 +1099,17 @@ def repack_pak_file_full(pak_file, edited_root, output_path, target_path=None, f
     # Get all files from edit folder or file
     edit_files = []
     edit_p = Path(edited_root)
+    ignored_names = {'.gitkeep', '.ds_store', 'desktop.ini', 'thumbs.db'}
     if edit_p.is_file():
-        edit_files.append(edit_p)
+        if edit_p.name.lower() not in ignored_names and not edit_p.name.startswith('.'):
+            edit_files.append(edit_p)
     elif edit_p.is_dir():
         for p in edit_p.rglob('*'):
-            if p.is_file():
+            if p.is_file() and p.name.lower() not in ignored_names and not p.name.startswith('.'):
                 edit_files.append(p)
     
     if not edit_files:
-        console.print(f'[bold red][X] Source folder ({edited_root}) me koi file nahi mili. Pehle files is folder me daalo.[/bold red]')
+        console.print(f'[bold red][X] Source folder ({edited_root}) me koi valid file nahi mili. Pehle edited files is folder me daalo.[/bold red]')
         return 0
     
     console.print(f'[bold cyan][+] Found {len(edit_files)} file(s) to process[/bold cyan]')
@@ -5678,16 +5680,19 @@ def pak_obb_tools_menu(data_path: Path):
                     continue
 
                 cand_dirs = [
-                    data_path / "REPLACE",
                     Path("/sdcard/FeaturesticLeaks/REPLACE"),
-                    data_path / "PAK TOOL" / "EDIT",
-                    Path("/sdcard/FeaturesticLeaks/PAK TOOL/EDIT")
+                    data_path / "REPLACE",
+                    Path("/sdcard/FeaturesticLeaks/PAK TOOL/EDIT"),
+                    data_path / "PAK TOOL" / "EDIT"
                 ]
                 actual_edit_path = None
+                ignored_names = {'.gitkeep', '.ds_store', 'desktop.ini', 'thumbs.db'}
                 for cd in cand_dirs:
-                    if cd.exists() and any(cd.iterdir()):
-                        actual_edit_path = cd
-                        break
+                    if cd.exists():
+                        valid_files = [p for p in cd.rglob('*') if p.is_file() and p.name.lower() not in ignored_names and not p.name.startswith('.')]
+                        if valid_files:
+                            actual_edit_path = cd
+                            break
 
                 if not actual_edit_path:
                     console.print('[yellow][!] REPLACE source folder me koi file nahi mili![/yellow]')
@@ -5737,16 +5742,19 @@ def pak_obb_tools_menu(data_path: Path):
                     continue
 
                 cand_dirs = [
-                    data_path / "INJECT",
                     Path("/sdcard/FeaturesticLeaks/INJECT"),
-                    data_path / "REPLACE",
-                    Path("/sdcard/FeaturesticLeaks/REPLACE")
+                    data_path / "INJECT",
+                    Path("/sdcard/FeaturesticLeaks/REPLACE"),
+                    data_path / "REPLACE"
                 ]
                 actual_edit_path = None
+                ignored_names = {'.gitkeep', '.ds_store', 'desktop.ini', 'thumbs.db'}
                 for cd in cand_dirs:
-                    if cd.exists() and any(cd.iterdir()):
-                        actual_edit_path = cd
-                        break
+                    if cd.exists():
+                        valid_files = [p for p in cd.rglob('*') if p.is_file() and p.name.lower() not in ignored_names and not p.name.startswith('.')]
+                        if valid_files:
+                            actual_edit_path = cd
+                            break
 
                 if not actual_edit_path:
                     console.print('[yellow][!] INJECT source folder me koi file nahi mili![/yellow]')
