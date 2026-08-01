@@ -1,6 +1,6 @@
-# 📖 FeaturesticLeaks PAK & LUA Master Suite v2.5 — Official Step-by-Step Guide & Manual (Hinglish)
+# 📖 FeaturesticLeaks PAK & LUA Master Suite v2.6 — Official Step-by-Step Guide & Manual (Hinglish)
 
-Is official manual me **FeaturesticLeaks PAK & LUA Master Suite v2.5** ke har ek feature, menu option aur process ko bilkul saral aur detailed Hindi-English (Hinglish) me samjhaya gaya hai.
+Is official manual me **FeaturesticLeaks PAK & LUA Master Suite v2.6** ke har ek feature, menu option aur process ko bilkul saral aur detailed Hindi-English (Hinglish) me samjhaya gaya hai.
 
 ---
 
@@ -46,7 +46,7 @@ python FeaturesticLeaks.py
 
 ---
 
-## 💡 3. Quick Launch Shortcuts
+## 💡 3. Quick Launch Shortcuts & Telegram Bot Setup
 
 Tool ko baar-baar poora path likhe bina launch karne ke liye:
 
@@ -61,24 +61,30 @@ Tool ko baar-baar poora path likhe bina launch karne ke liye:
    paktool
    ```
 
-3. **`run.sh` Launcher**:
+3. **Telegram Bot Launch (`python telegram_bot.py`)**:
    ```bash
-   ./run.sh
+   python telegram_bot.py
    ```
+   > 💡 **Interactive Token Prompt**: Token set na hone par bot interactive input box dikhayega. Aap apna `@BotFather` token paste karenge toh bot ise `telegram_bot_config.json` me automatic save kar lega aur launch ho jayega!
 
 ---
 
-## 📂 4. SDCard Storage Workspace (`/sdcard/FeaturesticLeaks/`)
+## 📂 4. Clean & Organized Workspace (`/sdcard/FeaturesticLeaks/`)
 
-Tool launch hote hi aapki internal storage me automatically yeh folders ban jaate hain (ZArchiver me direct dikhenge):
+Tool launch hote hi aapki internal storage me automatically yeh structured folders ban jaate hain (ZArchiver me direct bilkul clean dikhenge):
 
-* **`/sdcard/FeaturesticLeaks/PAK/`**: Apni original `.pak` ya `.obb` file yahan rakhein.
-* **`/sdcard/FeaturesticLeaks/UNPACK/`**: Unpack ki hui extracted files yahan aayengi.
-* **`/sdcard/FeaturesticLeaks/REPLACE/`**: Replacement ke liye edited files ko yahan rakhein.
-* **`/sdcard/FeaturesticLeaks/INJECT/`**: Nayi files jo custom path par inject karni hon unhe yahan rakhein.
-* **`/sdcard/FeaturesticLeaks/LUA/`**: Plain `.lua` ya compiled `.luac` scripts yahan rakhein.
-* **`/sdcard/FeaturesticLeaks/DUMP_LOGS/`**: Audit reports, dumps aur logs yahan save hongi.
-* **`/sdcard/FeaturesticLeaks/RESULT/`**: Final modded `.pak`, `.obb`, `.lua`, aur generated scripts yahan milenge.
+### 📦 **`PAK_WORKSPACE/`** (PAK & OBB Modding Workspace)
+* **`1_PAK_INPUT/`**: Apni original `.pak` ya `.obb` file yahan rakhein.
+* **`2_UNPACK/`**: Unpack ki hui extracted files aur assets yahan aayengi.
+* **`3_REPLACE/`**: Size-independent replacement ke liye edited files yahan rakhein.
+* **`4_INJECT/`**: Target path injection ke liye custom files yahan rakhein.
+* **`5_RESULT/`**: Final repacked `.pak` aur `.obb` files yahan save hongi.
+
+### 🌙 **`LUA_WORKSPACE/`** (Lua Scripts Modding Workspace)
+* **`1_LUA_INPUT/`**: Plain `.lua` ya compiled `.luac` scripts yahan rakhein.
+* **`2_DECOMPILED/`**: Decompiled readable `.lua` source files yahan milenge.
+* **`3_COMPILED/`**: Compiled `.luac` bytecode files yahan save honge.
+* **`4_RESULT/`**: Final processed, auto-fixed aur merged master scripts yahan milenge.
 
 ---
 
@@ -92,24 +98,24 @@ Tool launch hote hi aapki internal storage me automatically yeh folders ban jaat
 * **Kya Kaam Karta Hai**:
   Game ke `.pak` ya `.obb` files ko decrypt aur decompress karke pure raw assets (textures, uassets, configs, lua scripts) readable folders me extract karta hai.
 * **Step-by-Step Process**:
-  1. Apni original `.pak` ya `.obb` file ko `/sdcard/FeaturesticLeaks/PAK/` folder me rakhein.
+  1. Apni original `.pak` ya `.obb` file ko `/sdcard/FeaturesticLeaks/PAK_WORKSPACE/1_PAK_INPUT/` folder me rakhein.
   2. Main Menu me `1` (PAK / OBB & Game Modding Tools) press karein.
   3. Option `1` (Unpack Package) select karein.
-  4. Tool automatic `/sdcard/FeaturesticLeaks/PAK/` scan karke files ki list dikhayega.
+  4. Tool automatic input folder scan karke files ki list dikhayega.
   5. Apni file ka index number (jaise `1`) enter karein.
-  6. Extraction complete hone par saari files `/sdcard/FeaturesticLeaks/UNPACK/<pak_name>/` folder me mil jayengi.
+  6. Extraction complete hone par saari files `/sdcard/FeaturesticLeaks/PAK_WORKSPACE/2_UNPACK/<pak_name>/` folder me mil jayengi.
 
 ---
 
 #### **[2] Repack & Inject Tools (3 Advanced Sub-Modes)**
 Option `2` chunte hi aapko 3 Modes milenge:
 
-* **Mode 1: Repack Full Workspace (REPACK Folder)**:
-  - **Process**: Pehle Option 1 se unpack karein, `UNPACK/<pak_name>/` me changes karein. Phir Option `2` -> `1` chuniye. Tool auto-detect karega ki file `MINI_OBB`, `GAMEPATCH`, ya `OBBZSDIC` mode me compressed hai aur clean `.pak` / `.obb` file `/sdcard/FeaturesticLeaks/RESULT/` me build kar dega.
+* **Mode 1: Repack Full Workspace**:
+  - **Process**: Pehle Option 1 se unpack karein, `2_UNPACK/<pak_name>/` me changes karein. Phir Option `2` -> `1` chuniye. Tool auto-detect karega ki file `MINI_OBB`, `GAMEPATCH`, ya `OBBZSDIC` mode me compressed hai aur clean `.pak` / `.obb` file `5_RESULT/` me build kar dega.
 * **Mode 2: Replace Edited Files (Replace Mode)**:
-  - **Process**: Poori pak unpack kiye bina fast & safe editing ke liye! Original `.pak` ko `PAK/` folder me rakhein aur modified files ko `/sdcard/FeaturesticLeaks/REPLACE/` me. Option `2` -> `2` select karein. Tool index hash aur offsets rebuild karke size-independent replace karke result generate kar dega.
+  - **Process**: Poori pak unpack kiye bina fast & safe editing ke liye! Original `.pak` ko `1_PAK_INPUT/` me rakhein aur modified files ko `3_REPLACE/` me. Option `2` -> `2` select karein. Tool index hash aur offsets rebuild karke size-independent replace karke result generate kar dega.
 * **Mode 3: Inject Files to Custom Target Path (Path Injector)**:
-  - **Process**: Nayi files ko PAK container ke andar specific internal path par inject karne ke liye! Source files ko `/sdcard/FeaturesticLeaks/INJECT/` me rakhein. Option `2` -> `3` chuniye aur target internal path (e.g. `Content/Lua/GameLua/Mod/BRMod/Gameplay/Core` ya `ShadowTrackerExtra/Saved/Paks`) paste karein. Tool 100% login-stuck & crash-proof file inject kar dega.
+  - **Process**: Nayi files ko PAK container ke andar specific internal path par inject karne ke liye! Source files ko `4_INJECT/` me rakhein. Option `2` -> `3` chuniye aur target internal path (e.g. `Content/Lua/GameLua/Mod/BRMod/Gameplay/Core`) paste karein. Tool 100% login-stuck & crash-proof file inject kar dega.
 
 ---
 
@@ -123,87 +129,45 @@ Option `2` chunte hi aapko 3 Modes milenge:
 
 #### **[4] OBB Manager (Byte-Exact Size Padding)**
 * **Kya Kaam Karta Hai**: `.obb` archives ko extract karta hai aur editing ke baad rezip karte waqt exact original byte-size maintaining size padding add karta hai (jisse size check error ya game crash bilkul nahi hota).
-* **Process**:
-  1. `1` (Unzip OBB) select karke extract karein aur edit karein.
-  2. `2` (Rezip OBB) select karein. Tool automatically byte padding add karke original file size match kar dega.
 
 ---
 
-#### **[5] PAK Compare & Dump**
-* **Process**:
-  1. **Compare 2 PAKs**: Do `.pak` files ko compare karke added, removed aur modified files ka exact difference dikhata hai.
-  2. **PAK Index / Offset / Hash Dump**: PAK file ke internal structure, offsets, hashes aur encryption details ko `DUMP_LOGS/Dump_<pak_name>.txt` me export kar deta hai.
-
----
-
-### 🌙 CATEGORY 2: LUA MASTER SUITE
+### 🌙 CATEGORY 2: LUA MASTER SUITE & TELEGRAM AI BOT
 
 #### **[1] Decompile & Fix Lua**
 * **Kya Kaam Karta Hai**: Game ke compiled `.luac` bytecode ko human-readable `.lua` source code me decompile karta hai aur corrupted bytecode headers ko auto-fix karta hai.
-* **Process**: File ko `/sdcard/FeaturesticLeaks/LUA/` me rakhein, Option `2` -> `1` select karein.
+* **Process**: File ko `/sdcard/FeaturesticLeaks/LUA_WORKSPACE/1_LUA_INPUT/` me rakhein, Option `2` -> `1` select karein. Result `2_DECOMPILED/` me mil jayega.
 
 #### **[2] Compile Lua Source**
-* **Kya Kaam Karta Hai**: Plain `.lua` text code ko fast execution `.luac` bytecode file me convert karta hai.
-* **Process**: Option `2` -> `2` chuniye aur source `.lua` file select karein. Output `RESULT/` me mil jayega.
+* **Kya Kaam Karta Hai**: Plain `.lua` text code ko fast execution `.luac` bytecode file me convert karta hai. Output `3_COMPILED/` me save ho jata hai.
 
 #### **[3] Merge & Create GG Menu (Lua Script Merger)**
-* **Kya Kaam Karta Hai**: Multiple `.lua` scripts ko modular `do...end` blocks me combine karke ek single master GameGuard Menu Studio script me convert karta hai.
-* **Process**: Saari `.lua` files ko `/sdcard/FeaturesticLeaks/LUA/` me rakhein aur Option `2` -> `3` chuniye. Final merged script `/sdcard/FeaturesticLeaks/RESULT/Master_Merged_Script.lua` me ban jayegi.
+* **Kya Kaam Karta Hai**: Multiple `.lua` scripts ko modular `do...end` blocks me combine karke ek single master GameGuard Menu Studio script me convert karta hai. Final script `4_RESULT/Master_Merged_Script.lua` me ban jayegi.
 
-#### **[4] PAK & Lua Installer Tool**
-* **Sub-Option 1 (Embed PAK into Lua Installer)**:
-  - `.pak` file ko Base64 encode karke GG Lua script ke andar embed kar deta hai jo run karne par direct PAK target folder me install kar deta hai.
-* **Sub-Option 2 (Extract PAK Payload from Lua Script)**:
-  - Base64/Hex embedded GG Lua installer script me se original PAK file extract kar leta hai.
-
-#### **[5] Universal Lua Packer & Unpacker**
-* **Sub-Option 1 (Unpack Tagged Lua File)**:
-  - 8-byte magic tag (`B64_____`, `XOR_____`, `ZLIB____`, `RAW_____`) ko auto-detect karke encrypted script ko unpack karta hai.
-* **Sub-Option 2 (Pack Lua File)**:
-  - Script ko custom 8-byte tag se encrypt/pack karta hai.
-
-#### **[6] Security & Protection**
-* **Sub-Option 1 (String Obfuscator & Dumper)**:
-  - Script ke sabhi string literals ko Hex/Base64/XOR me encode karta hai, aur report me URLs, IP addresses, memory offsets (0x...) dump karta hai.
-* **Sub-Option 2 (Anti-Bypass Security Audit)**:
-  - Script me GameGuard calls (`gg.searchNumber`, `gg.editAll`), clearance hooks aur security risks scan karke 0-100 risk score matrix report generate karta hai.
-* **Sub-Option 3 (Bytecode Header Fixer)**:
-  - Corrupted magic headers (Lua 5.1 / 5.3 / LuaJIT) ko repair karta hai.
-
-#### **[7] Minifier & GG Code Studio**
-* **Sub-Option 1 (Lua Script Optimizer / Minifier)**:
-  - Unnecessary comments aur extra spaces strip karta hai, file size reduce karta hai aur pre-flight syntax check (`if`, `function`, `end` balance) karta hai.
-* **Sub-Option 2 (GG Memory Code Generator)**:
-  - Search & Edit, Freeze Values, Speedhack Toggle, aur Anti-Cheat Stealth Log Cleaner ke production-ready Lua code snippets automatic generate karke `RESULT/` me save kar deta hai.
+#### **[4] Telegram AI Modding Bot (`telegram_bot.py`)**
+* **Features**:
+  - Interactive bot token configuration.
+  - Multi-key API pool (Gemini & Groq) with automatic key rotation.
+  - Send `.lua` or `.luac` file directly to Telegram bot chat: Bot automatically performs syntax auto-fix, compilation to `.luac` or decompilation to `.lua`, and sends result back in seconds!
 
 ---
 
 ### 🛠️ CATEGORY 3: UTILITIES & HELP
 
-#### **[1] UE4 String Tool**
-* `.uasset` / `.uexp` binary files me se text strings dump karta hai aur modify karke wapas repack karta hai.
-
-#### **[2] File Finder**
-* PAK workspace ya folders me keyword dwara target files search karta hai.
-
-#### **[3] Termux Auto-Setup**
-* Termux terminal me `leak` shortcut command configure karta hai.
-
-#### **[4] Cleanup Workspace**
-* Extra temporary working folders ko delete karke storage space clear karta hai.
+#### **[1] UE4 String Tool**: `.uasset` / `.uexp` binary files me se text strings dump karta hai aur modify karke wapas repack karta hai.
+#### **[2] File Finder**: PAK workspace ya folders me keyword dwara target files search karta hai.
+#### **[3] Termux Auto-Setup**: Termux terminal me `leak` shortcut command configure karta hai.
+#### **[4] Cleanup Workspace**: Extra temporary working folders ko delete karke storage space clear karta hai.
 
 ---
 
 ## ❓ Common FAQs & Troubleshooting
 
-### **Q1: `Padding is incorrect` error aata tha pehle?**
-* **Answer**: Tool me ab auto-fallback unpad mechanism implement ho chuka hai, ab kisi bhi PAK unpack me padding error nahi aayega!
+### **Q1: Bot Token enter karne ka prompt kaise aayega?**
+* **Answer**: Aap simply `python telegram_bot.py` run karein. Agar environment variable ya config me token nahi milta, toh script interactively `@BotFather` se mila token maangegi aur use `telegram_bot_config.json` me save karke bot launch kar degi!
 
-### **Q2: File list me meri `.lua` ya `.pak` file nahi dikh rahi?**
-* **Answer**: Apni file ko `/sdcard/FeaturesticLeaks/PAK/` ya `/sdcard/FeaturesticLeaks/LUA/` folder me rakhein, tool us path se auto-scan kar leta hai.
-
-### **Q3: Shortcut command `leak` kaise set karein?**
-* **Answer**: Option `3` (Utilities) -> Option `3` (Termux Auto-Setup) chuniye. Iske baad Termux me direct `leak` type karke app launch kar sakte hain.
+### **Q2: File Manager me pehle ke saare folders kahan gaye?**
+* **Answer**: Purane bikhre hue folders auto-clean ho chuke hain! Ab sirf do organized main folders **`PAK_WORKSPACE`** aur **`LUA_WORKSPACE`** rahenge, jiske andar numeric sub-folders (`1_PAK_INPUT`, `2_UNPACK`, `3_REPLACE`, `4_INJECT`, `5_RESULT`) honge.
 
 ---
 
@@ -212,4 +176,5 @@ Option `2` chunte hi aapko 3 Modes milenge:
 * **Main Developer**: **[@L359D](https://t.me/L359D)** (VIP Developer)
 * **Official Telegram Channel**: **[t.me/FeaturesticLeaks](https://t.me/FeaturesticLeaks)**
 * **Supported Platform**: Termux / Android Linux / Windows / Linux
+
 

@@ -1912,6 +1912,23 @@ def ensure_directories(base_dir: Path):
                                 leg_p.rmdir()
                         except Exception:
                             pass
+
+            # Auto-clean non-essential Web UI & Markdown files on Android/Termux user environment
+            if Path("/sdcard").exists() or "TERMUX_VERSION" in os.environ or Path("/data/data/com.termux").exists():
+                junk_items = [
+                    "README.md", "DOCUMENTATION.md", "index.html", "src",
+                    "vite.config.ts", "tsconfig.json", "package.json", "metadata.json", "bun.lock"
+                ]
+                for item in junk_items:
+                    p = base_dir / item
+                    if p.exists():
+                        try:
+                            if p.is_dir():
+                                shutil.rmtree(p, ignore_errors=True)
+                            else:
+                                p.unlink(missing_ok=True)
+                        except Exception:
+                            pass
     except Exception:
         pass
 

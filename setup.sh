@@ -16,6 +16,14 @@ pkg update -y && pkg install -y python python-pip termux-api jq lua51 luajit zst
 echo "[3/4] Installing Python requirements..."
 pip install rich requests pytz gmalg pycryptodome zstandard
 
+echo "[Clean] Removing non-essential documentation & Web UI files for clean mobile workspace..."
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+for junk in "README.md" "DOCUMENTATION.md" "index.html" "src" "vite.config.ts" "tsconfig.json" "package.json" "metadata.json" "bun.lock"; do
+    if [ -e "$SCRIPT_DIR/$junk" ]; then
+        rm -rf "$SCRIPT_DIR/$junk" 2>/dev/null || true
+    fi
+done
+
 echo "[4/4] Creating SDCard & workspace folders..."
 mkdir -p /sdcard/FeaturesticLeaks/PAK
 mkdir -p /sdcard/FeaturesticLeaks/REPLACE

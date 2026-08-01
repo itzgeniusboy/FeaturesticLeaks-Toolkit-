@@ -1,4 +1,4 @@
-# ⚡ FEATURESTIC LEAKS PAK & LUA MASTER SUITE v2.5
+# ⚡ FEATURESTIC LEAKS PAK & LUA MASTER SUITE v2.6
 
 > **Termux / Android Game Reverse Engineering, PAK Manipulation & Universal Lua Suite**  
 > Complete high-performance reverse engineering suite for unpacking, repacking, path-injecting, rebuilding Unreal Engine / Tencent `.pak` & `.obb` containers, dumping skin assets, and managing Lua bytecode natively on Termux, Android Linux, and PC.
@@ -9,7 +9,7 @@
 
 * **Developer Telegram**: [@L359D](https://t.me/L359D) (VIP Developer)
 * **Official Telegram Channel**: [https://t.me/FeaturesticLeaks](https://t.me/FeaturesticLeaks)
-* **Tool Version**: `FeaturesticLeaks PAK & LUA Master Suite v2.5`
+* **Tool Version**: `FeaturesticLeaks PAK & LUA Master Suite v2.6`
 * **Supported Platform**: Termux / Android Linux / Windows / Linux
 
 ---
@@ -57,14 +57,14 @@ cd ~ && git clone https://github.com/itzgeniusboy/FeaturesticLeaks-Toolkit-.git
 cd FeaturesticLeaks-Toolkit-
 ```
 
-### **Step 6: Tool Run Karein**
+### **Step 6: Tool Launch Karein**
 ```bash
 python FeaturesticLeaks.py
 ```
 
 ---
 
-## 💡 Quick Launch Shortcuts
+## 💡 Quick Launch Shortcuts & Telegram Bot
 
 Shortcut commands through tool ko Termux me kisi bhi location se launch kar sakte hain:
 
@@ -76,41 +76,37 @@ Shortcut commands through tool ko Termux me kisi bhi location se launch kar sakt
    ```bash
    paktool
    ```
-3. **Auto-Launcher Script**:
+3. **Telegram Bot Runner**:
    ```bash
-   chmod +x run.sh && ./run.sh
+   python telegram_bot.py
    ```
+   > 💡 **Interactive Bot Token Prompt**: If no token is set in environment or config, `telegram_bot.py` will ask interactively for your `@BotFather` token and save it automatically to `telegram_bot_config.json`.
 
 ---
 
-## 📁 Automatic Workspace Structure
+## 📂 Clean & Organized Workspace Structure
 
-Tool launch hote hi local folder aur SDCard (`/sdcard/FeaturesticLeaks/`) me automatic workspace paths generate ho jate hain:
+Tool launch hote hi SDCard (`/sdcard/FeaturesticLeaks/`) me structured workspace system automatically setup ho jata hai, jisse File Manager (ZArchiver) bilkul clean rehta hai:
 
 ```text
-FeaturesticLeaks-Toolkit-/
-├── FeaturesticLeaks.py       <-- Main Termux Python Tool Engine
-├── run.sh                    <-- Shell Auto-Launcher
-├── setup.sh                  <-- Termux Shortcut & Folder Setup
-├── README.md                 <-- Tool Summary & Credits
-├── DOCUMENTATION.md          <-- Complete Step-by-Step Manual
+/sdcard/FeaturesticLeaks/
+├── 📦 PAK_WORKSPACE/            <-- Everything related to PAK & OBB Modding
+│   ├── 📥 1_PAK_INPUT/          <-- Put original game .pak / .obb files here
+│   ├── 📂 2_UNPACK/             <-- Extracted folders & assets
+│   ├── ✏️ 3_REPLACE/            <-- Put edited files here for replacement mode
+│   ├── 💉 4_INJECT/             <-- Put custom files for direct path injection
+│   └── 🚀 5_RESULT/             <-- Final repacked .pak & .obb files
 │
-├── PAK/                      <-- Original .pak / .obb files yahan rakhein
-├── UNPACK/                   <-- Extracted files & debug logs
-├── REPLACE/                  <-- Modified files for size-independent replacement
-├── INJECT/                   <-- Custom files for direct path injection
-├── LUA/                      <-- .lua / .luac scripts for Lua tools
-├── DUMP_LOGS/                <-- Skin asset logs & Lua audit reports
-├── RESULT/                   <-- Final modded .pak, .obb, .lua & skin dumps output
+├── 🌙 LUA_WORKSPACE/            <-- Everything related to Lua Scripts Modding
+│   ├── 📜 1_LUA_INPUT/          <-- Put .lua / .luac scripts here
+│   ├── 🔓 2_DECOMPILED/         <-- Decompiled .lua source files
+│   ├── ⚙️ 3_COMPILED/           <-- Compiled .luac bytecode files
+│   └── 🎉 4_RESULT/             <-- Final processed & merged scripts
 │
-└── PAK TOOL/                 <-- Path Injector Workspace
-    ├── PAK/                  <-- Target .pak files
-    ├── EDIT/                 <-- Modified assets to replace/inject
-    ├── UNPACK/               <-- Sub-unpack output
-    └── RESULT/               <-- Final output PAK
+└── 📋 LOGS/                    <-- System logs & debug reports
 ```
 
-> 💡 **SDCard Direct Access**: Files ko aap direct `/sdcard/FeaturesticLeaks/` ke subfolders (`PAK`, `UNPACK`, `REPLACE`, `INJECT`, `LUA`, `RESULT`, `DUMP_LOGS`) me rakh kar process kar sakte hain (ZArchiver me direct dikhega).
+> 💡 **Clean File Manager Experience**: Pehle ke faltu aur bikhre hue folders auto-clean ho jaate hain. Aap ZArchiver me direct `/sdcard/FeaturesticLeaks/` open karke easily manage kar sakte hain.
 
 ---
 
@@ -124,21 +120,22 @@ FeaturesticLeaks-Toolkit-/
 5. **White Body Mod**: One-click character asset nuller tool.
 6. **Skin ID Swap & Skin Asset Dumper**:
    - Swaps Lobby, Ingame, Weapon, Hit Effect & Deadbox skin IDs inside `.uasset` / `.uexp` binaries.
-   - **Skin Assets Dumper**: Scans PAK files or UNPACK folders for skin textures, meshes, uassets/uexps, generates `.txt` and `.json` reports, and exports raw skin assets directly to `RESULT/SKINS_DUMP/`.
+   - **Skin Assets Dumper**: Scans PAK files or UNPACK folders for skin textures, meshes, uassets/uexps, generates `.txt` and `.json` reports, and exports raw skin assets.
 7. **OBB Manager**: Unzips OBB containers and rezips with byte-exact padding to match original file sizes.
 
-### 🌙 2. Lua Master Suite
+### 🌙 2. Lua Master Suite & Telegram AI Bot
 1. **Compile Lua**: Converts `.lua` source code into `.luac` bytecode.
 2. **Decompile Lua**: Converts `.luac` bytecode back to readable `.lua` source text.
 3. **Embed PAK into Lua**: Converts `.pak` into Base64 payload and embeds it directly into a GameGuard Lua installer script.
-4. **Universal Pack Lua**: Encodes Lua scripts using extensible plugin architecture with fixed 8-byte ASCII tags (`B64_____`, `XOR_____`, `ZLIB____`, `RAW_____`).
-5. **Universal Unpack Lua**: Reads 8-byte magic tag, auto-detects algorithm, and decodes byte-for-byte losslessly.
-6. **Lua String Obfuscator & Dumper Engine**:
-   - Encrypts all string literals with Hex/Base64/XOR and injects a runtime decoder wrapper.
-   - Extracts and dumps all string constants, URLs, IP addresses, and memory offsets into `DUMP_LOGS/`.
-7. **Anti-Bypass & Security Analyzer**: Audits Lua scripts for GameGuard memory calls (`gg.editAll`, `gg.searchNumber`), clearance hooks, and security risks with a 0-100 risk score report.
-8. **Bytecode Header Fixer & Debug Stripper**: Repairs corrupted magic headers for Lua 5.1 (`1B 4C 75 61 51 00...`) or LuaJIT (`1B 4C 4A 02...`), and strips debug local symbols.
-9. **Lua Script Merger**: Merges multiple `.lua` scripts into a clean, modular `Master_Merged_Script.lua` file wrapped in `do...end` blocks.
+4. **Universal Pack & Unpack Lua**: Encodes/decodes Lua scripts using extensible plugin architecture with fixed 8-byte ASCII tags (`B64_____`, `XOR_____`, `ZLIB____`, `RAW_____`).
+5. **Lua String Obfuscator & Dumper Engine**: Encrypts string literals with Hex/Base64/XOR wrappers and dumps URLs/IPs.
+6. **Anti-Bypass & Security Analyzer**: Audits Lua scripts for GameGuard memory calls and outputs a 0-100 risk score report.
+7. **Bytecode Header Fixer**: Repairs corrupted magic headers for Lua 5.1 (`1B 4C 75 61 51 00...`) or LuaJIT (`1B 4C 4A 02...`).
+8. **Lua Script Merger**: Merges multiple `.lua` scripts into a clean, modular `Master_Merged_Script.lua` file wrapped in `do...end` blocks.
+9. **Telegram AI & Modding Bot (`telegram_bot.py`)**:
+   - Interactive Token Setup & config saving (`telegram_bot_config.json`).
+   - Multi-key API pool with auto rotation for Gemini & Groq AI models.
+   - Direct Telegram file handlers: Auto syntax repair, compile `.lua` -> `.luac`, and decompile scripts directly in Telegram chat!
 
 ### 🛠️ 3. Utilities & Help
 1. **UE4 String Tool**: Extract and repack readable string literals inside `.uasset` / `.uexp` binary files.
@@ -153,3 +150,4 @@ FeaturesticLeaks-Toolkit-/
 * **Main Developer**: **[@L359D](https://t.me/L359D)**
 * **Official Telegram Channel**: **[t.me/FeaturesticLeaks](https://t.me/FeaturesticLeaks)**
 * **Platform**: Termux / Android Linux / Windows / Linux
+
