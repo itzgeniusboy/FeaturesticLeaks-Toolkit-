@@ -6295,6 +6295,56 @@ def utilities_menu(data_path: Path):
             console.print('[bold red][X] Invalid choice.[/bold red]')
             time.sleep(1)
 
+def auto_start_telegram_bot_background(data_path: Path):
+    """Automatically starts the Telegram AI Vision & Interactive Modding Bot in the background when FeaturesticLeaks boots up!"""
+    bot_script = Path(__file__).parent / "telegram_bot.py"
+    if not bot_script.exists():
+        return
+
+    # Check if process is already running to prevent duplicate background instances
+    try:
+        proc = subprocess.run(["pgrep", "-f", "telegram_bot.py"], capture_output=True, text=True)
+        if proc.returncode == 0 and proc.stdout.strip():
+            return
+    except Exception:
+        pass
+
+    config_file = Path(__file__).parent / "telegram_bot_config.json"
+    token = None
+    if config_file.exists():
+        try:
+            cfg = json.loads(config_file.read_text(encoding="utf-8"))
+            token = cfg.get("telegram_token")
+        except Exception:
+            pass
+
+    if not token:
+        token = os.environ.get("TELEGRAM_BOT_TOKEN")
+
+    if not token:
+        console.print("\n[bold cyan]🤖 [Telegram Bot Auto-Launcher Setup][/bold cyan]")
+        console.print("[dim white]Connect your Telegram Bot once to enable 1-Click Auto Lua Compile & AI Assistant on Telegram![/dim white]")
+        bot_tok = safe_input("👉 Enter Bot Token from @BotFather (or press Enter to skip): ").strip()
+        if bot_tok:
+            try:
+                config_file.write_text(json.dumps({"telegram_token": bot_tok}, indent=4), encoding="utf-8")
+                token = bot_tok
+                console.print("[bold green]✅ Bot Token Saved! Auto-starting Telegram Bot in background...[/bold green]")
+            except Exception as e:
+                console.print(f"[bold red][X] Error saving token: {e}[/bold red]")
+
+    if token:
+        try:
+            subprocess.Popen(
+                [sys.executable, str(bot_script)],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                start_new_session=True
+            )
+            console.print("[bold green]🚀 [Telegram Bot] Active & Running in Background![/bold green]\n")
+        except Exception:
+            pass
+
 _BOOTED = False
 
 def main_menu():
@@ -6314,6 +6364,9 @@ def main_menu():
     except Exception:
         pass
     check_and_auto_update()
+    
+    # Auto-start Telegram Bot in background on tool boot
+    auto_start_telegram_bot_background(data_path)
 
     while True:
         print_banner()

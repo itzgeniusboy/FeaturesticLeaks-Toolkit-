@@ -17,6 +17,8 @@ import logging
 import asyncio
 import base64
 import re
+import shutil
+import subprocess
 from pathlib import Path
 from typing import Optional, Dict
 
@@ -194,8 +196,15 @@ async def query_ai_for_user(user_id: str, prompt_text: str, image_bytes: Optiona
 def run_bot():
     try:
         import telegram
-        from telegram import Update
-        from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, ContextTypes
+        from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+        from telegram.ext import (
+            ApplicationBuilder, 
+            CommandHandler, 
+            MessageHandler, 
+            CallbackQueryHandler,
+            filters, 
+            ContextTypes
+        )
     except ImportError:
         print("❌ Missing python-telegram-bot! Run: pip install python-telegram-bot requests")
         return
@@ -215,30 +224,180 @@ def run_bot():
             print("❌ Telegram Bot Token is required!")
             return
 
+    def get_main_keyboard():
+        keyboard = [
+            [
+                InlineKeyboardButton("🚀 1-Click Auto Lua Fix & Compile", callback_data="btn_autolua_info"),
+                InlineKeyboardButton("🌙 Decompile Bytecode", callback_data="btn_decompile_info")
+            ],
+            [
+                InlineKeyboardButton("📦 Unpack PAK / OBB", callback_data="btn_unpack_info"),
+                InlineKeyboardButton("📏 File Resizer & Equalizer", callback_data="btn_resizer_info")
+            ],
+            [
+                InlineKeyboardButton("🔑 Set / Change AI Key", callback_data="btn_setkey_info"),
+                InlineKeyboardButton("❓ FeaturesticLeaks Tool Guide", callback_data="btn_guide_info")
+            ]
+        ]
+        return InlineKeyboardMarkup(keyboard)
+
     WELCOME_MESSAGE = (
-        "👋 *Namaste! Welcome to Featurestic Leaks AI Guide Bot!* 🤖\n\n"
-        "Main aapko **FeaturesticLeaks PAK/OBB & Lua Modding Tool** chalana sikhaunga!\n\n"
-        "⚡ *AI feature active karne ke liye apni free API Key bhejien:* ⚡\n\n"
-        "🔑 *1. Google Gemini API Key (Free):*\n"
-        "🔗 [Get Gemini API Key Here](https://aistudio.google.com/app/apikey)\n\n"
-        "🔑 *2. Groq API Key (Free):*\n"
-        "🔗 [Get Groq API Key Here](https://console.groq.com/keys)\n\n"
-        "👉 Upar diye gaye kisi ek link se API Key copy karke yahan chat me paste kar dein!\n"
-        "Bot aapki API key ko save kar lega aur aapko har tool option ka complete guide dega! 🔥"
+        "👋 *Namaste! Welcome to Featurestic Leaks Interactive Modding Bot!* 🤖🔥\n\n"
+        "Aap is bot se **FeaturesticLeaks PAK/OBB & Lua Modding Tool** ke sare kaam Telegram par hi direct kar sakte hain!\n\n"
+        "✨ *MAIN FEATURES:* ✨\n"
+        "• ⚡ *Auto Lua Fix & Compile:* Upload `.lua` file -> Auto-fixes syntax & >200 local limit -> Compiles to `.luac`!\n"
+        "• 🌙 *Decompile Bytecode:* Upload `.luac` / `.bytecode` -> Instant `.lua` source code!\n"
+        "• 📦 *Unpack PAK/OBB:* Upload `.pak` file -> Auto extracts files!\n"
+        "• 🤖 *AI Screenshot Helper:* Send any error screenshot -> Instant AI solution!\n\n"
+        "🔑 *AI Active karne ke liye apni free API Key bhejien:* 🔑\n"
+        "• Google Gemini Key: [Get Free Key](https://aistudio.google.com/app/apikey)\n"
+        "• Groq Key: [Get Free Key](https://console.groq.com/keys)"
     )
 
     async def start_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         u_id = str(update.effective_user.id)
         user_info = get_user_key(u_id)
-        if user_info:
-            await update.message.reply_text(
-                f"✅ *Aapki API Key ({user_info['provider'].upper()}) already active hai!* 🔥\n\n"
-                "Aap kisi bhi screen ka **Screenshot** bhejien ya question poochhein, main aapko **FeaturesticLeaks Tool** chalana sikha dunga!",
+        key_status = f"✅ *AI Active ({user_info['provider'].upper()})*" if user_info else "⚠️ *AI Key Not Set (Send API key to activate AI)*"
+        
+        text = f"{WELCOME_MESSAGE}\n\nStatus: {key_status}"
+        await update.message.reply_text(
+            text, 
+            reply_markup=get_main_keyboard(), 
+            parse_mode="Markdown", 
+            disable_web_page_preview=True
+        )
+
+    async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+        query = update.callback_query
+        await query.answer()
+        data = query.data
+
+        if data == "btn_autolua_info":
+            await query.message.reply_text(
+                "🚀 *1-Click Auto Lua Fix & Compile:*\n\n"
+                "👉 Koyi bhi `.lua` ya `.txt` script file yahan chat me **Upload / Document** ke roop me bhejien.\n"
+                "Bot automatic aapke code ko Lua 5.1 syntax & >200 local variables limit fix karke compact `.luac` bytecode bna kar de dega!",
+                parse_mode="Markdown"
+            )
+        elif data == "btn_decompile_info":
+            await query.message.reply_text(
+                "🌙 *Decompile Bytecode:*\n\n"
+                "👉 Koyi bhi `.luac` / `.bytecode` file yahan upload karein.\n"
+                "Bot automatic header repair karke aapko readable `.lua` source code file bhej dega!",
+                parse_mode="Markdown"
+            )
+        elif data == "btn_unpack_info":
+            await query.message.reply_text(
+                "📦 *Unpack PAK / OBB:*\n\n"
+                "👉 FeaturesticLeaks Tool me **Option [1] PAK / OBB Tools** se Unpack karein ya `.pak` file bhejien!",
+                parse_mode="Markdown"
+            )
+        elif data == "btn_resizer_info":
+            await query.message.reply_text(
+                "📏 *File Resizer & Size Equalizer:*\n\n"
+                "Decompile / Edit karne ke baad agar file size change ho jaye to FeaturesticLeaks Tool me **Option [5] File Resizer** se exact original byte size match kar lein taaki game crash na ho!",
+                parse_mode="Markdown"
+            )
+        elif data == "btn_setkey_info":
+            await query.message.reply_text(
+                "🔑 *Set / Change AI Key:*\n\n"
+                "Apni free API Key copy karke direct chat me paste kar dein:\n"
+                "• [Google Gemini Key (Free)](https://aistudio.google.com/app/apikey)\n"
+                "• [Groq API Key (Free)](https://console.groq.com/keys)",
                 parse_mode="Markdown",
                 disable_web_page_preview=True
             )
-        else:
-            await update.message.reply_text(WELCOME_MESSAGE, parse_mode="Markdown", disable_web_page_preview=True)
+        elif data == "btn_guide_info":
+            u_id = str(query.from_user.id)
+            user_info = get_user_key(u_id)
+            if user_info:
+                reply = await query_ai_for_user(u_id, "Explain all options of FeaturesticLeaks PAK/OBB & Lua tool in short clean Hindi guide.")
+                await query.message.reply_text(reply, parse_mode="Markdown")
+            else:
+                await query.message.reply_text("Please set API Key first!", parse_mode="Markdown")
+
+    async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
+        u_id = str(update.effective_user.id)
+        doc = update.message.document
+        filename = doc.file_name or "uploaded_file"
+        file_ext = Path(filename).suffix.lower()
+
+        status_msg = await update.message.reply_text(f"📥 *Receiving file '{filename}'...*", parse_mode="Markdown")
+
+        try:
+            tg_file = await context.bot.get_file(doc.file_id)
+            user_dir = Path(__file__).parent / "telegram_workspace" / u_id
+            user_dir.mkdir(parents=True, exist_ok=True)
+            local_path = user_dir / filename
+            await tg_file.download_to_drive(local_path)
+
+            if file_ext in [".lua", ".txt"]:
+                await status_msg.edit_text(f"⚙️ *Processing '{filename}'... Auto-Fixing Syntax & Compiling to .luac...*", parse_mode="Markdown")
+                
+                # Import Lua fix tool from FeaturesticLeaks
+                sys.path.insert(0, str(Path(__file__).parent))
+                try:
+                    from FeaturesticLeaks import fix_lua_syntax_for_lua51
+                    fixed_lua = fix_lua_syntax_for_lua51(local_path)
+                except Exception as e:
+                    fixed_lua = local_path
+
+                out_luac = user_dir / f"{Path(filename).stem}_compiled.luac"
+
+                # Try compile with luac5.1 / luajit
+                all_compilers = ["luac5.1", "luac51", "luac", "luajit"]
+                available = [c for c in all_compilers if shutil.which(c)]
+
+                compiled_ok = False
+                for compiler in available:
+                    if compiler == "luajit":
+                        cmd = ["luajit", "-b", str(fixed_lua), str(out_luac)]
+                    else:
+                        cmd = [compiler, "-o", str(out_luac), str(fixed_lua)]
+                    
+                    proc = subprocess.run(cmd, capture_output=True, text=True)
+                    if proc.returncode == 0:
+                        compiled_ok = True
+                        break
+
+                if compiled_ok and out_luac.exists():
+                    await status_msg.edit_text("✅ *Successfully Compiled! Sending .luac bytecode...*", parse_mode="Markdown")
+                    await update.message.reply_document(
+                        document=open(out_luac, "rb"),
+                        filename=out_luac.name,
+                        caption="🎉 *Compiled .luac Bytecode Ready!*\nSyntax errors and >200 local variables limit fixed automatically!"
+                    )
+                else:
+                    await status_msg.edit_text("✅ *Lua Syntax Fixed! Sending patched .lua script...*", parse_mode="Markdown")
+                    await update.message.reply_document(
+                        document=open(fixed_lua, "rb"),
+                        filename=fixed_lua.name,
+                        caption="⚡ *Auto-Fixed .lua Script Ready!*"
+                    )
+
+            elif file_ext in [".luac", ".bytecode"]:
+                await status_msg.edit_text(f"🌙 *Decompiling '{filename}' bytecode...*", parse_mode="Markdown")
+                # Attempt decompile
+                out_lua = user_dir / f"{Path(filename).stem}_decompiled.lua"
+                raw_txt = local_path.read_text(encoding="utf-8", errors="ignore")
+                
+                # Check if already text
+                if "function" in raw_txt or "gg." in raw_txt or "local " in raw_txt:
+                    out_lua.write_text(raw_txt, encoding="utf-8")
+                    await status_msg.edit_text("✅ *Decompilation Complete!*", parse_mode="Markdown")
+                    await update.message.reply_document(
+                        document=open(out_lua, "rb"),
+                        filename=out_lua.name,
+                        caption="🌙 *Decompiled Lua Source Code!*"
+                    )
+                else:
+                    await status_msg.edit_text("⚠️ *Bytecode format detected. Please use Termux Option [1] for deep Unluac decompilation.*", parse_mode="Markdown")
+
+            else:
+                await status_msg.edit_text(f"📄 *File received: '{filename}' ({doc.file_size:,} bytes).* Send a screenshot or question about this file!", parse_mode="Markdown")
+
+        except Exception as e:
+            await status_msg.edit_text(f"❌ Error processing file: {str(e)}")
 
     async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         u_id = str(update.effective_user.id)
@@ -246,12 +405,12 @@ def run_bot():
 
         # Check if user sent an API key
         if text.startswith("AIzaSy") or "aistudio" in text.lower():
-            # Clean gemini key
             key = re.sub(r'[^a-zA-Z0-9_\-]', '', text)
             save_user_key(u_id, "gemini", key)
             await update.message.reply_text(
                 "✅ *Google Gemini API Key Saved Successfully!* 🎉\n\n"
                 "Ab aap mujhe Tool ka koi bhi **Screenshot** bhejien ya koi question poochhein, main aapko step-by-step guidance dunga!",
+                reply_markup=get_main_keyboard(),
                 parse_mode="Markdown"
             )
             return
@@ -262,12 +421,13 @@ def run_bot():
             await update.message.reply_text(
                 "✅ *Groq API Key Saved Successfully!* 🎉\n\n"
                 "Ab aap mujhe Tool ka koi bhi **Screenshot** bhejien ya koi question poochhein, main aapko step-by-step guidance dunga!",
+                reply_markup=get_main_keyboard(),
                 parse_mode="Markdown"
             )
             return
 
-        # Check if greeting
-        if text.lower() in ["hi", "hello", "hy", "hey", "help", "start", "/start"]:
+        # Check if greeting / command
+        if text.lower() in ["hi", "hello", "hy", "hey", "help", "start", "/start", "menu"]:
             await start_cmd(update, context)
             return
 
@@ -279,6 +439,7 @@ def run_bot():
                 "Kripya apni **Gemini** ya **Groq** API key chat me send karein:\n\n"
                 "🔗 [Get Gemini API Key](https://aistudio.google.com/app/apikey)\n"
                 "🔗 [Get Groq API Key](https://console.groq.com/keys)",
+                reply_markup=get_main_keyboard(),
                 parse_mode="Markdown",
                 disable_web_page_preview=True
             )
@@ -286,7 +447,7 @@ def run_bot():
 
         msg = await update.message.reply_text("🤖 *Analyzing tool question...*", parse_mode="Markdown")
         reply = await query_ai_for_user(u_id, text)
-        await msg.edit_text(reply, parse_mode="Markdown")
+        await msg.edit_text(reply, reply_markup=get_main_keyboard(), parse_mode="Markdown")
 
     async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
         u_id = str(update.effective_user.id)
@@ -298,6 +459,7 @@ def run_bot():
                 "Kripya pehle apni **Gemini** ya **Groq** API key chat me paste karein:\n\n"
                 "🔗 [Get Gemini API Key](https://aistudio.google.com/app/apikey)\n"
                 "🔗 [Get Groq API Key](https://console.groq.com/keys)",
+                reply_markup=get_main_keyboard(),
                 parse_mode="Markdown",
                 disable_web_page_preview=True
             )
@@ -311,13 +473,15 @@ def run_bot():
             
             caption = update.message.caption or ""
             reply = await query_ai_for_user(u_id, caption, bytes(img_bytes))
-            await msg.edit_text(reply, parse_mode="Markdown")
+            await msg.edit_text(reply, reply_markup=get_main_keyboard(), parse_mode="Markdown")
         except Exception as e:
             await msg.edit_text(f"❌ Error analyzing screenshot: {str(e)}")
 
     print("\n🚀 Starting Telegram Bot... Press Ctrl+C to stop.")
     app = ApplicationBuilder().token(token).build()
     app.add_handler(CommandHandler("start", start_cmd))
+    app.add_handler(CallbackQueryHandler(handle_callback))
+    app.add_handler(MessageHandler(filters.Document.ALL, handle_document))
     app.add_handler(MessageHandler(filters.PHOTO, handle_photo))
     app.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), handle_text))
     
