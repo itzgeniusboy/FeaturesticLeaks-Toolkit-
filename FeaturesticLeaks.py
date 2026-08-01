@@ -2482,22 +2482,60 @@ def _pseudo_decompile_lua(proto, depth: int = 0, func_name: str = "main") -> str
     return "\n".join(lines)
 
 def fix_lua_syntax_for_lua51(lua_file: Path) -> Path:
-    """Preprocesses .lua file to fix standard Lua 5.1 incompatible syntax like 'continue', bitwise '|', and excessive 'local' declarations (>200 limits)."""
+    """Preprocesses .lua file to fix standard Lua 5.1 incompatible syntax like 'continue', bitwise operators, and excessive 'local' declarations (>200 limits)."""
     try:
         text = lua_file.read_text(encoding="utf-8", errors="ignore")
+        
+        # Mask comments and string literals to prevent corruption
+        tokens = []
+        def save_token(m):
+            tokens.append(m.group(0))
+            return f"__LUA_TOK_{len(tokens)-1}__"
+
+        pattern = re.compile(
+            r'--\[(?P<c_eq>=*)\[[\s\S]*?\](?P=c_eq)\]|'   # Multi-line comment --[[ ... ]]
+            r'--[^\r\n]*|'                                # Single-line comment -- ...
+            r'\[(?P<s_eq>=*)\[[\s\S]*?\](?P=s_eq)\]|'     # Long string [[ ... ]]
+            r'"(?:\\.|[^"\\])*"|'                         # Double-quoted string "..."
+            r"'(?:\\.|[^'\\])*'",                         # Single-quoted string '...'
+            re.MULTILINE
+        )
+        masked_text = pattern.sub(save_token, text)
+
         # Replace standalone 'continue' with 'do break end'
-        fixed_text = re.sub(r'\bcontinue\b', 'do break end', text)
+        masked_text = re.sub(r'\bcontinue\b', 'do break end', masked_text)
         
-        # Replace bitwise OR pipe operator 'a | b' with 'bit.bor(a, b)' if simple regex matches
-        fixed_text = re.sub(r'(\b[\w_.]+\b|\d+)\s*\|\s*(\b[\w_.]+\b|\d+)', r'bit.bor(\1, \2)', fixed_text)
-        
-        # Strip redundant 'local' declarations in auto-decompiled files to stay within the 200 local variable limit per function
-        # e.g. converts 'local r1 = ...' or 'local r1, r2' to 'r1 = ...'
-        fixed_text = re.sub(r'^\s*local\s+([a-zA-Z0-9_,\s]+)=', r'\1=', fixed_text, flags=re.MULTILINE)
-        fixed_text = re.sub(r'^\s*local\s+([a-zA-Z0-9_]+)\s*$', r'-- \1', fixed_text, flags=re.MULTILINE)
+        # Replace bitwise OR pipe operator 'a | b' with 'bit.bor(a, b)'
+        masked_text = re.sub(r'(\b[\w_.]+\b|\d+)\s*\|\s*(\b[\w_.]+\b|\d+)', r'bit.bor(\1, \2)', masked_text)
+        # Replace bitwise AND '&' with 'bit.band(a, b)'
+        masked_text = re.sub(r'(\b[\w_.]+\b|\d+)\s*&\s*(\b[\w_.]+\b|\d+)', r'bit.band(\1, \2)', masked_text)
+        # Replace bitwise shift '<<' and '>>'
+        masked_text = re.sub(r'(\b[\w_.]+\b|\d+)\s*<<\s*(\b[\w_.]+\b|\d+)', r'bit.lshift(\1, \2)', masked_text)
+        masked_text = re.sub(r'(\b[\w_.]+\b|\d+)\s*>>\s*(\b[\w_.]+\b|\d+)', r'bit.rshift(\1, \2)', masked_text)
+
+        # Convert 'local function name' -> 'function name'
+        masked_text = re.sub(r'\blocal\s+function\b', 'function', masked_text)
+
+        # Convert 'local var1, var2 = val1, val2' -> 'var1, var2 = val1, val2'
+        var_list = r'[a-zA-Z_][a-zA-Z0-9_]*(?:\s*,\s*[a-zA-Z_][a-zA-Z0-9_]*)*'
+        masked_text = re.sub(rf'\blocal\s+({var_list})\s*=', r'\1 =', masked_text)
+
+        # Convert standalone 'local var1, var2' -> 'var1, var2 = nil, nil' (NEVER comment out code with '--'!)
+        def fix_standalone_local(m):
+            vars_str = m.group(1).strip()
+            v_list = [v.strip() for v in vars_str.split(',') if v.strip()]
+            if not v_list:
+                return ""
+            return f"{', '.join(v_list)} = {', '.join(['nil']*len(v_list))}"
+
+        masked_text = re.sub(rf'\blocal\s+({var_list})\b(?!\s*=)', fix_standalone_local, masked_text)
+
+        # Restore comments & strings
+        for i in range(len(tokens) - 1, -1, -1):
+            masked_text = masked_text.replace(f"__LUA_TOK_{i}__", tokens[i])
 
         out_file = lua_file.parent / f"{lua_file.stem}_fixed51.lua"
-        out_file.write_text(fixed_text, encoding="utf-8")
+        out_file.write_text(masked_text, encoding="utf-8")
         return out_file
     except Exception:
         return lua_file
