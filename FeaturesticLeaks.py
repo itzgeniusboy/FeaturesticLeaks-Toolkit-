@@ -6216,23 +6216,98 @@ def lua_tools_menu(data_path: Path):
             time.sleep(1)
 
 def run_telegram_bot_launcher(data_path: Path):
-    console.print(Panel(Align.center("[bold bright_cyan]🤖 TELEGRAM AI VISION BOT LAUNCHER 🤖[/bold bright_cyan]\n[dim white]Launch an AI Telegram Bot that analyzes user screenshots and guides everyone on how to use FeaturesticLeaks![/dim white]"), border_style="cyan", box=ROUNDED))
+    console.print(Panel(Align.center("[bold bright_cyan]🤖 TELEGRAM AI VISION BOT MANAGER 🤖[/bold bright_cyan]\n[dim white]Manage Telegram Bot, edit/change Bot Token, or run AI Assistant![/dim white]"), border_style="cyan", box=ROUNDED))
     
     bot_script = Path(__file__).parent / "telegram_bot.py"
     if not bot_script.exists():
         console.print("[bold red][X] telegram_bot.py not found in working directory.[/bold red]")
         return
         
-    console.print("\n[bold cyan]Checking / installing required packages (python-telegram-bot requests)...[/bold cyan]")
+    console.print("\n[bold cyan]Checking required packages (python-telegram-bot requests)...[/bold cyan]")
     try:
         subprocess.run([sys.executable, "-m", "pip", "install", "-q", "python-telegram-bot", "requests"], check=False)
     except Exception:
         pass
-        
+
+    config_file = Path(__file__).parent / "telegram_bot_config.json"
+    token = None
+    if config_file.exists():
+        try:
+            cfg = json.loads(config_file.read_text(encoding="utf-8"))
+            token = cfg.get("telegram_token")
+        except Exception:
+            pass
+
+    if not token:
+        token = os.environ.get("TELEGRAM_BOT_TOKEN")
+
+    if token:
+        masked_token = token[:6] + "..." + token[-4:] if len(token) > 10 else "***"
+        console.print(f"\n[bold green]✅ Current Saved Bot Token:[/bold green] [bold cyan]{masked_token}[/bold cyan]")
+        console.print("\n[bold yellow]⚙️ Options:[/bold yellow]")
+        console.print("  [bold cyan][1][/bold cyan] Launch / Restart Telegram Bot")
+        console.print("  [bold cyan][2][/bold cyan] Change / Edit Bot Token")
+        console.print("  [bold cyan][3][/bold cyan] Reset / Delete Saved Token")
+        console.print("  [bold cyan][0][/bold cyan] Back to Menu")
+
+        opt = safe_input("\n-> Select Option [0-3] [1]: ").strip() or "1"
+
+        if opt == "2":
+            new_tok = safe_input("\n👉 Enter NEW Bot Token from @BotFather: ").strip()
+            if new_tok:
+                try:
+                    config_file.write_text(json.dumps({"telegram_token": new_tok}, indent=4), encoding="utf-8")
+                    token = new_tok
+                    os.environ["TELEGRAM_BOT_TOKEN"] = new_tok
+                    console.print("[bold green]✅ Telegram Bot Token updated successfully![/bold green]")
+                except Exception as e:
+                    console.print(f"[bold red][X] Error saving token: {e}[/bold red]")
+                    return
+            else:
+                console.print("[yellow][!] No token entered. Keeping existing token.[/yellow]")
+        elif opt == "3":
+            if config_file.exists():
+                try:
+                    config_file.unlink()
+                    os.environ.pop("TELEGRAM_BOT_TOKEN", None)
+                    console.print("[bold green]✅ Saved Bot Token deleted successfully![/bold green]")
+                    # Kill background process if running
+                    subprocess.run(["pkill", "-f", "telegram_bot.py"], capture_output=True)
+                except Exception as e:
+                    console.print(f"[bold red][X] Error deleting config: {e}[/bold red]")
+            return
+        elif opt == "0":
+            return
+
+    if not token:
+        console.print("\n[bold cyan]🔑 Enter Bot Token from @BotFather:[/bold cyan]")
+        console.print("[dim white](e.g. 123456789:ABCdefGhIJKlmNoPQRsTUVwxyZ)[/dim white]")
+        bot_tok = safe_input("👉 Bot Token: ").strip()
+        if bot_tok:
+            try:
+                config_file.write_text(json.dumps({"telegram_token": bot_tok}, indent=4), encoding="utf-8")
+                token = bot_tok
+                os.environ["TELEGRAM_BOT_TOKEN"] = bot_tok
+                console.print("[bold green]✅ Bot Token saved successfully![/bold green]")
+            except Exception as e:
+                console.print(f"[bold red][X] Error saving token: {e}[/bold red]")
+                return
+        else:
+            console.print("[yellow][!] No token entered. Aborting bot launch.[/yellow]")
+            return
+
+    # Kill any existing instances before starting fresh foreground bot process
+    try:
+        subprocess.run(["pkill", "-f", "telegram_bot.py"], capture_output=True)
+    except Exception:
+        pass
+
     console.print("\n[bold green]🚀 Launching Telegram AI Bot...[/bold green]")
     console.print("[dim white]Press Ctrl+C inside Termux anytime to return to main menu.[/dim white]\n")
     try:
-        subprocess.run([sys.executable, str(bot_script)])
+        env = os.environ.copy()
+        env["TELEGRAM_BOT_TOKEN"] = token
+        subprocess.run([sys.executable, str(bot_script)], env=env)
     except KeyboardInterrupt:
         console.print("\n[bold yellow]Stopped Telegram Bot.[/bold yellow]")
     except Exception as e:
