@@ -6262,7 +6262,7 @@ import re
 import shutil
 import subprocess
 from pathlib import Path
-from typing import Optional, Dict
+from typing import Optional, Dict, List, Tuple
 
 logging.basicConfig(format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO)
 logger = logging.getLogger("FeaturesticLeaksBot")
@@ -6309,14 +6309,67 @@ def load_user_keys() -> Dict[str, dict]:
             pass
     return {}
 
-def save_user_key(user_id: str, provider: str, key: str):
-    keys = load_user_keys()
-    keys[str(user_id)] = {"provider": provider, "key": key}
-    USER_KEYS_FILE.write_text(json.dumps(keys, indent=2), encoding="utf-8")
+def save_all_keys(data: dict):
+    USER_KEYS_FILE.write_text(json.dumps(data, indent=2), encoding="utf-8")
 
-def get_user_key(user_id: str) -> Optional[dict]:
-    keys = load_user_keys()
-    return keys.get(str(user_id))
+def get_user_keys_info(user_id: str) -> dict:
+    data = load_user_keys()
+    u_str = str(user_id)
+    entry = data.get(u_str, {})
+    if not isinstance(entry, dict):
+        entry = {}
+
+    provider = entry.get("provider", "gemini")
+    gemini_keys = entry.get("gemini_keys", [])
+    groq_keys = entry.get("groq_keys", [])
+
+    if not gemini_keys and entry.get("provider") == "gemini" and entry.get("key"):
+        gemini_keys = [entry["key"]]
+    if not groq_keys and entry.get("provider") == "groq" and entry.get("key"):
+        groq_keys = [entry["key"]]
+
+    return {
+        "provider": provider,
+        "gemini_keys": list(gemini_keys),
+        "groq_keys": list(groq_keys)
+    }
+
+def add_user_keys(user_id: str, provider: str, keys_list: List[str]) -> Tuple[int, int]:
+    data = load_user_keys()
+    u_str = str(user_id)
+    info = get_user_keys_info(user_id)
+    
+    g_keys = info["gemini_keys"]
+    q_keys = info["groq_keys"]
+
+    added = 0
+    target_list = g_keys if provider == "gemini" else q_keys
+
+    for k in keys_list:
+        clean_k = k.strip()
+        if clean_k and clean_k not in target_list:
+            target_list.append(clean_k)
+            added += 1
+
+    data[u_str] = {
+        "provider": provider,
+        "gemini_keys": g_keys,
+        "groq_keys": q_keys
+    }
+    save_all_keys(data)
+    return len(target_list), added
+
+def update_user_keys_order(user_id: str, provider: str, keys_list: List[str]):
+    data = load_user_keys()
+    u_str = str(user_id)
+    info = get_user_keys_info(user_id)
+    if provider == "gemini":
+        info["gemini_keys"] = keys_list
+    else:
+        info["groq_keys"] = keys_list
+    info["provider"] = provider
+    data[u_str] = info
+    save_all_keys(data)
 
 def load_config():
     if CONFIG_FILE.exists():
@@ -6330,7 +6383,7 @@ def save_config(token: str):
     data = {"telegram_token": token}
     CONFIG_FILE.write_text(json.dumps(data, indent=2), encoding="utf-8")
 
-async def analyze_with_gemini(api_key: str, prompt_text: str, image_bytes: Optional[bytes] = None) -> str:
+async def analyze_with_gemini(api_key: str, prompt_text: str, image_bytes: Optional[bytes] = None) -> Tuple[bool, str]:
     import requests
     url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={api_key}"
     parts = []
@@ -6346,15 +6399,16 @@ async def analyze_with_gemini(api_key: str, prompt_text: str, image_bytes: Optio
         if res.status_code == 200:
             data = res.json()
             try:
-                return data["candidates"][0]["content"]["parts"][0]["text"]
+                text = data["candidates"][0]["content"]["parts"][0]["text"]
+                return True, text
             except (KeyError, IndexError):
-                return "⚠️ AI response match nahi ho paya. Kripya punah try karein."
+                return False, "⚠️ Gemini response match nahi ho paya."
         else:
-            return f"❌ Gemini API Error ({res.status_code}): Invalid Key ya API Limit over."
+            return False, f"HTTP {res.status_code} - API Limit over ya Invalid Key"
     except Exception as e:
-        return f"❌ AI Connection Error: {str(e)}"
+        return False, str(e)
 
-async def analyze_with_groq(api_key: str, prompt_text: str, image_bytes: Optional[bytes] = None) -> str:
+async def analyze_with_groq(api_key: str, prompt_text: str, image_bytes: Optional[bytes] = None) -> Tuple[bool, str]:
     import requests
     url = "https://api.groq.com/openai/v1/chat/completions"
     model = "llama-3.2-11b-vision-preview" if image_bytes else "llama-3.3-70b-versatile"
@@ -6370,22 +6424,55 @@ async def analyze_with_groq(api_key: str, prompt_text: str, image_bytes: Optiona
         res = await loop.run_in_executor(None, lambda: requests.post(url, json=payload, headers=headers, timeout=30))
         if res.status_code == 200:
             data = res.json()
-            return data["choices"][0]["message"]["content"]
+            return True, data["choices"][0]["message"]["content"]
         else:
-            return f"❌ Groq API Error ({res.status_code}): Invalid Key ya Model Limit."
+            return False, f"HTTP {res.status_code} - Model limit ya Invalid Key"
     except Exception as e:
-        return f"❌ AI Connection Error: {str(e)}"
+        return False, str(e)
 
 async def query_ai_for_user(user_id: str, prompt_text: str, image_bytes: Optional[bytes] = None) -> str:
-    user_info = get_user_key(user_id)
-    if not user_info:
+    info = get_user_keys_info(user_id)
+    provider = info.get("provider", "gemini")
+    gemini_keys = list(info.get("gemini_keys", []))
+    groq_keys = list(info.get("groq_keys", []))
+
+    if not gemini_keys and not groq_keys:
         return None
-    provider = user_info.get("provider")
-    key = user_info.get("key")
-    if provider == "groq":
-        return await analyze_with_groq(key, prompt_text, image_bytes)
-    else:
-        return await analyze_with_gemini(key, prompt_text, image_bytes)
+
+    primary_keys = gemini_keys if provider == "gemini" else groq_keys
+    secondary_keys = groq_keys if provider == "gemini" else gemini_keys
+    primary_prov = provider
+    secondary_prov = "groq" if provider == "gemini" else "gemini"
+
+    for idx, key in enumerate(primary_keys):
+        if primary_prov == "gemini":
+            ok, text = await analyze_with_gemini(key, prompt_text, image_bytes)
+        else:
+            ok, text = await analyze_with_groq(key, prompt_text, image_bytes)
+
+        if ok:
+            if idx > 0:
+                primary_keys.insert(0, primary_keys.pop(idx))
+                update_user_keys_order(user_id, primary_prov, primary_keys)
+            return text
+        else:
+            logger.warning(f"{primary_prov.upper()} Key #{idx+1} failed: {text}. Rotating key...")
+
+    if secondary_keys:
+        for idx, key in enumerate(secondary_keys):
+            if secondary_prov == "gemini":
+                ok, text = await analyze_with_gemini(key, prompt_text, image_bytes)
+            else:
+                ok, text = await analyze_with_groq(key, prompt_text, image_bytes)
+
+            if ok:
+                if idx > 0:
+                    secondary_keys.insert(0, secondary_keys.pop(idx))
+                    update_user_keys_order(user_id, secondary_prov, secondary_keys)
+                return text
+
+    total = len(gemini_keys) + len(groq_keys)
+    return f"❌ Aapki sabhi saved API keys ({total} keys) limit over ya invalid ho chuki hain! Kripya nayi Gemini ya Groq API key bhejien."
 
 def run_bot():
     try:
@@ -6400,16 +6487,8 @@ def run_bot():
     token = config.get("telegram_token") or os.environ.get("TELEGRAM_BOT_TOKEN")
 
     if not token:
-        print("=========================================================")
-        print("🤖 FEATURESTIC LEAKS TELEGRAM AI BOT SETUP 🤖")
-        print("=========================================================")
-        token = input("-> Enter Telegram Bot Token (from @BotFather): ").strip()
-        if token:
-            save_config(token)
-            print("✅ Configuration saved to telegram_bot_config.json")
-        else:
-            print("❌ Telegram Bot Token is required!")
-            return
+        print("❌ Telegram Bot Token is required!")
+        return
 
     def get_main_keyboard():
         keyboard = [
@@ -6422,7 +6501,7 @@ def run_bot():
                 InlineKeyboardButton("📏 File Resizer & Equalizer", callback_data="btn_resizer_info")
             ],
             [
-                InlineKeyboardButton("🔑 Set / Change AI Key", callback_data="btn_setkey_info"),
+                InlineKeyboardButton("🔑 Add / View Saved Keys", callback_data="btn_setkey_info"),
                 InlineKeyboardButton("❓ FeaturesticLeaks Tool Guide", callback_data="btn_guide_info")
             ]
         ]
@@ -6435,16 +6514,23 @@ def run_bot():
         "• ⚡ *Auto Lua Fix & Compile:* Upload `.lua` file -> Auto-fixes syntax & >200 local limit -> Compiles to `.luac`!\\n"
         "• 🌙 *Decompile Bytecode:* Upload `.luac` / `.bytecode` -> Instant `.lua` source code!\\n"
         "• 📦 *Unpack PAK/OBB:* Upload `.pak` file -> Auto extracts files!\\n"
-        "• 🤖 *AI Screenshot Helper:* Send any error screenshot -> Instant AI solution!\\n\\n"
-        "🔑 *AI Active karne ke liye apni free API Key bhejien:* 🔑\\n"
+        "• 🤖 *Multi-Key AI Assistant:* 1 se jada 10-50 API keys save karein! Auto key rotation & failover active!\\n\\n"
+        "🔑 *AI Active karne ke liye apni free API Key bhejien (1 ya 10-50 ek sath paste karein):* 🔑\\n"
         "• Google Gemini Key: [Get Free Key](https://aistudio.google.com/app/apikey)\\n"
         "• Groq Key: [Get Free Key](https://console.groq.com/keys)"
     )
 
     async def start_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         u_id = str(update.effective_user.id)
-        user_info = get_user_key(u_id)
-        key_status = f"✅ *AI Active ({user_info['provider'].upper()})*" if user_info else "⚠️ *AI Key Not Set (Send API key to activate AI)*"
+        info = get_user_keys_info(u_id)
+        g_cnt = len(info["gemini_keys"])
+        q_cnt = len(info["groq_keys"])
+
+        if g_cnt > 0 or q_cnt > 0:
+            key_status = f"✅ *AI Active* (Gemini: *{g_cnt}* keys | Groq: *{q_cnt}* keys)\\n_Auto Failover: Ek key khatam hogi to dusri automatic chalegi!_"
+        else:
+            key_status = "⚠️ *AI Key Not Set (Gemini ya Groq ki 1 ya multiple API keys chat me paste karein)*"
+
         text = f"{WELCOME_MESSAGE}\\n\\nStatus: {key_status}"
         await update.message.reply_text(text, reply_markup=get_main_keyboard(), parse_mode="Markdown", disable_web_page_preview=True)
 
@@ -6462,15 +6548,25 @@ def run_bot():
         elif data == "btn_resizer_info":
             await query.message.reply_text("📏 *File Resizer & Size Equalizer:*\\n\\nMatch exact byte size of files.", parse_mode="Markdown")
         elif data == "btn_setkey_info":
-            await query.message.reply_text("🔑 *Set / Change AI Key:*\\n\\nSend Gemini or Groq key in chat.", parse_mode="Markdown", disable_web_page_preview=True)
+            u_id = str(query.from_user.id)
+            info = get_user_keys_info(u_id)
+            g_cnt = len(info["gemini_keys"])
+            q_cnt = len(info["groq_keys"])
+            msg = (
+                f"🔑 *API Keys Pool Status:*\\n\\n"
+                f"• Gemini Keys Saved: *{g_cnt}*\\n"
+                f"• Groq Keys Saved: *{q_cnt}*\\n\\n"
+                f"👉 Aap 1 se 50 tak kitni bhi API Keys chat me bhej sakte hain (1 per line ya ek sath copy-paste).\\n"
+                f"⚡ *Auto Rotation:* Ek key limit hit karne par bot automatically next key par switch kar lega!"
+            )
+            await query.message.reply_text(msg, parse_mode="Markdown", disable_web_page_preview=True)
         elif data == "btn_guide_info":
             u_id = str(query.from_user.id)
-            user_info = get_user_key(u_id)
-            if user_info:
-                reply = await query_ai_for_user(u_id, "Explain all options of FeaturesticLeaks PAK/OBB & Lua tool in short clean Hindi guide.")
+            reply = await query_ai_for_user(u_id, "Explain all options of FeaturesticLeaks PAK/OBB & Lua tool in short clean Hindi guide.")
+            if reply:
                 await query.message.reply_text(reply, parse_mode="Markdown")
             else:
-                await query.message.reply_text("Please set API Key first!", parse_mode="Markdown")
+                await query.message.reply_text("⚠️ Kripya pehle Gemini ya Groq ki API key bhejien!", parse_mode="Markdown")
 
     async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
         u_id = str(update.effective_user.id)
@@ -6520,33 +6616,56 @@ def run_bot():
     async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         u_id = str(update.effective_user.id)
         text = update.message.text.strip()
-        if text.startswith("AIzaSy") or "aistudio" in text.lower():
-            key = re.sub(r'[^a-zA-Z0-9_\\-]', '', text)
-            save_user_key(u_id, "gemini", key)
-            await update.message.reply_text("✅ *Google Gemini API Key Saved Successfully!* 🎉", reply_markup=get_main_keyboard(), parse_mode="Markdown")
+
+        gemini_found = re.findall(r'AIzaSy[A-Za-z0-9_\-]{33}', text)
+        groq_found = re.findall(r'gsk_[A-Za-z0-9_\-]+', text)
+
+        if gemini_found:
+            total, added = add_user_keys(u_id, "gemini", gemini_found)
+            msg = f"✅ *Saved {added} New Gemini API Key(s)!* 🎉\\n\\n• Active Gemini Pool: *{total} Keys*\\n• Auto Key Failover: *ACTIVE*\\n\\n_Aap aur keys bhi bhej sakte hain (10-50 keys support)_"
+            await update.message.reply_text(msg, reply_markup=get_main_keyboard(), parse_mode="Markdown")
             return
-        if text.startswith("gsk_") or "groq" in text.lower():
-            key = re.sub(r'[^a-zA-Z0-9_\\-]', '', text)
-            save_user_key(u_id, "groq", key)
-            await update.message.reply_text("✅ *Groq API Key Saved Successfully!* 🎉", reply_markup=get_main_keyboard(), parse_mode="Markdown")
+
+        if groq_found:
+            total, added = add_user_keys(u_id, "groq", groq_found)
+            msg = f"✅ *Saved {added} New Groq API Key(s)!* 🎉\\n\\n• Active Groq Pool: *{total} Keys*\\n• Auto Key Failover: *ACTIVE*\\n\\n_Aap aur keys bhi bhej sakte hain (10-50 keys support)_"
+            await update.message.reply_text(msg, reply_markup=get_main_keyboard(), parse_mode="Markdown")
             return
+
+        if "aistudio" in text.lower() or "gemini" in text.lower():
+            raw = re.sub(r'[^a-zA-Z0-9_\\-]', '', text)
+            if len(raw) >= 30:
+                total, added = add_user_keys(u_id, "gemini", [raw])
+                await update.message.reply_text(f"✅ *Gemini Key Saved! Total Keys: {total}*", reply_markup=get_main_keyboard(), parse_mode="Markdown")
+                return
+
+        if "groq" in text.lower():
+            raw = re.sub(r'[^a-zA-Z0-9_\\-]', '', text)
+            if len(raw) >= 30:
+                total, added = add_user_keys(u_id, "groq", [raw])
+                await update.message.reply_text(f"✅ *Groq Key Saved! Total Keys: {total}*", reply_markup=get_main_keyboard(), parse_mode="Markdown")
+                return
+
         if text.lower() in ["hi", "hello", "hy", "hey", "help", "start", "/start", "menu"]:
             await start_cmd(update, context)
             return
-        user_info = get_user_key(u_id)
-        if not user_info:
-            await update.message.reply_text("⚠️ *API Key is required to ask AI!*", reply_markup=get_main_keyboard(), parse_mode="Markdown", disable_web_page_preview=True)
+
+        info = get_user_keys_info(u_id)
+        if not info["gemini_keys"] and not info["groq_keys"]:
+            await update.message.reply_text("⚠️ *API Key is required to ask AI! (Send Gemini or Groq API key(s))*", reply_markup=get_main_keyboard(), parse_mode="Markdown", disable_web_page_preview=True)
             return
+
         msg = await update.message.reply_text("🤖 *Analyzing tool question...*", parse_mode="Markdown")
         reply = await query_ai_for_user(u_id, text)
         await msg.edit_text(reply, reply_markup=get_main_keyboard(), parse_mode="Markdown")
 
     async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
         u_id = str(update.effective_user.id)
-        user_info = get_user_key(u_id)
-        if not user_info:
+        info = get_user_keys_info(u_id)
+        if not info["gemini_keys"] and not info["groq_keys"]:
             await update.message.reply_text("⚠️ *API Key is required to analyze screenshots!*", reply_markup=get_main_keyboard(), parse_mode="Markdown", disable_web_page_preview=True)
             return
+
         msg = await update.message.reply_text("🔍 *Analyzing screenshot...*", parse_mode="Markdown")
         try:
             photo = update.message.photo[-1]
@@ -6558,7 +6677,7 @@ def run_bot():
         except Exception as e:
             await msg.edit_text(f"❌ Error analyzing screenshot: {str(e)}")
 
-    print("\\n🚀 Starting Telegram Bot... Press Ctrl+C to stop.")
+    logger.info("🚀 Telegram AI Vision Bot running in background...")
     app = ApplicationBuilder().token(token).build()
     app.add_handler(CommandHandler("start", start_cmd))
     app.add_handler(CallbackQueryHandler(handle_callback))
@@ -6585,7 +6704,6 @@ def ensure_telegram_bot_script(data_path: Path) -> Path:
         if c.exists() and c.stat().st_size > 100:
             return c
 
-    # Missing everywhere -> write telegram_bot.py automatically
     target_dir = Path(__file__).resolve().parent
     if not os.access(target_dir, os.W_OK):
         target_dir = data_path
@@ -6593,7 +6711,6 @@ def ensure_telegram_bot_script(data_path: Path) -> Path:
     bot_path = target_dir / "telegram_bot.py"
     
     try:
-        # Check if telegram_bot.py exists in source directory
         if Path("/telegram_bot.py").exists():
             bot_path.write_text(Path("/telegram_bot.py").read_text(encoding="utf-8"), encoding="utf-8")
             return bot_path
@@ -6609,15 +6726,9 @@ def ensure_telegram_bot_script(data_path: Path) -> Path:
     return bot_path
 
 def run_telegram_bot_launcher(data_path: Path):
-    console.print(Panel(Align.center("[bold bright_cyan]🤖 TELEGRAM AI VISION BOT MANAGER 🤖[/bold bright_cyan]\\n[dim white]Manage Telegram Bot, edit/change Bot Token, or run AI Assistant![/dim white]"), border_style="cyan", box=ROUNDED))
+    console.print(Panel(Align.center("[bold bright_cyan]🤖 TELEGRAM AI VISION BOT MANAGER 🤖[/bold bright_cyan]\\n[dim white]Manage Telegram Bot, add AI Keys, or launch Bot in background![/dim white]"), border_style="cyan", box=ROUNDED))
     
     bot_script = ensure_telegram_bot_script(data_path)
-    
-    console.print("\\n[bold cyan]Checking required packages (python-telegram-bot requests)...[/bold cyan]")
-    try:
-        subprocess.run([sys.executable, "-m", "pip", "install", "-q", "python-telegram-bot", "requests"], check=False)
-    except Exception:
-        pass
 
     config_file = bot_script.parent / "telegram_bot_config.json"
     token = None
@@ -6634,15 +6745,54 @@ def run_telegram_bot_launcher(data_path: Path):
     if token:
         masked_token = token[:6] + "..." + token[-4:] if len(token) > 10 else "***"
         console.print(f"\\n[bold green]✅ Current Saved Bot Token:[/bold green] [bold cyan]{masked_token}[/bold cyan]")
+        
+        is_running = False
+        try:
+            proc = subprocess.run(["pgrep", "-f", "telegram_bot.py"], capture_output=True, text=True)
+            if proc.returncode == 0 and proc.stdout.strip():
+                is_running = True
+        except Exception:
+            pass
+
+        if is_running:
+            console.print("[bold green]🟢 Bot Status: RUNNING IN BACKGROUND (Silent Mode)[/bold green]")
+        else:
+            console.print("[bold yellow]🔴 Bot Status: STOPPED[/bold yellow]")
+
         console.print("\\n[bold yellow]⚙️ Options:[/bold yellow]")
-        console.print("  [bold cyan][1][/bold cyan] Launch / Restart Telegram Bot")
-        console.print("  [bold cyan][2][/bold cyan] Change / Edit Bot Token")
-        console.print("  [bold cyan][3][/bold cyan] Reset / Delete Saved Token")
+        console.print("  [bold cyan][1][/bold cyan] Start / Restart Background Bot")
+        console.print("  [bold cyan][2][/bold cyan] Stop Background Bot")
+        console.print("  [bold cyan][3][/bold cyan] Change / Edit Bot Token")
+        console.print("  [bold cyan][4][/bold cyan] Reset / Delete Saved Token")
         console.print("  [bold cyan][0][/bold cyan] Back to Menu")
 
-        opt = safe_input("\\n-> Select Option [0-3] [1]: ").strip() or "1"
+        opt = safe_input("\\n-> Select Option [0-4] [1]: ").strip() or "1"
 
-        if opt == "2":
+        if opt == "1":
+            try:
+                subprocess.run(["pkill", "-f", "telegram_bot.py"], capture_output=True)
+            except Exception:
+                pass
+            
+            try:
+                env = os.environ.copy()
+                env["TELEGRAM_BOT_TOKEN"] = token
+                p = subprocess.Popen([sys.executable, str(bot_script)], env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
+                console.print(f"[bold green]✅ Telegram Bot started silently in background! (PID: {p.pid})[/bold green]")
+                console.print("[dim white]Bot will continue running in background without taking over Termux screen.[/dim white]")
+            except Exception as e:
+                console.print(f"[bold red][X] Failed to launch bot: {e}[/bold red]")
+            return
+
+        elif opt == "2":
+            try:
+                subprocess.run(["pkill", "-f", "telegram_bot.py"], capture_output=True)
+                console.print("[bold green]✅ Background Telegram Bot stopped successfully.[/bold green]")
+            except Exception as e:
+                console.print(f"[bold red][X] Error stopping bot: {e}[/bold red]")
+            return
+
+        elif opt == "3":
             new_tok = safe_input("\\n👉 Enter NEW Bot Token from @BotFather: ").strip()
             if new_tok:
                 try:
@@ -6650,58 +6800,54 @@ def run_telegram_bot_launcher(data_path: Path):
                     token = new_tok
                     os.environ["TELEGRAM_BOT_TOKEN"] = new_tok
                     console.print("[bold green]✅ Telegram Bot Token updated successfully![/bold green]")
+                    subprocess.run(["pkill", "-f", "telegram_bot.py"], capture_output=True)
+                    env = os.environ.copy()
+                    env["TELEGRAM_BOT_TOKEN"] = new_tok
+                    p = subprocess.Popen([sys.executable, str(bot_script)], env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
+                    console.print(f"[bold green]🚀 Bot restarted in background with new token! (PID: {p.pid})[/bold green]")
                 except Exception as e:
                     console.print(f"[bold red][X] Error saving token: {e}[/bold red]")
                     return
             else:
                 console.print("[yellow][!] No token entered. Keeping existing token.[/yellow]")
-        elif opt == "3":
+            return
+
+        elif opt == "4":
             if config_file.exists():
                 try:
                     config_file.unlink()
                     os.environ.pop("TELEGRAM_BOT_TOKEN", None)
                     console.print("[bold green]✅ Saved Bot Token deleted successfully![/bold green]")
-                    # Kill background process if running
                     subprocess.run(["pkill", "-f", "telegram_bot.py"], capture_output=True)
                 except Exception as e:
                     console.print(f"[bold red][X] Error deleting config: {e}[/bold red]")
             return
+
         elif opt == "0":
             return
 
     if not token:
         console.print("\\n[bold cyan]🔑 Enter Bot Token from @BotFather:[/bold cyan]")
         console.print("[dim white](e.g. 123456789:ABCdefGhIJKlmNoPQRsTUVwxyZ)[/dim white]")
-        bot_tok = safe_input("👉 Bot Token: ").strip()
+        bot_tok = safe_input("👉 Bot Token (or press Enter to cancel): ").strip()
         if bot_tok:
             try:
                 config_file.write_text(json.dumps({"telegram_token": bot_tok}, indent=4), encoding="utf-8")
                 token = bot_tok
                 os.environ["TELEGRAM_BOT_TOKEN"] = bot_tok
                 console.print("[bold green]✅ Bot Token saved successfully![/bold green]")
+                
+                subprocess.run(["pkill", "-f", "telegram_bot.py"], capture_output=True)
+                env = os.environ.copy()
+                env["TELEGRAM_BOT_TOKEN"] = bot_tok
+                p = subprocess.Popen([sys.executable, str(bot_script)], env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
+                console.print(f"[bold green]🚀 Telegram Bot started in background! (PID: {p.pid})[/bold green]")
             except Exception as e:
                 console.print(f"[bold red][X] Error saving token: {e}[/bold red]")
                 return
         else:
             console.print("[yellow][!] No token entered. Aborting bot launch.[/yellow]")
             return
-
-    # Kill any existing instances before starting fresh foreground bot process
-    try:
-        subprocess.run(["pkill", "-f", "telegram_bot.py"], capture_output=True)
-    except Exception:
-        pass
-
-    console.print("\\n[bold green]🚀 Launching Telegram AI Bot...[/bold green]")
-    console.print("[dim white]Press Ctrl+C inside Termux anytime to return to main menu.[/dim white]\\n")
-    try:
-        env = os.environ.copy()
-        env["TELEGRAM_BOT_TOKEN"] = token
-        subprocess.run([sys.executable, str(bot_script)], env=env)
-    except KeyboardInterrupt:
-        console.print("\\n[bold yellow]Stopped Telegram Bot.[/bold yellow]")
-    except Exception as e:
-        console.print(f"\\n[bold red][X] Error running Telegram Bot: {e}[/bold red]")
 
 def utilities_menu(data_path: Path):
     while True:
@@ -6766,7 +6912,6 @@ def auto_start_telegram_bot_background(data_path: Path):
     if not bot_script or not bot_script.exists():
         return
 
-    # Check if process is already running to prevent duplicate background instances
     try:
         proc = subprocess.run(["pgrep", "-f", "telegram_bot.py"], capture_output=True, text=True)
         if proc.returncode == 0 and proc.stdout.strip():
@@ -6787,28 +6932,20 @@ def auto_start_telegram_bot_background(data_path: Path):
         token = os.environ.get("TELEGRAM_BOT_TOKEN")
 
     if not token:
-        console.print("\n[bold cyan]🤖 [Telegram Bot Auto-Launcher Setup][/bold cyan]")
-        console.print("[dim white]Connect your Telegram Bot once to enable 1-Click Auto Lua Compile & AI Assistant on Telegram![/dim white]")
-        bot_tok = safe_input("👉 Enter Bot Token from @BotFather (or press Enter to skip): ").strip()
-        if bot_tok:
-            try:
-                config_file.write_text(json.dumps({"telegram_token": bot_tok}, indent=4), encoding="utf-8")
-                token = bot_tok
-                console.print("[bold green]✅ Bot Token Saved! Auto-starting Telegram Bot in background...[/bold green]")
-            except Exception as e:
-                console.print(f"[bold red][X] Error saving token: {e}[/bold red]")
+        return
 
-    if token:
-        try:
-            subprocess.Popen(
-                [sys.executable, str(bot_script)],
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-                start_new_session=True
-            )
-            console.print("[bold green]🚀 [Telegram Bot] Active & Running in Background![/bold green]\n")
-        except Exception:
-            pass
+    try:
+        env = os.environ.copy()
+        env["TELEGRAM_BOT_TOKEN"] = token
+        subprocess.Popen(
+            [sys.executable, str(bot_script)],
+            env=env,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            start_new_session=True
+        )
+    except Exception:
+        pass
 
 _BOOTED = False
 
