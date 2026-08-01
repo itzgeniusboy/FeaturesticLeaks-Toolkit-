@@ -713,18 +713,40 @@ class PakCompression:
         return ZstdCompressionDict(dict_data, DICT_TYPE_AUTO)
     @staticmethod
     def decompress_block(block, dict: Optional[ZstdCompressionDict], compression_method: int) -> bytes:
+        if compression_method == CM_NONE:
+            return bytes(block)
         if compression_method == CM_ZLIB:
             try:
                 return zlib.decompress(block)
-            except zlib.error:
-                return block
+            except Exception:
+                return bytes(block)
+        elif compression_method in (CM_ZSTD, CM_ZSTD_DICT):
+            active_dict = dict if compression_method == CM_ZSTD_DICT else None
+            try:
+                return PakCompression._zstd_decompressor(active_dict).decompress(block)
+            except Exception:
+                # Fallback 1: Try opposite dictionary mode
+                other_dict = None if active_dict else dict
+                if other_dict:
+                    try:
+                        return PakCompression._zstd_decompressor(other_dict).decompress(block)
+                    except Exception:
+                        pass
+                # Fallback 2: Try without dictionary
+                if active_dict or other_dict:
+                    try:
+                        return PakCompression._zstd_decompressor(None).decompress(block)
+                    except Exception:
+                        pass
+                # Fallback 3: Try zlib
+                try:
+                    return zlib.decompress(block)
+                except Exception:
+                    pass
+                # Fallback 4: Return raw block bytes
+                return bytes(block)
         else:
-            if compression_method == CM_ZSTD or compression_method == CM_ZSTD_DICT:
-                if compression_method!= CM_ZSTD_DICT:
-                    dict = None
-                return PakCompression._zstd_decompressor(dict).decompress(block)
-            else:
-                raise ValueError(f'Unknown compression method: {compression_method}')
+            return bytes(block)
 
 class TencentPakFile:
     def __init__(self, file_path: PurePath, is_od=False):
