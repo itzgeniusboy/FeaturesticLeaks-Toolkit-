@@ -1461,12 +1461,21 @@ def repack_pak_file_full(pak_file, edited_root, output_path, target_path=None, f
         else:
             index_bytes = index_plain
 
+        orig_pak_size = os.path.getsize(pak_file._file_path) if hasattr(pak_file, '_file_path') and os.path.exists(pak_file._file_path) else 0
+        footer_sz = TencentPakInfo._mem_size(version)
+        current_with_index_footer = current_offset + len(index_bytes) + footer_sz
+
+        if orig_pak_size > 0 and current_with_index_footer < orig_pak_size:
+            pad_bytes = orig_pak_size - current_with_index_footer
+            out_fh.write(b'\x00' * pad_bytes)
+            current_offset += pad_bytes
+            console.print(f"[bold green][SIZE MATCH] Applied {pad_bytes:,} bytes padding before index -> Repacked PAK matches original ({orig_pak_size:,} bytes)[/bold green]")
+
         new_idx_offset = current_offset
         new_idx_size = len(index_bytes)
         out_fh.write(index_bytes)
         current_offset += len(index_bytes)
 
-        footer_sz = TencentPakInfo._mem_size(version)
         new_footer = bytearray(orig_fc[-footer_sz:])
 
         h_key = struct.pack('<5I', *keystream[4:9])
@@ -1495,7 +1504,9 @@ def _repack_compressed_with_display(outfh, pak_file, entry, pak_relative_path, n
     
     if len(new_data) != entry.uncompressed_size:
         if len(new_data) < entry.uncompressed_size:
-            new_data = new_data.ljust(entry.uncompressed_size, b'\x00')
+            is_text_lua = pak_relative_path.name.lower().endswith(('.lua', '.json', '.txt', '.xml', '.ini', '.csv')) or any(kw in new_data[:100] for kw in [b'function', b'local', b'--', b'return', b'{'])
+            pad_byte = b' ' if is_text_lua else b'\x00'
+            new_data = new_data.ljust(entry.uncompressed_size, pad_byte)
         else:
             new_data = new_data[:entry.uncompressed_size]
 
@@ -1583,7 +1594,9 @@ def _repack_compressed_with_display(outfh, pak_file, entry, pak_relative_path, n
     
     if len(new_data) != entry.uncompressed_size:
         if len(new_data) < entry.uncompressed_size:
-            new_data = new_data.ljust(entry.uncompressed_size, b'\x00')
+            is_text_lua = pak_relative_path.name.lower().endswith(('.lua', '.json', '.txt', '.xml', '.ini', '.csv')) or any(kw in new_data[:100] for kw in [b'function', b'local', b'--', b'return', b'{'])
+            pad_byte = b' ' if is_text_lua else b'\x00'
+            new_data = new_data.ljust(entry.uncompressed_size, pad_byte)
         else:
             new_data = new_data[:entry.uncompressed_size]
 
@@ -1776,6 +1789,18 @@ def repack_pak_file_with_block_display(pak_file, edited_root: Path, output_path:
             gc.collect()
     
     display.final_summary()
+
+    try:
+        if hasattr(pak_file, '_file_path') and os.path.exists(pak_file._file_path):
+            orig_sz = os.path.getsize(pak_file._file_path)
+            curr_sz = os.path.getsize(output_path) if os.path.exists(output_path) else 0
+            if orig_sz > 0 and curr_sz > 0 and curr_sz < orig_sz:
+                diff = orig_sz - curr_sz
+                with open(output_path, "ab") as out_f:
+                    out_f.write(b'\x00' * diff)
+                console.print(f"[bold green][SIZE MATCH] Auto-padded {diff:,} bytes -> Repacked PAK matches original ({orig_sz:,} bytes)[/bold green]")
+    except Exception:
+        pass
 
 def detect_repack_mode(pak_path: Path) -> str:
     name = pak_path.name.lower()
@@ -5613,6 +5638,135 @@ def run_pak_compare_dumper(data_path: Path) -> None:
         except Exception as e:
             handle_exception(e, "PAK Compare", data_path)
 
+def run_file_resizer_tool(data_path: Path) -> None:
+    console.print(Panel(
+        "[bold cyan]📏 FEATURESTIC LEAKS — FILE RESIZER & SIZE EQUALIZER 📏[/bold cyan]\n"
+        "[dim white]Match exact byte sizes for PAK, OBB, LUA, or any file to pass anti-cheat integrity checks.[/dim white]",
+        border_style="cyan",
+        box=ROUNDED,
+        padding=(0, 2)
+    ))
+    
+    res_dir = data_path / "RESULT"
+    res_dir.mkdir(parents=True, exist_ok=True)
+    
+    cand_files = list(res_dir.glob("*")) + list((data_path / "LUA").glob("*")) + list((data_path / "PAK").glob("*"))
+    valid_files = [f for f in cand_files if f.is_file() and not f.name.startswith('.')]
+    
+    target_file = None
+    if valid_files:
+        console.print("\n[bold cyan]Select file to resize / pad:[/bold cyan]")
+        table = Table(title="[bold cyan]AVAILABLE FILES[/bold cyan]", box=ROUNDED)
+        table.add_column("Index", style="bold yellow", justify="center", width=8)
+        table.add_column("File Name", style="bold white")
+        table.add_column("Current Size", style="bold cyan")
+        table.add_column("Path", style="dim white")
+        
+        for i, f in enumerate(valid_files[:15], 1):
+            table.add_row(str(i), f.name, human_size(f.stat().st_size), str(f.parent.name))
+        console.print(table)
+        
+        sel = safe_input("-> Enter file number or custom file path: ").strip().strip('"\'')
+        if sel.isdigit() and 1 <= int(sel) <= len(valid_files[:15]):
+            target_file = valid_files[int(sel) - 1]
+        elif sel:
+            custom_p = Path(sel)
+            if custom_p.exists() and custom_p.is_file():
+                target_file = custom_p
+    
+    if not target_file:
+        custom = safe_input("-> Enter file path to resize (or press Enter to cancel): ").strip().strip('"\'')
+        if not custom:
+            return
+        target_file = Path(custom)
+        if not target_file.exists():
+            console.print(f"[bold red][X] File not found: {target_file}[/bold red]")
+            return
+
+    curr_size = target_file.stat().st_size
+    console.print(f"\n[bold white]Target File:[/bold white] {target_file.name}")
+    console.print(f"[bold white]Current Size:[/bold white] {curr_size:,} bytes ({human_size(curr_size)})")
+
+    console.print("\n[bold cyan]Select Size Matching Mode:[/bold cyan]")
+    console.print("  [1] Match size with Original Reference File (Select .pak / .obb / .lua)")
+    console.print("  [2] Enter Target Size manually (in Bytes or MB)")
+    
+    mode = safe_input("\n-> Select Mode (1-2) [1]: ").strip() or '1'
+    target_bytes = 0
+    
+    if mode == '1':
+        ref_dir = data_path / "PAK"
+        ref_file, _ = pick_file_from_folder("Reference File", ref_dir)
+        if not ref_file:
+            custom_ref = safe_input("-> Enter reference file path: ").strip().strip('"\'')
+            if custom_ref:
+                ref_file = Path(custom_ref)
+        if ref_file and ref_file.exists():
+            target_bytes = ref_file.stat().st_size
+            console.print(f"[bold green][+] Reference File: {ref_file.name} ({target_bytes:,} bytes)[/bold green]")
+        else:
+            console.print("[bold red][X] Valid reference file not provided.[/bold red]")
+            return
+    else:
+        sz_input = safe_input("-> Enter target size (e.g. 10485760 or 10.5MB): ").strip().lower()
+        if not sz_input:
+            return
+        try:
+            if sz_input.endswith("mb"):
+                target_bytes = int(float(sz_input.replace("mb", "").strip()) * 1024 * 1024)
+            elif sz_input.endswith("kb"):
+                target_bytes = int(float(sz_input.replace("kb", "").strip()) * 1024)
+            else:
+                target_bytes = int(sz_input)
+        except Exception:
+            console.print("[bold red][X] Invalid size input.[/bold red]")
+            return
+
+    if target_bytes <= 0:
+        console.print("[bold red][X] Target size must be greater than 0.[/bold red]")
+        return
+
+    console.print(f"\n[bold cyan]Padding Strategy:[/bold cyan]")
+    console.print("  [1] Null Bytes (0x00) — Best for PAK / OBB / Binary")
+    console.print("  [2] Space / Newline — Best for LUA / JSON / Source Code")
+    
+    pad_choice = safe_input("-> Select Padding Byte (1-2) [1]: ").strip() or '1'
+    pad_byte = b' ' if pad_choice == '2' else b'\x00'
+
+    # Perform resizing
+    out_file = res_dir / f"{target_file.stem}_resized{target_file.suffix}"
+    shutil.copy2(target_file, out_file)
+
+    if curr_size == target_bytes:
+        console.print("[bold green][OK] File already matches target size perfectly![/bold green]")
+    elif curr_size < target_bytes:
+        diff = target_bytes - curr_size
+        with open(out_file, "ab") as f:
+            chunk = pad_byte * min(diff, 65536)
+            written = 0
+            while written < diff:
+                to_w = min(len(chunk), diff - written)
+                f.write(chunk[:to_w])
+                written += to_w
+        console.print(f"[bold green][OK] Added {diff:,} bytes padding ({'0x20 Space' if pad_byte == b' ' else '0x00 Null'})![/bold green]")
+        console.print(f"[bold green][+] Resized output: {out_file} ({out_file.stat().st_size:,} bytes)[/bold green]")
+    else:
+        diff = curr_size - target_bytes
+        console.print(f"[bold yellow][!] File is LARGER than target by {diff:,} bytes.[/bold yellow]")
+        trim = safe_input("-> Trim excess bytes from end of file? (y/N): ").strip().lower()
+        if trim in ['y', 'yes']:
+            with open(out_file, "r+b") as f:
+                f.truncate(target_bytes)
+            console.print(f"[bold green][OK] Trimmed {diff:,} bytes -> Exact match ({out_file.stat().st_size:,} bytes)[/bold green]")
+
+    sd_res = Path("/sdcard/FeaturesticLeaks/RESULT")
+    if sd_res.exists():
+        try:
+            shutil.copy2(out_file, sd_res / out_file.name)
+            console.print(f"[bold green][+] Saved to SDCard: {sd_res / out_file.name}[/bold green]")
+        except Exception:
+            pass
+
 def pak_obb_tools_menu(data_path: Path):
     while True:
         print_banner()
@@ -5633,11 +5787,12 @@ def pak_obb_tools_menu(data_path: Path):
         menu_table.add_row("[3]", "One-Click Game Mods", "White Body / Item Nuller & Skin ID Swapper")
         menu_table.add_row("[4]", "OBB Manager", "Unzip & Rezip OBB with size padding")
         menu_table.add_row("[5]", "PAK Compare & Dump", "Compare 2 PAKs or dump index / offsets / hashes")
+        menu_table.add_row("[6]", "File Resizer & Equalizer", "Match exact byte size of any file (PAK, OBB, LUA)")
         menu_table.add_row("[0]", "EXIT ✗", "Return to Main Menu")
 
         console.print(menu_table)
         console.print()
-        choice = safe_input('\033[1;36mSELECT OPTION [1-5] [0]: \033[0m').strip()
+        choice = safe_input('\033[1;36mSELECT OPTION [1-6] [0]: \033[0m').strip()
 
         if choice == '1':
             pak_dir = data_path / "PAK"
@@ -5863,6 +6018,10 @@ def pak_obb_tools_menu(data_path: Path):
             run_pak_compare_dumper(data_path)
             safe_input('\nPress Enter to continue...')
 
+        elif choice == '6':
+            run_file_resizer_tool(data_path)
+            safe_input('\nPress Enter to continue...')
+
         elif choice == '0':
             break
         else:
@@ -5974,12 +6133,13 @@ def utilities_menu(data_path: Path):
         menu_table.add_row("[2]", "File Finder", "Search .uasset/.uexp/.ubulk by pattern")
         menu_table.add_row("[3]", "Workspace Summary", "Folder guide & live file count summary")
         menu_table.add_row("[4]", "Termux Auto-Setup", "Setup 'leak' direct command & SDCard folders")
-        menu_table.add_row("[5]", "Cleanup Workspace", "Delete workspace folders")
+        menu_table.add_row("[5]", "File Resizer & Equalizer", "Match exact byte size of any file (PAK, OBB, LUA)")
+        menu_table.add_row("[6]", "Cleanup Workspace", "Delete workspace folders")
         menu_table.add_row("[0]", "EXIT ✗", "Return to Main Menu")
 
         console.print(menu_table)
         console.print()
-        choice = safe_input('\033[1;36mSELECT OPTION [1-5] [0]: \033[0m').strip()
+        choice = safe_input('\033[1;36mSELECT OPTION [1-6] [0]: \033[0m').strip()
 
         if choice == '1':
             run_ue4_string_tool(data_path)
@@ -5996,6 +6156,9 @@ def utilities_menu(data_path: Path):
             install_termux_shortcut_and_sdcard(data_path)
             safe_input('\nPress Enter to continue...')
         elif choice == '5':
+            run_file_resizer_tool(data_path)
+            safe_input('\nPress Enter to continue...')
+        elif choice == '6':
             delete_folder(data_path)
             safe_input('\nPress Enter to continue...')
         elif choice == '0':
