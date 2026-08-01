@@ -4526,40 +4526,20 @@ def pick_file_from_folder(action_title: str, default_folder: Path, extensions: L
     current_path_str = str(default_folder)
     
     while True:
-        console.print(f"\n[bold cyan][?] Select Source Folder for {action_title}[/bold cyan]")
-        console.print(f"[dim]Default directory: {current_path_str}[/dim]")
-        user_input = safe_input("-> Enter folder path [Press Enter for default, 'C' to cancel]: ").strip().strip('"\'')
-        
-        if user_input.upper() == 'C':
-            return None, []
-        
-        target_path = Path(user_input) if user_input else Path(current_path_str)
-        
-        if not target_path.exists():
-            console.print(f"[bold red][X] Path does not exist: {target_path}[/bold red]")
-            continue
-        
-        # If user passed a direct file path
-        if target_path.is_file():
-            if any(target_path.name.lower().endswith(ext) for ext in extensions):
-                size_mb = target_path.stat().st_size / (1024 * 1024)
-                console.print(f"[bold green][OK] File selected: {target_path.name} ({size_mb:.2f} MB)[/bold green]")
-                return target_path, [target_path]
-            else:
-                console.print(f"[bold red][X] File is not a valid package ({', '.join(extensions)}): {target_path.name}[/bold red]")
-                continue
+        target_path = Path(current_path_str)
         
         # Scan folder
         found_files = []
-        scan_dirs = [target_path]
+        scan_dirs = []
+        if target_path.exists():
+            scan_dirs.append(target_path)
         
         sd_twin = Path("/sdcard/FeaturesticLeaks") / target_path.name
-        if sd_twin.exists() and sd_twin != target_path:
+        if sd_twin.exists() and sd_twin not in scan_dirs:
             scan_dirs.append(sd_twin)
             
         sd_base = Path("/sdcard/FeaturesticLeaks")
-        if sd_base.exists() and sd_base != target_path and sd_base not in scan_dirs:
-            # Also add /sdcard/FeaturesticLeaks/LUA or PAK if target_path ends with LUA/PAK
+        if sd_base.exists() and sd_base not in scan_dirs:
             sd_sub = sd_base / target_path.name
             if sd_sub.exists() and sd_sub not in scan_dirs:
                 scan_dirs.append(sd_sub)
@@ -4573,46 +4553,73 @@ def pick_file_from_folder(action_title: str, default_folder: Path, extensions: L
         
         found_files.sort(key=lambda x: x.name.lower())
         
-        if not found_files:
-            console.print(f"[bold red][X] No valid files ({', '.join(extensions)}) found in folder: {target_path}[/bold red]")
-            console.print("[dim]Please enter a folder path containing your .pak or .obb files.[/dim]")
+        # If files are found in default/SDCard location, auto display file selection or auto-select
+        if found_files:
+            if len(found_files) == 1:
+                selected = found_files[0]
+                size_mb = selected.stat().st_size / (1024 * 1024)
+                console.print(f"\n[bold green][OK] Auto-selected single file: {selected.name} ({size_mb:.2f} MB)[/bold green]")
+                return selected, found_files
+
+            # Multiple files found -> Display clean table directly without asking for folder path
+            file_table = Table(
+                title=f"[bold cyan]Available Files ({action_title})[/bold cyan]",
+                show_header=True,
+                header_style="bold cyan",
+                box=ROUNDED,
+                border_style="dim cyan",
+                expand=True
+            )
+            file_table.add_column("Index", style="bold yellow", justify="center", width=8)
+            file_table.add_column("Filename", style="bold white", justify="left")
+            file_table.add_column("Size", style="dim white", justify="right", width=12)
+            
+            for i, f in enumerate(found_files, 1):
+                size_mb = f.stat().st_size / (1024 * 1024)
+                file_table.add_row(str(i), f.name, f"{size_mb:.2f} MB")
+            
+            file_table.add_row("P", "Custom Folder Path", "-")
+            file_table.add_row("C", "Cancel", "-")
+            
+            console.print()
+            console.print(file_table)
+            
+            choice = safe_input(f"-> Select file number (1-{len(found_files)}) or [P/C]: ").strip().upper()
+            if choice.isdigit():
+                idx = int(choice)
+                if 1 <= idx <= len(found_files):
+                    selected = found_files[idx - 1]
+                    size_mb = selected.stat().st_size / (1024 * 1024)
+                    console.print(f"[bold green][OK] Selected: {selected.name} ({size_mb:.2f} MB)[/bold green]")
+                    return selected, found_files
+            elif choice == 'C':
+                return None, []
+            elif choice != 'P':
+                console.print("[bold red][X] Invalid option selected.[/bold red]")
+                continue
+
+        # Ask for folder path only if no files found or user selected 'P'
+        console.print(f"\n[bold cyan][?] Enter Source Folder / File Path for {action_title}[/bold cyan]")
+        console.print(f"[dim]Default directory: {current_path_str}[/dim]")
+        user_input = safe_input("-> Enter path [Press Enter for default, 'C' to cancel]: ").strip().strip('"\'')
+        
+        if user_input.upper() == 'C':
+            return None, []
+        
+        if user_input:
+            target_path = Path(user_input)
+            if not target_path.exists():
+                console.print(f"[bold red][X] Path does not exist: {target_path}[/bold red]")
+                continue
+            if target_path.is_file():
+                if any(target_path.name.lower().endswith(ext.lower()) for ext in extensions):
+                    size_mb = target_path.stat().st_size / (1024 * 1024)
+                    console.print(f"[bold green][OK] File selected: {target_path.name} ({size_mb:.2f} MB)[/bold green]")
+                    return target_path, [target_path]
+                else:
+                    console.print(f"[bold red][X] File is not valid ({', '.join(extensions)}): {target_path.name}[/bold red]")
+                    continue
             current_path_str = str(target_path)
-            continue
-        
-        # Auto-select if 1 file found
-        if len(found_files) == 1:
-            selected = found_files[0]
-            size_mb = selected.stat().st_size / (1024 * 1024)
-            console.print(f"\n[bold green][OK] Auto-selected single file: {selected.name} ({size_mb:.2f} MB)[/bold green]")
-            return selected, found_files
-        
-        # Multiple files found -> Display clean table
-        file_table = Table(
-            title=f"[bold cyan]Available Files in {target_path.name}[/bold cyan]",
-            show_header=True,
-            header_style="bold cyan",
-            box=ROUNDED,
-            border_style="dim cyan",
-            expand=True
-        )
-        file_table.add_column("Index", style="bold yellow", justify="center", width=8)
-        file_table.add_column("Filename", style="bold white", justify="left")
-        file_table.add_column("Size", style="dim white", justify="right", width=12)
-        
-        for i, f in enumerate(found_files, 1):
-            size_mb = f.stat().st_size / (1024 * 1024)
-            file_table.add_row(str(i), f.name, f"{size_mb:.2f} MB")
-        
-        file_table.add_row("C", "Change folder or cancel", "-")
-        
-        console.print()
-        console.print(file_table)
-        
-        choice = safe_input(f"-> Select file number (1-{len(found_files)}) or 'C': ").strip().upper()
-        
-        if choice == 'C':
-            current_path_str = str(target_path)
-            continue
         
         try:
             idx = int(choice) - 1
