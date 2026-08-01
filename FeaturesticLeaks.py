@@ -6025,13 +6025,44 @@ def pak_obb_tools_menu(data_path: Path):
                         continue
                     actual_edit_path = custom_p
 
-                target_path = safe_input('\n-> Enter Target Path inside PAK (or "C" to cancel): ').strip().strip('"\'')
-                if not target_path or target_path.upper() == 'C':
-                    safe_input('\nPress Enter to continue...')
-                    continue
-
                 try:
                     pak = TencentPakFile(pak_file)
+                    all_dirs = sorted([d for d in pak._index.keys() if d.strip()])
+
+                    if all_dirs:
+                        dir_table = Table(
+                            title="[bold cyan]Internal PAK Directories Found[/bold cyan]",
+                            show_header=True,
+                            header_style="bold cyan",
+                            box=ROUNDED,
+                            border_style="dim cyan"
+                        )
+                        dir_table.add_column("Index", style="bold yellow", justify="center", width=8)
+                        dir_table.add_column("PAK Internal Folder Path", style="bold white", justify="left")
+                        for i, d in enumerate(all_dirs[:20], 1):
+                            dir_table.add_row(str(i), d)
+                        console.print()
+                        console.print(dir_table)
+
+                        console.print("\n[dim]Select number (1-N) from list, or paste custom target path, or press Enter for [1].[/dim]")
+                        target_input = safe_input(f"-> Select Target Path inside PAK [1-{len(all_dirs)}] (or 'C' to cancel) [1]: ").strip().strip('"\'')
+                        if target_input.upper() == 'C':
+                            safe_input('\nPress Enter to continue...')
+                            continue
+                        if not target_input:
+                            target_path = all_dirs[0]
+                            console.print(f"[bold green][OK] Selected Default Path: {target_path}[/bold green]")
+                        elif target_input.isdigit() and 1 <= int(target_input) <= len(all_dirs):
+                            target_path = all_dirs[int(target_input) - 1]
+                            console.print(f"[bold green][OK] Selected Path: {target_path}[/bold green]")
+                        else:
+                            target_path = target_input
+                    else:
+                        target_path = safe_input('\n-> Enter Target Path inside PAK (or "C" to cancel): ').strip().strip('"\'')
+                        if not target_path or target_path.upper() == 'C':
+                            safe_input('\nPress Enter to continue...')
+                            continue
+
                     result_dir = data_path / "RESULT"
                     result_dir.mkdir(parents=True, exist_ok=True)
                     output_pak = result_dir / pak_file.name
