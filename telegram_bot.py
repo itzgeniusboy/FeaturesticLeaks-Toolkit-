@@ -11,7 +11,15 @@ import subprocess
 from pathlib import Path
 from typing import Optional, Dict, List, Tuple
 
-logging.basicConfig(format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO)
+LOG_FILE = Path(__file__).resolve().parent / "telegram_bot.log"
+logging.basicConfig(
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    level=logging.INFO,
+    handlers=[
+        logging.FileHandler(LOG_FILE, encoding="utf-8"),
+        logging.StreamHandler(sys.stdout)
+    ]
+)
 logger = logging.getLogger("FeaturesticLeaksBot")
 
 CONFIG_FILE = Path(__file__).resolve().parent / "telegram_bot_config.json"
@@ -221,20 +229,49 @@ async def query_ai_for_user(user_id: str, prompt_text: str, image_bytes: Optiona
     total = len(gemini_keys) + len(groq_keys)
     return f"❌ Aapki sabhi saved API keys ({total} keys) limit over ya invalid ho chuki hain! Kripya nayi Gemini ya Groq API key bhejien."
 
+async def send_safe(target, text: str, reply_markup=None, is_edit: bool = False, disable_web_page_preview: bool = True):
+    """Sends or edits message safely with Markdown fallback to plain text if Telegram rejects entities."""
+    if not text:
+        text = "⚠️ Empty response."
+    
+    try:
+        if is_edit:
+            return await target.edit_text(text, reply_markup=reply_markup, parse_mode="Markdown", disable_web_page_preview=disable_web_page_preview)
+        else:
+            return await target.reply_text(text, reply_markup=reply_markup, parse_mode="Markdown", disable_web_page_preview=disable_web_page_preview)
+    except Exception as e:
+        logger.warning(f"Markdown send failed ({e}). Falling back to plain text.")
+        try:
+            if is_edit:
+                return await target.edit_text(text, reply_markup=reply_markup, parse_mode=None, disable_web_page_preview=disable_web_page_preview)
+            else:
+                return await target.reply_text(text, reply_markup=reply_markup, parse_mode=None, disable_web_page_preview=disable_web_page_preview)
+        except Exception as e2:
+            logger.error(f"Plain text send also failed: {e2}")
+            return None
+
 def run_bot():
     try:
         import telegram
-        from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-        from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, CallbackQueryHandler, filters, ContextTypes
+        import requests
     except ImportError:
-        print("❌ Missing python-telegram-bot! Run: pip install python-telegram-bot requests")
-        return
+        logger.info("Installing missing packages: python-telegram-bot requests...")
+        subprocess.run([sys.executable, "-m", "pip", "install", "python-telegram-bot", "requests"], check=False)
+        try:
+            import telegram
+            import requests
+        except ImportError:
+            print("❌ Failed to install required libraries python-telegram-bot / requests!")
+            return
+
+    from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+    from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, CallbackQueryHandler, filters, ContextTypes
 
     config = load_config()
     token = config.get("telegram_token") or os.environ.get("TELEGRAM_BOT_TOKEN")
 
     if not token:
-        print("❌ Telegram Bot Token is required!")
+        logger.error("❌ Telegram Bot Token is required!")
         return
 
     def get_main_keyboard():
@@ -279,21 +316,24 @@ def run_bot():
             key_status = "⚠️ *AI Key Not Set (Gemini ya Groq ki 1 ya multiple API keys chat me paste karein)*"
 
         text = f"{WELCOME_MESSAGE}\n\nStatus: {key_status}"
-        await update.message.reply_text(text, reply_markup=get_main_keyboard(), parse_mode="Markdown", disable_web_page_preview=True)
+        await send_safe(update.message, text, reply_markup=get_main_keyboard(), disable_web_page_preview=True)
 
     async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         query = update.callback_query
-        await query.answer()
+        try:
+            await query.answer()
+        except Exception:
+            pass
         data = query.data
 
         if data == "btn_autolua_info":
-            await query.message.reply_text("🚀 *1-Click Auto Lua Fix & Compile:*\n\n👉 Upload `.lua` script file here.", parse_mode="Markdown")
+            await send_safe(query.message, "🚀 *1-Click Auto Lua Fix & Compile:*\n\n👉 Upload `.lua` script file here.")
         elif data == "btn_decompile_info":
-            await query.message.reply_text("🌙 *Decompile Bytecode:*\n\n👉 Upload `.luac` bytecode file here.", parse_mode="Markdown")
+            await send_safe(query.message, "🌙 *Decompile Bytecode:*\n\n👉 Upload `.luac` bytecode file here.")
         elif data == "btn_unpack_info":
-            await query.message.reply_text("📦 *Unpack PAK / OBB:*\n\n👉 Use Option [1] PAK/OBB tools in FeaturesticLeaks.", parse_mode="Markdown")
+            await send_safe(query.message, "📦 *Unpack PAK / OBB:*\n\n👉 Use Option [1] PAK/OBB tools in FeaturesticLeaks.")
         elif data == "btn_resizer_info":
-            await query.message.reply_text("📏 *File Resizer & Size Equalizer:*\n\nMatch exact byte size of files.", parse_mode="Markdown")
+            await send_safe(query.message, "📏 *File Resizer & Size Equalizer:*\n\nMatch exact byte size of files.")
         elif data == "btn_setkey_info":
             u_id = str(query.from_user.id)
             info = get_user_keys_info(u_id)
@@ -306,21 +346,21 @@ def run_bot():
                 f"👉 Aap 1 se 50 tak kitni bhi API Keys chat me bhej sakte hain (1 per line ya ek sath copy-paste).\n"
                 f"⚡ *Auto Rotation:* Ek key limit hit karne par bot automatically next key par switch kar lega!"
             )
-            await query.message.reply_text(msg, parse_mode="Markdown", disable_web_page_preview=True)
+            await send_safe(query.message, msg, disable_web_page_preview=True)
         elif data == "btn_guide_info":
             u_id = str(query.from_user.id)
             reply = await query_ai_for_user(u_id, "Explain all options of FeaturesticLeaks PAK/OBB & Lua tool in short clean Hindi guide.")
             if reply:
-                await query.message.reply_text(reply, parse_mode="Markdown")
+                await send_safe(query.message, reply)
             else:
-                await query.message.reply_text("⚠️ Kripya pehle Gemini ya Groq ki API key bhejien!", parse_mode="Markdown")
+                await send_safe(query.message, "⚠️ Kripya pehle Gemini ya Groq ki API key bhejien!")
 
     async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
         u_id = str(update.effective_user.id)
         doc = update.message.document
         filename = doc.file_name or "uploaded_file"
         file_ext = Path(filename).suffix.lower()
-        status_msg = await update.message.reply_text(f"📥 *Receiving file '{filename}'...*", parse_mode="Markdown")
+        status_msg = await send_safe(update.message, f"📥 *Receiving file '{filename}'...*")
         try:
             tg_file = await context.bot.get_file(doc.file_id)
             user_dir = Path(__file__).resolve().parent / "telegram_workspace" / u_id
@@ -329,7 +369,8 @@ def run_bot():
             await tg_file.download_to_drive(local_path)
 
             if file_ext in [".lua", ".txt"]:
-                await status_msg.edit_text(f"⚙️ *Processing '{filename}'... Auto-Fixing Syntax & Compiling to .luac...*", parse_mode="Markdown")
+                if status_msg:
+                    await send_safe(status_msg, f"⚙️ *Processing '{filename}'... Auto-Fixing Syntax & Compiling to .luac...*", is_edit=True)
                 sys.path.insert(0, str(Path(__file__).resolve().parent))
                 try:
                     from FeaturesticLeaks import fix_lua_syntax_for_lua51
@@ -350,15 +391,22 @@ def run_bot():
                         break
 
                 if compiled_ok and out_luac.exists():
-                    await status_msg.edit_text("✅ *Successfully Compiled! Sending .luac bytecode...*", parse_mode="Markdown")
+                    if status_msg:
+                        await send_safe(status_msg, "✅ *Successfully Compiled! Sending .luac bytecode...*", is_edit=True)
                     await update.message.reply_document(document=open(out_luac, "rb"), filename=out_luac.name, caption="🎉 *Compiled .luac Bytecode Ready!*")
                 else:
-                    await status_msg.edit_text("✅ *Lua Syntax Fixed! Sending patched .lua script...*", parse_mode="Markdown")
+                    if status_msg:
+                        await send_safe(status_msg, "✅ *Lua Syntax Fixed! Sending patched .lua script...*", is_edit=True)
                     await update.message.reply_document(document=open(fixed_lua, "rb"), filename=fixed_lua.name, caption="⚡ *Auto-Fixed .lua Script Ready!*")
             else:
-                await status_msg.edit_text(f"📄 *File received: '{filename}'.*", parse_mode="Markdown")
+                if status_msg:
+                    await send_safe(status_msg, f"📄 *File received: '{filename}'.*", is_edit=True)
         except Exception as e:
-            await status_msg.edit_text(f"❌ Error processing file: {str(e)}")
+            err_txt = f"❌ Error processing file: {str(e)}"
+            if status_msg:
+                await send_safe(status_msg, err_txt, is_edit=True)
+            else:
+                await send_safe(update.message, err_txt)
 
     async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         u_id = str(update.effective_user.id)
@@ -370,27 +418,27 @@ def run_bot():
         if gemini_found:
             total, added = add_user_keys(u_id, "gemini", gemini_found)
             msg = f"✅ *Saved {added} New Gemini API Key(s)!* 🎉\n\n• Active Gemini Pool: *{total} Keys*\n• Auto Key Failover: *ACTIVE*\n\n_Aap aur keys bhi bhej sakte hain (10-50 keys support)_"
-            await update.message.reply_text(msg, reply_markup=get_main_keyboard(), parse_mode="Markdown")
+            await send_safe(update.message, msg, reply_markup=get_main_keyboard())
             return
 
         if groq_found:
             total, added = add_user_keys(u_id, "groq", groq_found)
             msg = f"✅ *Saved {added} New Groq API Key(s)!* 🎉\n\n• Active Groq Pool: *{total} Keys*\n• Auto Key Failover: *ACTIVE*\n\n_Aap aur keys bhi bhej sakte hain (10-50 keys support)_"
-            await update.message.reply_text(msg, reply_markup=get_main_keyboard(), parse_mode="Markdown")
+            await send_safe(update.message, msg, reply_markup=get_main_keyboard())
             return
 
         if "aistudio" in text.lower() or "gemini" in text.lower():
             raw = re.sub(r'[^a-zA-Z0-9_\-]', '', text)
             if len(raw) >= 30:
                 total, added = add_user_keys(u_id, "gemini", [raw])
-                await update.message.reply_text(f"✅ *Gemini Key Saved! Total Keys: {total}*", reply_markup=get_main_keyboard(), parse_mode="Markdown")
+                await send_safe(update.message, f"✅ *Gemini Key Saved! Total Keys: {total}*", reply_markup=get_main_keyboard())
                 return
 
         if "groq" in text.lower():
             raw = re.sub(r'[^a-zA-Z0-9_\-]', '', text)
             if len(raw) >= 30:
                 total, added = add_user_keys(u_id, "groq", [raw])
-                await update.message.reply_text(f"✅ *Groq Key Saved! Total Keys: {total}*", reply_markup=get_main_keyboard(), parse_mode="Markdown")
+                await send_safe(update.message, f"✅ *Groq Key Saved! Total Keys: {total}*", reply_markup=get_main_keyboard())
                 return
 
         if text.lower() in ["hi", "hello", "hy", "hey", "help", "start", "/start", "menu"]:
@@ -399,39 +447,63 @@ def run_bot():
 
         info = get_user_keys_info(u_id)
         if not info["gemini_keys"] and not info["groq_keys"]:
-            await update.message.reply_text("⚠️ *API Key is required to ask AI! (Send Gemini or Groq API key(s))*", reply_markup=get_main_keyboard(), parse_mode="Markdown", disable_web_page_preview=True)
+            await send_safe(update.message, "⚠️ *API Key is required to ask AI! (Send Gemini or Groq API key(s))*", reply_markup=get_main_keyboard(), disable_web_page_preview=True)
             return
 
-        msg = await update.message.reply_text("🤖 *Analyzing tool question...*", parse_mode="Markdown")
-        reply = await query_ai_for_user(u_id, text)
-        await msg.edit_text(reply, reply_markup=get_main_keyboard(), parse_mode="Markdown")
+        msg = await send_safe(update.message, "🤖 *Analyzing tool question...*")
+        try:
+            reply = await query_ai_for_user(u_id, text)
+            if not reply:
+                reply = "⚠️ *API Key is required to ask AI! (Send Gemini or Groq API key(s))*"
+            if msg:
+                await send_safe(msg, reply, reply_markup=get_main_keyboard(), is_edit=True)
+            else:
+                await send_safe(update.message, reply, reply_markup=get_main_keyboard(), is_edit=False)
+        except Exception as e:
+            err_msg = f"❌ *AI Query Error:* {str(e)}"
+            if msg:
+                await send_safe(msg, err_msg, reply_markup=get_main_keyboard(), is_edit=True)
+            else:
+                await send_safe(update.message, err_msg, reply_markup=get_main_keyboard(), is_edit=False)
 
     async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
         u_id = str(update.effective_user.id)
         info = get_user_keys_info(u_id)
         if not info["gemini_keys"] and not info["groq_keys"]:
-            await update.message.reply_text("⚠️ *API Key is required to analyze screenshots!*", reply_markup=get_main_keyboard(), parse_mode="Markdown", disable_web_page_preview=True)
+            await send_safe(update.message, "⚠️ *API Key is required to analyze screenshots!*", reply_markup=get_main_keyboard(), disable_web_page_preview=True)
             return
 
-        msg = await update.message.reply_text("🔍 *Analyzing screenshot...*", parse_mode="Markdown")
+        msg = await send_safe(update.message, "🔍 *Analyzing screenshot...*")
         try:
             photo = update.message.photo[-1]
             file = await context.bot.get_file(photo.file_id)
             img_bytes = await file.download_as_bytearray()
             caption = update.message.caption or ""
             reply = await query_ai_for_user(u_id, caption, bytes(img_bytes))
-            await msg.edit_text(reply, reply_markup=get_main_keyboard(), parse_mode="Markdown")
+            if not reply:
+                reply = "⚠️ *API Key is required to analyze screenshots!*"
+            if msg:
+                await send_safe(msg, reply, reply_markup=get_main_keyboard(), is_edit=True)
+            else:
+                await send_safe(update.message, reply, reply_markup=get_main_keyboard(), is_edit=False)
         except Exception as e:
-            await msg.edit_text(f"❌ Error analyzing screenshot: {str(e)}")
+            err_msg = f"❌ *Error analyzing screenshot:* {str(e)}"
+            if msg:
+                await send_safe(msg, err_msg, reply_markup=get_main_keyboard(), is_edit=True)
+            else:
+                await send_safe(update.message, err_msg, reply_markup=get_main_keyboard(), is_edit=False)
 
     logger.info("🚀 Telegram AI Vision Bot running in background...")
-    app = ApplicationBuilder().token(token).build()
-    app.add_handler(CommandHandler("start", start_cmd))
-    app.add_handler(CallbackQueryHandler(handle_callback))
-    app.add_handler(MessageHandler(filters.Document.ALL, handle_document))
-    app.add_handler(MessageHandler(filters.PHOTO, handle_photo))
-    app.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), handle_text))
-    app.run_polling()
+    try:
+        app = ApplicationBuilder().token(token).build()
+        app.add_handler(CommandHandler("start", start_cmd))
+        app.add_handler(CallbackQueryHandler(handle_callback))
+        app.add_handler(MessageHandler(filters.Document.ALL, handle_document))
+        app.add_handler(MessageHandler(filters.PHOTO, handle_photo))
+        app.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), handle_text))
+        app.run_polling()
+    except Exception as e:
+        logger.error(f"❌ Bot polling failed: {e}")
 
 if __name__ == "__main__":
     run_bot()

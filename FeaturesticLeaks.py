@@ -1865,6 +1865,7 @@ def repack_gamepatch(pak, repack_dir, output_pak):
     repack_pak_file_with_block_display(pak_file=pak, edited_root=repack_dir, output_path=output_pak)
 
 def ensure_directories(base_dir: Path):
+    # Main Root folders (Backward compatibility)
     (base_dir / "PAK").mkdir(parents=True, exist_ok=True)
     (base_dir / "UNPACK").mkdir(parents=True, exist_ok=True)
     (base_dir / "REPLACE").mkdir(parents=True, exist_ok=True)
@@ -1873,6 +1874,21 @@ def ensure_directories(base_dir: Path):
     (base_dir / "REPACK").mkdir(parents=True, exist_ok=True)
     (base_dir / "RESULT").mkdir(parents=True, exist_ok=True)
     (base_dir / "LOGS").mkdir(parents=True, exist_ok=True)
+
+    # Organized Subfolder System for PAK
+    pak_ws = base_dir / "PAK_WORKSPACE"
+    (pak_ws / "1_PAK_INPUT").mkdir(parents=True, exist_ok=True)
+    (pak_ws / "2_UNPACK").mkdir(parents=True, exist_ok=True)
+    (pak_ws / "3_REPLACE").mkdir(parents=True, exist_ok=True)
+    (pak_ws / "4_INJECT").mkdir(parents=True, exist_ok=True)
+    (pak_ws / "5_RESULT").mkdir(parents=True, exist_ok=True)
+
+    # Organized Subfolder System for LUA
+    lua_ws = base_dir / "LUA_WORKSPACE"
+    (lua_ws / "1_INPUT_SCRIPTS").mkdir(parents=True, exist_ok=True)
+    (lua_ws / "2_DECOMPILED").mkdir(parents=True, exist_ok=True)
+    (lua_ws / "3_COMPILED").mkdir(parents=True, exist_ok=True)
+    (lua_ws / "4_RESULT").mkdir(parents=True, exist_ok=True)
     
     # Backwards compatibility legacy paths
     pak_tool_dir = base_dir / "PAK TOOL"
@@ -1892,6 +1908,19 @@ def ensure_directories(base_dir: Path):
             (sdcard_path / "LUA").mkdir(parents=True, exist_ok=True)
             (sdcard_path / "RESULT").mkdir(parents=True, exist_ok=True)
             (sdcard_path / "LOGS").mkdir(parents=True, exist_ok=True)
+
+            s_pak_ws = sdcard_path / "PAK_WORKSPACE"
+            (s_pak_ws / "1_PAK_INPUT").mkdir(parents=True, exist_ok=True)
+            (s_pak_ws / "2_UNPACK").mkdir(parents=True, exist_ok=True)
+            (s_pak_ws / "3_REPLACE").mkdir(parents=True, exist_ok=True)
+            (s_pak_ws / "4_INJECT").mkdir(parents=True, exist_ok=True)
+            (s_pak_ws / "5_RESULT").mkdir(parents=True, exist_ok=True)
+
+            s_lua_ws = sdcard_path / "LUA_WORKSPACE"
+            (s_lua_ws / "1_INPUT_SCRIPTS").mkdir(parents=True, exist_ok=True)
+            (s_lua_ws / "2_DECOMPILED").mkdir(parents=True, exist_ok=True)
+            (s_lua_ws / "3_COMPILED").mkdir(parents=True, exist_ok=True)
+            (s_lua_ws / "4_RESULT").mkdir(parents=True, exist_ok=True)
     except Exception:
         pass
 
@@ -1918,34 +1947,42 @@ def display_workspace_summary(data_path: Path):
                     pass
         return cnt
 
-    pak_cnt = get_cnt("PAK")
-    unpack_cnt = get_cnt("UNPACK")
-    replace_cnt = get_cnt("REPLACE") + get_cnt("PAK TOOL", "EDIT")
-    inject_cnt = get_cnt("INJECT")
-    lua_cnt = get_cnt("LUA")
-    result_cnt = get_cnt("RESULT")
+    pak_cnt = get_cnt("PAK") + get_cnt("PAK_WORKSPACE", "1_PAK_INPUT")
+    unpack_cnt = get_cnt("UNPACK") + get_cnt("PAK_WORKSPACE", "2_UNPACK")
+    replace_cnt = get_cnt("REPLACE") + get_cnt("PAK TOOL", "EDIT") + get_cnt("PAK_WORKSPACE", "3_REPLACE")
+    inject_cnt = get_cnt("INJECT") + get_cnt("PAK_WORKSPACE", "4_INJECT")
+    lua_cnt = get_cnt("LUA") + get_cnt("LUA_WORKSPACE", "1_INPUT_SCRIPTS")
+    result_cnt = get_cnt("RESULT") + get_cnt("PAK_WORKSPACE", "5_RESULT") + get_cnt("LUA_WORKSPACE", "4_RESULT")
 
     table = Table(
-        title="[bold bright_cyan]📂 WORKSPACE STATUS & FILES 📂[/bold bright_cyan]",
+        title="[bold bright_cyan]📂 ORGANIZED WORKSPACE STATUS 📂[/bold bright_cyan]",
         border_style="bright_cyan",
         box=ROUNDED,
         show_header=True,
         header_style="bold bright_cyan",
         expand=True
     )
-    table.add_column("Folder Name", justify="left", style="bold bright_cyan", width=14)
-    table.add_column("Where to Put / Purpose", justify="left", style="bold bright_white")
-    table.add_column("Files Found", justify="center", style="bold bright_yellow", width=12)
+    table.add_column("Folder System", justify="left", style="bold bright_cyan", width=22)
+    table.add_column("Purpose / Direct Path", justify="left", style="bold bright_white")
+    table.add_column("Files", justify="center", style="bold bright_yellow", width=10)
 
-    table.add_row("📥 PAK/", "Put original game .pak / .obb files here", f"[bold bright_yellow]{pak_cnt}[/bold bright_yellow]")
-    table.add_row("📂 UNPACK/", "Extracted files from Unpack tool", f"[bold bright_yellow]{unpack_cnt}[/bold bright_yellow]")
-    table.add_row("✏️ REPLACE/", "Put edited files here to replace existing PAK files", f"[bold bright_yellow]{replace_cnt}[/bold bright_yellow]")
-    table.add_row("💉 INJECT/", "Put custom files here for Inject Path mode", f"[bold bright_yellow]{inject_cnt}[/bold bright_yellow]")
-    table.add_row("🌙 LUA/", "Put .lua / .luac scripts here for Lua tools", f"[bold bright_yellow]{lua_cnt}[/bold bright_yellow]")
-    table.add_row("🚀 RESULT/", "Final repacked PAK, OBB & compiled files saved here", f"[bold bright_yellow]{result_cnt}[/bold bright_yellow]")
+    # Section 1: PAK Tools Workspace
+    table.add_row("[bold yellow]📦 PAK SYSTEM[/bold yellow]", "[dim]Subfolders in PAK_WORKSPACE/ or PAK/[/dim]", "")
+    table.add_row("  └ 📥 1_PAK_INPUT", "Put original game .pak / .obb files here", f"[bold bright_yellow]{pak_cnt}[/bold bright_yellow]")
+    table.add_row("  └ 📂 2_UNPACK", "Extracted files from Unpack tool", f"[bold bright_yellow]{unpack_cnt}[/bold bright_yellow]")
+    table.add_row("  └ ✏️ 3_REPLACE", "Put edited files here to replace PAK files", f"[bold bright_yellow]{replace_cnt}[/bold bright_yellow]")
+    table.add_row("  └ 💉 4_INJECT", "Put custom files here for Inject Path mode", f"[bold bright_yellow]{inject_cnt}[/bold bright_yellow]")
+    table.add_row("  └ 🚀 5_RESULT", "Final repacked .pak files saved here", f"[bold bright_yellow]{result_cnt}[/bold bright_yellow]")
+
+    # Section 2: LUA Tools Workspace
+    table.add_row("[bold cyan]🌙 LUA SYSTEM[/bold cyan]", "[dim]Subfolders in LUA_WORKSPACE/ or LUA/[/dim]", "")
+    table.add_row("  └ 📜 1_INPUT_SCRIPTS", "Put .lua / .luac scripts here for Lua tools", f"[bold bright_yellow]{lua_cnt}[/bold bright_yellow]")
+    table.add_row("  └ 🔓 2_DECOMPILED", "Decompiled .lua source files saved here", f"[bold dim_white]Auto[/bold dim_white]")
+    table.add_row("  └ ⚙️ 3_COMPILED", "Compiled .luac bytecode saved here", f"[bold dim_white]Auto[/bold dim_white]")
+    table.add_row("  └ 🎉 4_RESULT", "Final processed & auto-fixed scripts saved here", f"[bold dim_white]Auto[/bold dim_white]")
 
     console.print(table)
-    console.print("[bold bright_cyan]💡 SDCard Location: [bold bright_white]/sdcard/FeaturesticLeaks/[/bold bright_white] (ZArchiver / File Manager me direct dikhega)[/bold bright_cyan]\n")
+    console.print("[bold bright_cyan]💡 Workspace Location: [bold bright_white]/sdcard/FeaturesticLeaks/[/bold bright_white] (ZArchiver me direct dikhega)[/bold bright_cyan]\n")
 
 # ============================================================================
 # LUA ENGINE & PSEUDO-DECOMPILER (Pure Python + External Tools Fallback)
@@ -4653,7 +4690,11 @@ def pick_file_from_folder(action_title: str, default_folder: Path, extensions: L
                 scan_dirs.append(sd_sub)
             
         # Multi-folder scan fallback for common workspace directories
-        extra_subdirs = ["LUA", "RESULT", "REPLACE", "UNPACK", "PAK"]
+        extra_subdirs = [
+            "LUA", "RESULT", "REPLACE", "UNPACK", "PAK",
+            "PAK_WORKSPACE/1_PAK_INPUT", "PAK_WORKSPACE/2_UNPACK", "PAK_WORKSPACE/3_REPLACE", "PAK_WORKSPACE/4_INJECT", "PAK_WORKSPACE/5_RESULT",
+            "LUA_WORKSPACE/1_INPUT_SCRIPTS", "LUA_WORKSPACE/2_DECOMPILED", "LUA_WORKSPACE/3_COMPILED", "LUA_WORKSPACE/4_RESULT"
+        ]
         base_parent = default_folder.parent if hasattr(default_folder, 'parent') and default_folder.parent.exists() else default_folder
         for sub in extra_subdirs:
             cand = base_parent / sub
@@ -6722,19 +6763,6 @@ if __name__ == "__main__":
 """
 
 def ensure_telegram_bot_script(data_path: Path) -> Path:
-    candidates = [
-        Path(__file__).resolve().parent / "telegram_bot.py",
-        Path.cwd() / "telegram_bot.py",
-        data_path / "telegram_bot.py",
-        Path("/sdcard/FeaturesticLeaks/telegram_bot.py"),
-        Path.home() / "FeaturesticLeaks-Toolkit" / "telegram_bot.py",
-        Path("/telegram_bot.py"),
-        Path("/app/applet/telegram_bot.py")
-    ]
-    for c in candidates:
-        if c.exists() and c.stat().st_size > 100:
-            return c
-
     target_dir = Path(__file__).resolve().parent
     if not os.access(target_dir, os.W_OK):
         target_dir = data_path
@@ -6742,8 +6770,9 @@ def ensure_telegram_bot_script(data_path: Path) -> Path:
     bot_path = target_dir / "telegram_bot.py"
     
     try:
-        if Path("/telegram_bot.py").exists():
-            bot_path.write_text(Path("/telegram_bot.py").read_text(encoding="utf-8"), encoding="utf-8")
+        source_bot = Path("/telegram_bot.py")
+        if source_bot.exists():
+            bot_path.write_text(source_bot.read_text(encoding="utf-8"), encoding="utf-8")
             return bot_path
     except Exception:
         pass
