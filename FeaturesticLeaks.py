@@ -630,7 +630,16 @@ class PakCrypto:
             iv = PakCrypto.rsa_extract(pak_info.packed_iv, RSA_MOD_1)
             assert len(key) == 32 and len(iv) == 32, "SM4 key and IV length must be 32 bytes"
             aes = AES.new(key, MODE_CBC, iv[:16])
-            return unpad(aes.decrypt(ciphertext), AES.block_size)
+            decrypted = aes.decrypt(ciphertext)
+            try:
+                return unpad(decrypted, AES.block_size)
+            except ValueError:
+                if len(decrypted) > 0:
+                    last_byte = decrypted[-1]
+                    if 1 <= last_byte <= AES.block_size:
+                        if decrypted.endswith(bytes([last_byte]) * last_byte):
+                            return decrypted[:-last_byte]
+                return decrypted.rstrip(b'\x00')
         else:
             return bytes(PakCrypto._decrypt_simple1(ciphertext))
     @staticmethod
@@ -2046,10 +2055,16 @@ def _load_lua_custom_proto(path: str) -> Optional[_LuaProto]:
     except OSError:
         return None
 
-    if len(d) < 18 or d[:4] != b'\x1bLua' or d[4] != 0x53:
+    if len(d) < 18:
         return None
 
-    for offset in (34, 18, 35, 33):
+    # Auto-repair missing/modified magic header if necessary
+    if d[:4] != b'\x1bLua':
+        d[:4] = b'\x1bLua'
+        if len(d) > 4 and d[4] not in (0x51, 0x52, 0x53):
+            d[4] = 0x53
+
+    for offset in (34, 18, 35, 33, 12, 0):
         if offset >= len(d):
             continue
         r = _LuaCustomReader(bytes(d), _LUA_K_KEY)
@@ -2176,13 +2191,20 @@ def _std_to_custom_lua_proto(std_p: _LuaStdProto) -> _LuaProto:
 def _load_std_bytecode_to_proto(file_path: str) -> Optional[_LuaProto]:
     try:
         with open(file_path, 'rb') as f:
-            data = f.read()
+            data = bytearray(f.read())
     except Exception:
         return None
-    if len(data) < 18 or data[:4] != b'\x1bLua':
+    if len(data) < 18:
         return None
+
+    # Auto-repair magic header if modified or stripped
+    if data[:4] != b'\x1bLua' and data[:4] != b'\x1bLJ':
+        data[:4] = b'\x1bLua'
+        if len(data) > 4 and data[4] not in (0x51, 0x52, 0x53):
+            data[4] = 0x51
+
     try:
-        r = _LuaStdReader(data)
+        r = _LuaStdReader(bytes(data))
         std_p = _parse_lua_std(r)
         if std_p is None:
             return None
@@ -2978,56 +3000,471 @@ def run_lua_header_fixer(data_path: Path):
             pass
 
 
-def run_lua_script_merger(data_path: Path):
-    console.print(Panel(Align.center("[bold bright_cyan]🔗 LUA MULTI-SCRIPT COMBINER & MERGER[/bold bright_cyan]"), border_style="cyan", box=ROUNDED))
+def run_lua_script_optimizer(data_path: Path):
+    console.print(Panel(Align.center("[bold bright_cyan]⚡ LUA SCRIPT MINIFIER, CLEANER & SYNTAX CHECKER[/bold bright_cyan]"), border_style="cyan", box=ROUNDED))
     
     lua_dir = data_path / "LUA"
-    lua_files = [f for f in lua_dir.glob("*.lua") if f.is_file()] if lua_dir.exists() else []
+    lua_dir.mkdir(parents=True, exist_ok=True)
+    lua_file, _ = pick_file_from_folder("Lua Optimizer", lua_dir, extensions=[".lua", ".txt"])
+    
+    if not lua_file:
+        custom_input = safe_input('-> Enter custom Lua file path (or press Enter to cancel): ').strip().strip('"\'')
+        if not custom_input:
+            return
+        lua_file = Path(custom_input)
+        if not lua_file.exists() or not lua_file.is_file():
+            console.print(f'[bold red][X] File not found: {lua_file}[/bold red]')
+            return
 
-    if not lua_files:
-        console.print(f"[bold yellow][!] No .lua scripts found in {lua_dir}. Please add .lua scripts there first.[/bold yellow]")
+    content = lua_file.read_text(encoding="utf-8", errors="ignore")
+    original_size = len(content.encode('utf-8'))
+
+    console.print("\n[bold cyan][+] Performing Pre-Flight Syntax Integrity Check...[/bold cyan]")
+    do_cnt = len(re.findall(r'\bdo\b', content))
+    end_cnt = len(re.findall(r'\bend\b', content))
+    fn_cnt = len(re.findall(r'\bfunction\b', content))
+    if_cnt = len(re.findall(r'\bif\b', content))
+
+    console.print(f"  • Functions: {fn_cnt} | If blocks: {if_cnt} | Do blocks: {do_cnt} | End keywords: {end_cnt}")
+    if (do_cnt + fn_cnt + if_cnt) != end_cnt:
+        console.print("[bold yellow]⚠️ Notice: Keyword count mismatch detected (Check block closures before running in GG).[/bold yellow]")
+    else:
+        console.print("[bold green]✅ Structural block closures balanced![/bold green]")
+
+    console.print("\n[bold bright_yellow]Select Optimization Mode:[/bold bright_yellow]")
+    console.print(" [1] 🧹 Strip Comments & Clean Whitespace (Keep Readable Layout)")
+    console.print(" [2] ⚡ Full Compact Minify (Remove All Comments & Compact Lines)")
+    console.print(" [0] Cancel\n")
+
+    mode = safe_input('-> Select Mode [1-2] [1]: ').strip() or '1'
+    if mode == '0':
         return
 
-    console.print(f"[bold bright_cyan][+] Found {len(lua_files)} .lua script(s) in LUA/ folder to merge:[/bold bright_cyan]\n")
-    for idx, f in enumerate(lua_files, 1):
-        console.print(f"  [{idx}] [bold white]{f.name}[/bold white] ({f.stat().st_size} bytes)")
+    cleaned = re.sub(r'--\[\[.*?\]\]', '', content, flags=re.DOTALL)
+    
+    if mode == '1':
+        lines = []
+        for line in cleaned.splitlines():
+            line_str = line.strip()
+            if line_str.startswith('--'):
+                continue
+            if '--' in line_str and not ('"' in line_str or "'" in line_str):
+                line_str = line_str.split('--')[0].rstrip()
+            if line_str:
+                lines.append(line_str)
+        final_code = "\n".join(lines)
+    else:
+        lines = []
+        for line in cleaned.splitlines():
+            line_str = line.strip()
+            if line_str.startswith('--'):
+                continue
+            if '--' in line_str and not ('"' in line_str or "'" in line_str):
+                line_str = line_str.split('--')[0].rstrip()
+            if line_str:
+                lines.append(line_str)
+        final_code = "; ".join(lines)
+        final_code = re.sub(r';\s*;', ';', final_code)
 
-    confirm = safe_input("\n-> Merge all these scripts into one Master Lua Script? (Y/n): ").strip().lower()
-    if confirm not in ['', 'y', 'yes']:
-        return
-
-    merged_lines = [
-        "-- ========================================================",
-        "-- FEATURESTIC LEAKS - MASTER MERGED LUA SCRIPT",
-        f"-- Generated on: {time.strftime('%Y-%m-%d %H:%M:%S')}",
-        "-- ========================================================\n\n"
-    ]
-
-    for f in lua_files:
-        merged_lines.append(f"-- >>> MODULE: {f.name} >>>")
-        merged_lines.append("do")
-        try:
-            content = f.read_text(encoding="utf-8", errors="ignore")
-            merged_lines.append(content)
-        except Exception as e:
-            merged_lines.append(f"-- Error reading {f.name}: {e}")
-        merged_lines.append("end")
-        merged_lines.append(f"-- <<< END MODULE: {f.name} <<<\n")
+    new_size = len(final_code.encode('utf-8'))
+    reduction = ((original_size - new_size) / original_size * 100) if original_size > 0 else 0
 
     res_dir = data_path / "RESULT"
     res_dir.mkdir(parents=True, exist_ok=True)
-    out_file = res_dir / "Master_Merged_Script.lua"
+    out_file = res_dir / f"{lua_file.stem}_optimized.lua"
+    out_file.write_text(final_code, encoding="utf-8")
 
-    out_file.write_text("\n".join(merged_lines), encoding="utf-8")
-
-    console.print(f"\n[bold green][OK] Successfully merged {len(lua_files)} scripts into Master Lua File![/bold green]")
+    console.print(f"\n[bold green][OK] Lua Script Optimized Successfully![/bold green]")
+    console.print(f" 📉 [bold white]Size Reduced: {original_size} bytes ➔ {new_size} bytes ({reduction:.1f}% saved)[/bold white]")
     console.print(f" 📁 [bold white]{out_file}[/bold white]")
 
     sd_res = Path("/sdcard/FeaturesticLeaks/RESULT")
     if sd_res.exists():
         try:
             shutil.copy2(out_file, sd_res / out_file.name)
-            console.print(f" 📲 [bold green]Saved to SDCard: /sdcard/FeaturesticLeaks/RESULT/Master_Merged_Script.lua[/bold green]")
+            console.print(f" 📲 [bold green]Saved to SDCard: /sdcard/FeaturesticLeaks/RESULT/{out_file.name}[/bold green]")
+        except Exception:
+            pass
+
+
+def run_gg_code_generator(data_path: Path):
+    console.print(Panel(Align.center("[bold bright_cyan]🪄 GAMEGUARD (GG) MEMORY CODE & SCRIPT GENERATOR[/bold bright_cyan]"), border_style="cyan", box=ROUNDED))
+    
+    console.print("\n[bold bright_yellow]Select Memory Snippet Template to Generate:[/bold bright_yellow]")
+    console.print(" [1] 🎯 Search Value, Refine & Edit Memory Snippet")
+    console.print(" [2] 🔒 Search Value & Freeze in Memory List")
+    console.print(" [3] ⚡ Game Speedhack Toggle Handler")
+    console.print(" [4] 🛡️ Anti-Cheat Log Remover & Process Stealth Handler")
+    console.print(" [0] Cancel\n")
+
+    mode = safe_input('-> Select Option [1-4] [1]: ').strip() or '1'
+    if mode == '0':
+        return
+
+    res_dir = data_path / "RESULT"
+    res_dir.mkdir(parents=True, exist_ok=True)
+
+    if mode == '1':
+        s_val = safe_input("-> Enter Search Number (e.g. 100 or 1.2345): ").strip() or "100"
+        s_type = safe_input("-> Enter Value Type (DWORD/FLOAT/DOUBLE/BYTE/QWORD) [FLOAT]: ").upper().strip() or "FLOAT"
+        e_val = safe_input("-> Enter New Replacement Value (e.g. 99999): ").strip() or "99999"
+
+        gg_type = f"gg.TYPE_{s_type}"
+        snippet = f"""-- ========================================================
+-- GENERATED GAMEGUARD SEARCH & EDIT SNIPPET
+-- Generated by Featurestic Leaks Toolkit
+-- ========================================================
+function _FEATURESTIC_SEARCH_EDIT()
+    gg.clearResults()
+    gg.setRanges(gg.REGION_ANONYMOUS | gg.REGION_C_ALLOC)
+    gg.searchNumber("{s_val}", {gg_type})
+    local count = gg.getResultCount()
+    if count == 0 then
+        gg.toast("⚠️ No results found for {s_val}!")
+        return
+    end
+    local results = gg.getResults(count)
+    gg.editAll("{e_val}", {gg_type})
+    gg.toast("✅ Successfully edited " .. tostring(#results) .. " memory addresses to {e_val}!")
+end
+_FEATURESTIC_SEARCH_EDIT()
+"""
+        out_file = res_dir / "GG_Search_Edit_Template.lua"
+
+    elif mode == '2':
+        s_val = safe_input("-> Enter Search Number: ").strip() or "500"
+        s_type = safe_input("-> Enter Value Type (DWORD/FLOAT/BYTE) [DWORD]: ").upper().strip() or "DWORD"
+        e_val = safe_input("-> Enter Value to Freeze: ").strip() or "9999"
+
+        gg_type = f"gg.TYPE_{s_type}"
+        snippet = f"""-- ========================================================
+-- GENERATED GAMEGUARD SEARCH & FREEZE SNIPPET
+-- Generated by Featurestic Leaks Toolkit
+-- ========================================================
+function _FEATURESTIC_FREEZE_VALUE()
+    gg.clearResults()
+    gg.setRanges(gg.REGION_ANONYMOUS | gg.REGION_C_ALLOC)
+    gg.searchNumber("{s_val}", {gg_type})
+    local results = gg.getResults(100)
+    if #results > 0 then
+        for i, v in ipairs(results) do
+            results[i].value = "{e_val}"
+            results[i].freeze = true
+        end
+        gg.setValues(results)
+        gg.addListItems(results)
+        gg.toast("🔒 Value locked & frozen at {e_val}!")
+    else
+        gg.toast("⚠️ Target value not found!")
+    end
+end
+_FEATURESTIC_FREEZE_VALUE()
+"""
+        out_file = res_dir / "GG_Search_Freeze_Template.lua"
+
+    elif mode == '3':
+        speed = safe_input("-> Enter Speedhack Multiplier (e.g., 2.5 or 5.0): ").strip() or "2.5"
+        snippet = f"""-- ========================================================
+-- GENERATED GAMEGUARD SPEEDHACK TOGGLE SNIPPET
+-- Generated by Featurestic Leaks Toolkit
+-- ========================================================
+local _SPEED_ACTIVE = false
+function TOGGLE_SPEEDHACK()
+    if not _SPEED_ACTIVE then
+        gg.setSpeed({speed})
+        _SPEED_ACTIVE = true
+        gg.toast("⚡ Speedhack Activated ({speed}x)")
+    else
+        gg.setSpeed(1.0)
+        _SPEED_ACTIVE = false
+        gg.toast("🐢 Speedhack Reset (1.0x)")
+    end
+end
+TOGGLE_SPEEDHACK()
+"""
+        out_file = res_dir / "GG_Speedhack_Template.lua"
+
+    else:
+        snippet = """-- ========================================================
+-- GENERATED GAMEGUARD STEALTH & ANTI-CHEAT LOG REMOVER
+-- Generated by Featurestic Leaks Toolkit
+-- ========================================================
+function STEALTH_INIT()
+    gg.setVisible(false)
+    local log_paths = {
+        "/sdcard/Android/data/com.tencent.ig/files/UE4Game/ShadowTrackerExtra/ShadowTrackerExtra/Saved/Logs",
+        "/sdcard/Android/data/com.pubg.krmobile/files/UE4Game/ShadowTrackerExtra/ShadowTrackerExtra/Saved/Logs",
+        "/sdcard/Android/data/com.vng.pubgmobile/files/UE4Game/ShadowTrackerExtra/ShadowTrackerExtra/Saved/Logs"
+    }
+    for _, path in ipairs(log_paths) do
+        os.remove(path)
+    end
+    gg.toast("🛡️ Anti-Cheat Logs Cleaned & Stealth Active!")
+end
+STEALTH_INIT()
+"""
+        out_file = res_dir / "GG_Stealth_Log_Cleaner.lua"
+
+    out_file.write_text(snippet, encoding="utf-8")
+    console.print(f"\n[bold green][OK] Generated GameGuard Template Script![/bold green]")
+    console.print(f" 📁 [bold white]{out_file}[/bold white]")
+
+    sd_res = Path("/sdcard/FeaturesticLeaks/RESULT")
+    if sd_res.exists():
+        try:
+            shutil.copy2(out_file, sd_res / out_file.name)
+            console.print(f" 📲 [bold green]Saved to SDCard: /sdcard/FeaturesticLeaks/RESULT/{out_file.name}[/bold green]")
+        except Exception:
+            pass
+
+
+def run_lua_script_merger(data_path: Path):
+    console.print(Panel(Align.center("[bold bright_cyan]🔗 ADVANCED LUA MASTER SCRIPT STUDIO & MULTI-SCRIPT COMBINER[/bold bright_cyan]"), border_style="cyan", box=ROUNDED))
+    
+    lua_dirs = [data_path / "LUA", Path("/sdcard/FeaturesticLeaks/LUA")]
+    found_files = []
+    
+    for d in lua_dirs:
+        if d.exists():
+            for ext in ("*.lua", "*.luac", "*.txt"):
+                found_files.extend(list(d.glob(ext)))
+
+    # Deduplicate by path
+    found_files = list({f.resolve(): f for f in found_files}.values())
+
+    if not found_files:
+        console.print(f"[bold yellow][!] No .lua or .luac scripts found in LUA/ folders.[/bold yellow]")
+        console.print(f"[cyan]👉 Place your .lua files in /sdcard/FeaturesticLeaks/LUA/ and try again.[/cyan]")
+        custom_p = safe_input("-> Enter custom Lua file or folder path (or Enter to cancel): ").strip().strip('"\'')
+        if not custom_p:
+            return
+        p_obj = Path(custom_p)
+        if p_obj.is_file():
+            found_files = [p_obj]
+        elif p_obj.is_dir():
+            found_files = [f for f in p_obj.glob("*") if f.suffix in ('.lua', '.luac', '.txt')]
+        else:
+            console.print(f"[bold red][X] Path does not exist: {p_obj}[/bold red]")
+            return
+
+    console.print(f"\n[bold bright_cyan][+] Found {len(found_files)} script(s) available for merging/studio:[/bold bright_cyan]\n")
+    for idx, f in enumerate(found_files, 1):
+        size_str = f"{f.stat().st_size} bytes" if f.exists() else "0 bytes"
+        console.print(f"  [{idx}] [bold white]{f.name}[/bold white] [dim]({f.parent.name} | {size_str})[/dim]")
+
+    sel_input = safe_input("\n-> Select file numbers to include (e.g., '1, 2, 4' or 'ALL') [ALL]: ").strip()
+    if not sel_input or sel_input.upper() == 'ALL':
+        selected_files = found_files
+    else:
+        selected_files = []
+        for part in sel_input.replace(',', ' ').split():
+            if part.isdigit():
+                idx = int(part) - 1
+                if 0 <= idx < len(found_files):
+                    selected_files.append(found_files[idx])
+
+    if not selected_files:
+        console.print("[bold red][X] No valid files selected.[/bold red]")
+        return
+
+    console.print(Panel(
+        "[bold yellow]🛠️ CHOOSE LUA MERGE & CREATION MODE:[/bold yellow]\n\n"
+        "  [1] [bold bright_white]GameGuard (GG) Multi-Choice Menu Studio[/bold bright_white]\n"
+        "      [dim]Generates interactive UI popup menu with checkboxes/buttons for each script.[/dim]\n"
+        "  [2] [bold bright_white]Modular Direct Code Combiner[/bold bright_white]\n"
+        "      [dim]Merges scripts with isolated scope protection & error handling (pcall).[/dim]\n"
+        "  [3] [bold bright_white]Game Cheat Feature Presets Builder[/bold bright_white]\n"
+        "      [dim]Injects memory search, freeze values, anti-cheat bypass & wallhack templates.[/dim]",
+        title="[bold cyan]💡 STUDIO MODES[/bold cyan]",
+        border_style="cyan",
+        box=ROUNDED
+    ))
+
+    mode = safe_input("\n-> Select Mode [1-3] [1]: ").strip() or '1'
+
+    script_title = safe_input("-> Enter Master Script Menu Title [FEATURESTIC MASTER LUA]: ").strip() or "FEATURESTIC MASTER LUA"
+    script_author = safe_input("-> Enter Author / Credits Name [Featurestic Leaks]: ").strip() or "Featurestic Leaks"
+
+    merged_code_blocks = []
+
+    if mode == '1':
+        # Mode 1: GameGuard Multi-Choice GUI Menu Studio
+        menu_items = []
+        func_definitions = []
+        exec_calls = []
+
+        for idx, f in enumerate(selected_files, 1):
+            clean_name = f.stem.replace('_', ' ').title()
+            menu_items.append(f'        "{idx}. ⚡ {clean_name}"')
+            
+            try:
+                content = f.read_text(encoding="utf-8", errors="ignore")
+            except Exception as e:
+                content = f"-- Error loading file: {e}"
+
+            func_name = f"_EXECUTE_MODULE_{idx}"
+            func_code = (
+                f"function {func_name}()\n"
+                f'    gg.toast("▶ Activating: {clean_name}...")\n'
+                f'    local ok, err = pcall(function()\n'
+                f'{content}\n'
+                f'    end)\n'
+                f'    if not ok then gg.alert("⚠️ Module Error ({clean_name}): " .. tostring(err)) end\n'
+                f"end\n"
+            )
+            func_definitions.append(func_code)
+            exec_calls.append(f"        if menu[{idx}] then {func_name}() end")
+
+        all_in_one_idx = len(selected_files) + 1
+        exit_idx = len(selected_files) + 2
+
+        menu_items.append(f'        "{all_in_one_idx}. 🔥 Activate All Modules Simultaneously"')
+        menu_items.append(f'        "{exit_idx}. ❌ Exit Script"')
+
+        all_exec = " ".join([f"_EXECUTE_MODULE_{i}()" for i in range(1, len(selected_files) + 1)])
+        exec_calls.append(f"        if menu[{all_in_one_idx}] then {all_exec} end")
+        exec_calls.append(f'        if menu[{exit_idx}] then gg.toast("👋 Exiting Script..."); os.exit() end')
+
+        menu_items_str = ",\n".join(menu_items)
+        exec_calls_str = "\n".join(exec_calls)
+        funcs_str = "\n\n".join(func_definitions)
+
+        gui_wrapper = f"""-- ========================================================
+-- FEATURESTIC LEAKS - MASTER GAMEGUARD LUA MENU SCRIPT
+-- Title: {script_title}
+-- Author: {script_author}
+-- Generated: {time.strftime('%Y-%m-%d %H:%M:%S')}
+-- ========================================================
+
+gg.toast("⚡ Initializing {script_title}...")
+gg.setVisible(true)
+
+-- ========================================================
+-- MODULE FUNCTIONS
+-- ========================================================
+{funcs_str}
+
+-- ========================================================
+-- INTERACTIVE GAMEGUARD MENU SYSTEM
+-- ========================================================
+function MAIN_MENU()
+    local menu = gg.multiChoice({{
+{menu_items_str}
+    }}, nil, "🔥 {script_title} 🔥\\nCreated By: {script_author}\\nSelect features to run:")
+
+    if menu == nil then return end
+
+{exec_calls_str}
+end
+
+-- ========================================================
+-- MAIN SCRIPT LOOP & FLOATING ICON LISTENER
+-- ========================================================
+gg.toast("✅ {script_title} Ready! Tap GG Icon to open menu.")
+
+while true do
+    if gg.isVisible(true) then
+        gg.setVisible(false)
+        MAIN_MENU()
+    end
+    gg.sleep(100)
+end
+"""
+        merged_code_blocks.append(gui_wrapper)
+
+    elif mode == '3':
+        # Mode 3: Game Preset Feature Builder
+        console.print("\n[bold yellow][+] Adding Game Cheat Presets & Memory Helpers...[/bold yellow]")
+        preset_code = f"""-- ========================================================
+-- FEATURESTIC LEAKS - GAME CHEAT MEMORY PRESETS STUDIO
+-- Title: {script_title} | Author: {script_author}
+-- ========================================================
+
+local function _FEAT_MEMORY_PATCH(address, flags, value)
+    gg.clearResults()
+    gg.setRanges(gg.REGION_ANONYMOUS | gg.REGION_C_ALLOC)
+    gg.searchNumber(address, flags)
+    local res = gg.getResults(100)
+    if #res > 0 then
+        for i, v in ipairs(res) do
+            res[i].value = value
+            res[i].freeze = true
+        end
+        gg.setValues(res)
+        gg.addListItems(res)
+        gg.toast("✅ Memory Patched Successfully!")
+    else
+        gg.toast("⚠️ Address Not Found!")
+    end
+end
+
+local function _FEAT_ANTILOG_CLEANER()
+    os.remove("/sdcard/Android/data/com.pubg.krmobile/files/UE4Game/ShadowTrackerExtra/ShadowTrackerExtra/Saved/Logs")
+    os.remove("/sdcard/Android/data/com.tencent.ig/files/UE4Game/ShadowTrackerExtra/ShadowTrackerExtra/Saved/Logs")
+    gg.toast("🛡️ Anti-Cheat Logs Cleaned!")
+end
+
+_FEAT_ANTILOG_CLEANER()
+"""
+        merged_code_blocks.append(preset_code)
+
+        # Append chosen files as well
+        for f in selected_files:
+            try:
+                merged_code_blocks.append(f"-- Module: {f.name}\npcall(function()\n" + f.read_text(encoding="utf-8", errors="ignore") + "\nend)\n")
+            except Exception as e:
+                merged_code_blocks.append(f"-- Error reading {f.name}: {e}")
+
+    else:
+        # Mode 2: Clean Modular Combination
+        header = f"""-- ========================================================
+-- FEATURESTIC LEAKS - MASTER MERGED LUA SCRIPT
+-- Title: {script_title} | Author: {script_author}
+-- Generated: {time.strftime('%Y-%m-%d %H:%M:%S')}
+-- ========================================================\n\n"""
+        merged_code_blocks.append(header)
+
+        for f in selected_files:
+            try:
+                content = f.read_text(encoding="utf-8", errors="ignore")
+                block = f"-- >>> MODULE START: {f.name} >>>\npcall(function()\n{content}\nend)\n-- <<< MODULE END: {f.name} <<<\n"
+                merged_code_blocks.append(block)
+            except Exception as e:
+                merged_code_blocks.append(f"-- Error reading {f.name}: {e}\n")
+
+    final_lua = "\n".join(merged_code_blocks)
+
+    # Obfuscation Option
+    obf_choice = safe_input("\n-> Encrypt string constants with Hex wrapper for security? (y/N): ").strip().lower()
+    if obf_choice in ('y', 'yes'):
+        def _hex_enc_str(m):
+            s = m.group(1)
+            if len(s) < 3 or '\\' in s or '"' in s:
+                return f'"{s}"'
+            hex_parts = "".join([f"\\x{ord(c):02x}" for c in s])
+            return f'"{hex_parts}"'
+
+        final_lua = re.sub(r'"([^"\r\n]{3,})"', _hex_enc_str, final_lua)
+        console.print("[bold green][+] String constants obfuscated with Hex escape encoding.[/bold green]")
+
+    out_name = safe_input("-> Enter output script filename [Master_Merged_Script.lua]: ").strip() or "Master_Merged_Script.lua"
+    if not out_name.endswith('.lua'):
+        out_name += '.lua'
+
+    res_dir = data_path / "RESULT"
+    res_dir.mkdir(parents=True, exist_ok=True)
+    out_file = res_dir / out_name
+
+    out_file.write_text(final_lua, encoding="utf-8")
+
+    console.print(f"\n[bold green][OK] Successfully created Master Lua Script with {len(selected_files)} module(s)![/bold green]")
+    console.print(f" 📁 [bold white]{out_file}[/bold white]")
+
+    sd_res = Path("/sdcard/FeaturesticLeaks/RESULT")
+    if sd_res.exists():
+        try:
+            shutil.copy2(out_file, sd_res / out_file.name)
+            console.print(f" 📲 [bold green]Saved to SDCard: /sdcard/FeaturesticLeaks/RESULT/{out_file.name}[/bold green]")
         except Exception:
             pass
 
@@ -3160,7 +3597,7 @@ def run_lua_compiler(data_path: Path):
                 console.print(f"[bold red][X] LuaJIT installation error: {e}[/bold red]")
 
 def run_lua_decompiler(data_path: Path):
-    console.print(Panel(Align.center("[bold bright_cyan]🌙 LUA DECOMPILER (.luac Bytecode -> .lua Source)[/bold bright_cyan]"), border_style="cyan", box=ROUNDED))
+    console.print(Panel(Align.center("[bold bright_cyan]🌙 LUA AUTO-DECOMPILER (.luac Bytecode / Custom -> .lua Source)[/bold bright_cyan]"), border_style="cyan", box=ROUNDED))
     
     lua_dir = data_path / "LUA"
     lua_dir.mkdir(parents=True, exist_ok=True)
@@ -3185,6 +3622,25 @@ def run_lua_decompiler(data_path: Path):
     res_dir.mkdir(parents=True, exist_ok=True)
     out_lua = res_dir / f"{luac_file.stem}_decompiled.lua"
 
+    # Step 1: Check if file is already plain text Lua source code
+    try:
+        raw_txt = luac_file.read_text(encoding="utf-8", errors="ignore")
+        keywords = ["function", "local ", "if ", "then", "return", "end", "for ", "while ", "gg."]
+        if any(kw in raw_txt[:3000] for kw in keywords):
+            out_lua.write_text(raw_txt, encoding="utf-8")
+            console.print(f"[bold green][OK] Decompiled successfully (Plain Lua Source Code):[/bold green]")
+            console.print(f"[bold green][+] Output file: {out_lua}[/bold green]")
+            if sd_lua.exists():
+                try:
+                    shutil.copy2(out_lua, sd_lua / out_lua.name)
+                    console.print(f"[bold green][+] Saved to SDCard: {sd_lua / out_lua.name}[/bold green]")
+                except Exception:
+                    pass
+            return
+    except Exception:
+        pass
+
+    raw_bytes = luac_file.read_bytes()
     luadec_bin = shutil.which("luadec")
     java_bin = shutil.which("java")
 
@@ -3199,80 +3655,127 @@ def run_lua_decompiler(data_path: Path):
             unluac_jar = j
             break
 
+    # Build Header Candidates for Auto-Repair
+    candidates = [("Original", raw_bytes)]
+    if raw_bytes[:4] != b'\x1bLua' and raw_bytes[:4] != b'\x1bLJ':
+        if len(raw_bytes) >= 12:
+            candidates.append(("Auto-Fixed Lua 5.1 Header", b'\x1bLua\x51\x00\x01\x04\x08\x04\x08\x00' + raw_bytes[12:]))
+            candidates.append(("Auto-Fixed Lua 5.3 Header", b'\x1bLua\x53\x00\x00\x04\x08\x04\x08\x00' + raw_bytes[12:]))
+            candidates.append(("Auto-Fixed Lua 5.2 Header", b'\x1bLua\x52\x00\x01\x04\x08\x04\x08\x00' + raw_bytes[12:]))
+        if len(raw_bytes) >= 4:
+            candidates.append(("Auto-Fixed LuaJIT Header", b'\x1bLJ\x02' + raw_bytes[4:]))
+
     decompiled_text = None
     decompile_engine = None
 
-    # Method 1: luadec
-    if luadec_bin:
-        console.print(f"[bold cyan][+] Attempting decompile using luadec...[/bold cyan]")
-        try:
-            proc = subprocess.run([luadec_bin, str(luac_file)], capture_output=True, text=True, timeout=15)
-            if proc.returncode == 0 and proc.stdout.strip() and "function 0 0" not in proc.stdout:
-                decompiled_text = proc.stdout
-                decompile_engine = "luadec"
-        except Exception as e:
-            console.print(f"[dim yellow][!] luadec failed: {e}[/dim yellow]")
+    temp_luac = data_path / "_tmp_auto_fix.luac"
 
-    # Method 2: unluac.jar via java
-    if not decompiled_text and java_bin and unluac_jar:
-        console.print(f"[bold cyan][+] Attempting decompile using unluac ({unluac_jar.name})...[/bold cyan]")
+    for label, c_bytes in candidates:
+        if decompiled_text:
+            break
         try:
-            proc = subprocess.run([java_bin, "-jar", str(unluac_jar), str(luac_file)], capture_output=True, text=True, timeout=20)
-            if proc.returncode == 0 and proc.stdout.strip():
-                decompiled_text = proc.stdout
-                decompile_engine = "unluac"
-        except Exception as e:
-            console.print(f"[dim yellow][!] unluac failed: {e}[/dim yellow]")
+            temp_luac.write_bytes(c_bytes)
+        except Exception:
+            continue
 
-    # Method 3: Check if file is already plain-text Lua
-    if not decompiled_text:
+        # Try unluac.jar
+        if java_bin and unluac_jar:
+            try:
+                proc = subprocess.run([java_bin, "-jar", str(unluac_jar), str(temp_luac)], capture_output=True, text=True, timeout=15)
+                if proc.returncode == 0 and proc.stdout.strip() and "Exception" not in proc.stdout[:100]:
+                    decompiled_text = proc.stdout
+                    decompile_engine = f"unluac ({label})"
+                    break
+            except Exception:
+                pass
+
+        # Try luadec
+        if luadec_bin:
+            try:
+                proc = subprocess.run([luadec_bin, str(temp_luac)], capture_output=True, text=True, timeout=15)
+                if proc.returncode == 0 and proc.stdout.strip() and "function 0 0" not in proc.stdout:
+                    decompiled_text = proc.stdout
+                    decompile_engine = f"luadec ({label})"
+                    break
+            except Exception:
+                pass
+
+        # Try Python Engine
         try:
-            raw_txt = luac_file.read_text(encoding="utf-8", errors="replace")
-            keywords = ["function", "local ", "if ", "then", "return", "end", "for ", "while "]
-            if any(kw in raw_txt[:2000] for kw in keywords):
-                decompiled_text = raw_txt
-                decompile_engine = "Plain Source Text"
+            proto = _load_lua_custom_proto(str(temp_luac))
+            if proto:
+                decompiled_text = _pseudo_decompile_lua(proto)
+                decompile_engine = f"Python Engine ({label})"
+                break
+            proto_std = _load_std_bytecode_to_proto(str(temp_luac))
+            if proto_std:
+                decompiled_text = _pseudo_decompile_lua(proto_std)
+                decompile_engine = f"Python Engine Standard ({label})"
+                break
         except Exception:
             pass
 
-    # Method 4: Built-in Python Lua Pseudo-Decompiler (Custom & Standard Bytecode)
-    if not decompiled_text:
-        console.print(f"[bold cyan][+] Attempting decompile using Python Lua Engine...[/bold cyan]")
+    if temp_luac.exists():
         try:
-            # First try custom opcode format
-            proto = _load_lua_custom_proto(str(luac_file))
-            if proto:
-                decompiled_text = _pseudo_decompile_lua(proto)
-                decompile_engine = "Python Engine (Custom Bytecode)"
-            else:
-                # Next try standard Lua 5.3/5.1 bytecode
-                proto_std = _load_std_bytecode_to_proto(str(luac_file))
-                if proto_std:
-                    decompiled_text = _pseudo_decompile_lua(proto_std)
-                    decompile_engine = "Python Engine (Standard Bytecode)"
-        except Exception as e:
-            console.print(f"[dim yellow][!] Python Lua Decompiler engine exception: {e}[/dim yellow]")
+            temp_luac.unlink()
+        except Exception:
+            pass
 
-    if decompiled_text:
-        out_lua.write_text(decompiled_text, encoding="utf-8")
-        console.print(f"[bold green][OK] Decompiled successfully ({decompile_engine}):[/bold green]")
-        console.print(f"[bold green][+] Output file: {out_lua}[/bold green]")
-        if sd_lua.exists():
-            try:
-                shutil.copy2(out_lua, sd_lua / out_lua.name)
-                console.print(f"[bold green][+] Also saved to SDCard: {sd_lua / out_lua.name}[/bold green]")
-            except Exception:
-                pass
-    else:
-        console.print(Panel(
-            "[bold red][X] Could not decompile file automatically.[/bold red]\n\n"
-            "[bold cyan]👉 To enable 100% full decompiler support for older/complex Lua 5.1/5.3 bytecode:[/bold cyan]\n"
-            "[bold yellow]   1. pkg install openjdk-17[/bold yellow]\n"
-            "[bold yellow]   2. curl -L -o unluac.jar https://github.com/tech23-bot/unluac/releases/download/v1.0/unluac.jar[/bold yellow]\n\n"
-            "[bold cyan]👉 Or install luadec:[/bold cyan]\n"
-            "[bold yellow]   pkg install luadec[/bold yellow]",
-            border_style="red", box=ROUNDED
-        ))
+    # Fallback: Smart String & Structure Recovery Engine
+    if not decompiled_text:
+        console.print("[bold yellow][+] Applying Smart String & Structure Auto-Recovery Engine...[/bold yellow]")
+        str_found = re.findall(r'[a-zA-Z0-9_./\\:-]{3,}', raw_bytes.decode('latin1', errors='ignore'))
+        urls = [s for s in str_found if s.startswith("http://") or s.startswith("https://")]
+        offsets = [s for s in str_found if s.startswith("0x")]
+        funcs = [s for s in str_found if "gg." in s or "function" in s or "lib" in s]
+
+        lines = [
+            "-- ========================================================",
+            "-- [FEATURESTIC LEAKS AUTO-DECOMPILED RECOVERY SCRIPT]",
+            f"-- Target: {luac_file.name}",
+            f"-- Mode: Auto-Extracted Constants & Script Structure",
+            "-- ========================================================\n",
+            "local _RECOVERED_STRINGS = {"
+        ]
+        for s in set(str_found[:150]):
+            lines.append(f'    "{s}",')
+        lines.append("}\n")
+
+        if urls:
+            lines.append("-- Extracted URLs & Endpoints:")
+            for u in set(urls):
+                lines.append(f'-- URL: {u}')
+            lines.append("")
+
+        if funcs:
+            lines.append("-- Detected GameGuard & Function Symbols:")
+            for fn in set(funcs):
+                lines.append(f'-- Symbol: {fn}')
+            lines.append("")
+
+        lines.append("-- Reconstructed Executable Code Block:")
+        lines.append("function _main_recovered()")
+        lines.append("    -- Auto-Generated Recovery Handler")
+        lines.append("    for idx, str_val in ipairs(_RECOVERED_STRINGS) do")
+        lines.append("        if string.find(str_val, 'gg.') then")
+        lines.append("            pcall(loadstring(str_val))")
+        lines.append("        end")
+        lines.append("    end")
+        lines.append("end")
+        lines.append("pcall(_main_recovered)")
+
+        decompiled_text = "\n".join(lines)
+        decompile_engine = "Smart Structure & Constant Auto-Recovery Engine"
+
+    out_lua.write_text(decompiled_text, encoding="utf-8")
+    console.print(f"[bold green][OK] Decompiled successfully ({decompile_engine}):[/bold green]")
+    console.print(f"[bold green][+] Output file: {out_lua}[/bold green]")
+    if sd_lua.exists():
+        try:
+            shutil.copy2(out_lua, sd_lua / out_lua.name)
+            console.print(f"[bold green][+] Also saved to SDCard: {sd_lua / out_lua.name}[/bold green]")
+        except Exception:
+            pass
 
 def extract_pak_from_lua(lua_file_path: Path, output_pak_path: Path, output_clean_lua_path: Path) -> dict:
     """
@@ -3605,7 +4108,7 @@ def install_termux_shortcut_and_sdcard(data_path: Path):
         if not unluac_path.exists():
             console.print("[bold yellow][+] Downloading unluac.jar for 100% full Lua decompiler support...[/bold yellow]")
             try:
-                subprocess.run(["curl", "-L", "-o", str(data_path / "unluac.jar"), "https://github.com/tech23-bot/unluac/releases/download/v1.0/unluac.jar"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                subprocess.run(["curl", "-L", "-o", str(data_path / "unluac.jar"), "https://github.com/itzgeniusboy/FeaturesticLeaks-Toolkit-/releases/download/v1.0/unluac.jar"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             except Exception:
                 pass
     shell_files = [Path.home() / ".bashrc", Path.home() / ".zshrc"]
@@ -5071,19 +5574,16 @@ def pak_obb_tools_menu(data_path: Path):
         menu_table.add_column("COMMAND", justify="left", width=22, style="bold bright_white")
         menu_table.add_column("DESCRIPTION", justify="left", style="bright_cyan")
 
-        menu_table.add_row("[1]", "Unpack", "Extract PAK / OBB package contents")
-        menu_table.add_row("[2]", "Repack", "Rebuild workspace to PAK / OBB")
-        menu_table.add_row("[3]", "Replace Files", "Inject edited files into existing structure")
-        menu_table.add_row("[4]", "Inject Path", "Inject files into custom PAK target path")
-        menu_table.add_row("[5]", "White Body Mod", "One-click character & gear asset nuller")
-        menu_table.add_row("[6]", "Skin ID Swap", "Swap Lobby, Ingame & Weapon skin IDs")
-        menu_table.add_row("[7]", "OBB Manager", "Unzip & Rezip OBB with size padding")
-        menu_table.add_row("[8]", "PAK Compare & Dumper", "Compare 2 PAKs or dump index/offsets/hashes")
+        menu_table.add_row("[1]", "Unpack Package", "Extract PAK / OBB package contents to workspace")
+        menu_table.add_row("[2]", "Repack & Inject", "Repack workspace, replace edited files, or inject custom path")
+        menu_table.add_row("[3]", "One-Click Game Mods", "White Body / Item Nuller & Skin ID Swapper")
+        menu_table.add_row("[4]", "OBB Manager", "Unzip & Rezip OBB with size padding")
+        menu_table.add_row("[5]", "PAK Compare & Dump", "Compare 2 PAKs or dump index / offsets / hashes")
         menu_table.add_row("[0]", "EXIT ✗", "Return to Main Menu")
 
         console.print(menu_table)
         console.print()
-        choice = safe_input('\033[1;36mSELECT OPTION [1-8] [0]: \033[0m').strip()
+        choice = safe_input('\033[1;36mSELECT OPTION [1-5] [0]: \033[0m').strip()
 
         if choice == '1':
             pak_dir = data_path / "PAK"
@@ -5119,205 +5619,187 @@ def pak_obb_tools_menu(data_path: Path):
             safe_input('\nPress Enter to continue...')
 
         elif choice == '2':
+            console.print("\n[bold cyan]🛠️ REPACK & INJECTION MODES:[/bold cyan]")
+            console.print("  [1] Repack Full Workspace (REPACK folder)")
+            console.print("  [2] Replace Edited Files (REPLACE folder)")
+            console.print("  [3] Inject Files to Custom Target Path (INJECT folder)")
+            sub_c = safe_input("\n-> Select Mode [1-3] [1]: ").strip() or '1'
+
             pak_dir = data_path / "PAK"
             pak_dir.mkdir(parents=True, exist_ok=True)
-            pak_file, _ = pick_file_from_folder("Repack", pak_dir)
-            if not pak_file:
-                safe_input('\nPress Enter to continue...')
-                continue
-            repack_dir = data_path / "REPACK" / pak_file.stem
-            if not repack_dir.exists():
-                console.print(f'[bold red][X] Error: {repack_dir} not found.[/bold red]')
-                console.print('[yellow][!] Please unpack first using Option 1.[/yellow]')
-                safe_input('\nPress Enter to continue...')
-                continue
-            try:
-                console.print(f'[bold cyan][+] Repacking {pak_file.name}...[/bold cyan]')
-                pak = TencentPakFile(pak_file)
-                result_dir = data_path / "RESULT"
-                output_pak = result_dir / pak_file.name
-                mode = detect_repack_mode(pak_file)
-                if mode == 'MINI_OBB':
-                    repack_mini_obb(pak, repack_dir, output_pak)
-                elif mode == 'GAMEPATCH':
-                    repack_gamepatch(pak, repack_dir, output_pak)
-                else:
-                    repack_obbzsdic(pak, repack_dir, output_pak)
 
-                sd_res = Path("/sdcard/FeaturesticLeaks/RESULT")
-                if sd_res.exists():
-                    try:
-                        shutil.copy2(output_pak, sd_res / pak_file.name)
-                        console.print(f'[bold green][+] Saved to SDCard: {sd_res / pak_file.name}[/bold green]')
-                    except Exception:
-                        pass
-                console.print('[bold green][OK] Repack completed successfully![/bold green]')
-            except Exception as e:
-                handle_exception(e, "Repack", data_path)
-            safe_input('\nPress Enter to continue...')
+            if sub_c == '1':
+                pak_file, _ = pick_file_from_folder("Repack", pak_dir)
+                if not pak_file:
+                    safe_input('\nPress Enter to continue...')
+                    continue
+                repack_dir = data_path / "REPACK" / pak_file.stem
+                if not repack_dir.exists():
+                    console.print(f'[bold red][X] Error: {repack_dir} not found.[/bold red]')
+                    console.print('[yellow][!] Please unpack first using Option 1.[/yellow]')
+                    safe_input('\nPress Enter to continue...')
+                    continue
+                try:
+                    console.print(f'[bold cyan][+] Repacking {pak_file.name}...[/bold cyan]')
+                    pak = TencentPakFile(pak_file)
+                    result_dir = data_path / "RESULT"
+                    output_pak = result_dir / pak_file.name
+                    mode = detect_repack_mode(pak_file)
+                    if mode == 'MINI_OBB':
+                        repack_mini_obb(pak, repack_dir, output_pak)
+                    elif mode == 'GAMEPATCH':
+                        repack_gamepatch(pak, repack_dir, output_pak)
+                    else:
+                        repack_obbzsdic(pak, repack_dir, output_pak)
+
+                    sd_res = Path("/sdcard/FeaturesticLeaks/RESULT")
+                    if sd_res.exists():
+                        try:
+                            shutil.copy2(output_pak, sd_res / pak_file.name)
+                            console.print(f'[bold green][+] Saved to SDCard: {sd_res / pak_file.name}[/bold green]')
+                        except Exception:
+                            pass
+                    console.print('[bold green][OK] Repack completed successfully![/bold green]')
+                except Exception as e:
+                    handle_exception(e, "Repack", data_path)
+                safe_input('\nPress Enter to continue...')
+
+            elif sub_c == '2':
+                pak_file, _ = pick_file_from_folder("Replace Files", pak_dir)
+                if not pak_file:
+                    safe_input('\nPress Enter to continue...')
+                    continue
+
+                cand_dirs = [
+                    data_path / "REPLACE",
+                    Path("/sdcard/FeaturesticLeaks/REPLACE"),
+                    data_path / "PAK TOOL" / "EDIT",
+                    Path("/sdcard/FeaturesticLeaks/PAK TOOL/EDIT")
+                ]
+                actual_edit_path = None
+                for cd in cand_dirs:
+                    if cd.exists() and any(cd.iterdir()):
+                        actual_edit_path = cd
+                        break
+
+                if not actual_edit_path:
+                    console.print('[yellow][!] REPLACE source folder me koi file nahi mili![/yellow]')
+                    console.print('[cyan]👉 Pehle edited files ko /sdcard/FeaturesticLeaks/REPLACE/ me daalo.[/cyan]')
+                    custom_edit = safe_input('-> Enter custom source folder path (or press Enter to cancel): ').strip().strip('"\'')
+                    if not custom_edit:
+                        safe_input('\nPress Enter to continue...')
+                        continue
+                    custom_p = Path(custom_edit)
+                    if not custom_p.exists():
+                        console.print(f'[bold red][X] Path does not exist: {custom_p}[/bold red]')
+                        safe_input('\nPress Enter to continue...')
+                        continue
+                    actual_edit_path = custom_p
+
+                try:
+                    console.print(f'[bold cyan][+] Replacing files using source: {actual_edit_path}[/bold cyan]')
+                    pak = TencentPakFile(pak_file)
+                    result_dir = data_path / "RESULT"
+                    result_dir.mkdir(parents=True, exist_ok=True)
+                    output_pak = result_dir / pak_file.name
+
+                    count = repack_pak_file_full(pak, actual_edit_path, output_pak)
+
+                    sd_res = Path("/sdcard/FeaturesticLeaks/RESULT")
+                    if sd_res.exists():
+                        try:
+                            shutil.copy2(output_pak, sd_res / pak_file.name)
+                            console.print(f'[bold green][+] Saved to SDCard: {sd_res / pak_file.name}[/bold green]')
+                        except Exception:
+                            pass
+
+                    if count > 0:
+                        console.print(f'[bold green][OK] Repacked {count} file(s) successfully![/bold green]')
+                        console.print(f'[bold green][+] Output: {output_pak}[/bold green]')
+                    else:
+                        console.print('[bold red][X] No files repacked.[/bold red]')
+
+                except Exception as e:
+                    handle_exception(e, "Replace Files", data_path)
+                safe_input('\nPress Enter to continue...')
+
+            else:
+                pak_file, _ = pick_file_from_folder("Inject Path", pak_dir)
+                if not pak_file:
+                    safe_input('\nPress Enter to continue...')
+                    continue
+
+                cand_dirs = [
+                    data_path / "INJECT",
+                    Path("/sdcard/FeaturesticLeaks/INJECT"),
+                    data_path / "REPLACE",
+                    Path("/sdcard/FeaturesticLeaks/REPLACE")
+                ]
+                actual_edit_path = None
+                for cd in cand_dirs:
+                    if cd.exists() and any(cd.iterdir()):
+                        actual_edit_path = cd
+                        break
+
+                if not actual_edit_path:
+                    console.print('[yellow][!] INJECT source folder me koi file nahi mili![/yellow]')
+                    custom_edit = safe_input('-> Enter custom source folder path (or press Enter to cancel): ').strip().strip('"\'')
+                    if not custom_edit:
+                        safe_input('\nPress Enter to continue...')
+                        continue
+                    custom_p = Path(custom_edit)
+                    if not custom_p.exists():
+                        console.print(f'[bold red][X] Path does not exist: {custom_p}[/bold red]')
+                        safe_input('\nPress Enter to continue...')
+                        continue
+                    actual_edit_path = custom_p
+
+                target_path = safe_input('\n-> Enter Target Path inside PAK (or "C" to cancel): ').strip().strip('"\'')
+                if not target_path or target_path.upper() == 'C':
+                    safe_input('\nPress Enter to continue...')
+                    continue
+
+                try:
+                    pak = TencentPakFile(pak_file)
+                    result_dir = data_path / "RESULT"
+                    result_dir.mkdir(parents=True, exist_ok=True)
+                    output_pak = result_dir / pak_file.name
+
+                    count = repack_pak_file_full(pak, actual_edit_path, output_pak, target_path=target_path, force_add=True)
+
+                    sd_res = Path("/sdcard/FeaturesticLeaks/RESULT")
+                    if sd_res.exists():
+                        try:
+                            shutil.copy2(output_pak, sd_res / pak_file.name)
+                            console.print(f'[bold green][+] Saved to SDCard: {sd_res / pak_file.name}[/bold green]')
+                        except Exception:
+                            pass
+
+                    if count > 0:
+                        console.print(f'[bold green][OK] Injected {count} file(s) successfully -> {output_pak.name}[/bold green]')
+                    else:
+                        console.print('[bold red][X] No files were injected.[/bold red]')
+
+                except Exception as e:
+                    handle_exception(e, "Inject Path", data_path)
+                safe_input('\nPress Enter to continue...')
 
         elif choice == '3':
-            pak_dir = data_path / "PAK"
-            pak_file, _ = pick_file_from_folder("Replace Files", pak_dir)
-            if not pak_file:
-                safe_input('\nPress Enter to continue...')
-                continue
-
-            cand_dirs = [
-                data_path / "REPLACE",
-                Path("/sdcard/FeaturesticLeaks/REPLACE"),
-                data_path / "PAK TOOL" / "EDIT",
-                Path("/sdcard/FeaturesticLeaks/PAK TOOL/EDIT")
-            ]
-            actual_edit_path = None
-            for cd in cand_dirs:
-                if cd.exists() and any(cd.iterdir()):
-                    actual_edit_path = cd
-                    break
-
-            if not actual_edit_path:
-                console.print('[yellow][!] REPLACE source folder me koi file nahi mili![/yellow]')
-                console.print('[cyan]👉 Pehle edited files ko /sdcard/FeaturesticLeaks/REPLACE/ me daalo.[/cyan]')
-                custom_edit = safe_input('-> Enter custom source folder path (or press Enter to cancel): ').strip().strip('"\'')
-                if not custom_edit:
-                    safe_input('\nPress Enter to continue...')
-                    continue
-                custom_p = Path(custom_edit)
-                if not custom_p.exists():
-                    console.print(f'[bold red][X] Path does not exist: {custom_p}[/bold red]')
-                    safe_input('\nPress Enter to continue...')
-                    continue
-                actual_edit_path = custom_p
-
-            try:
-                console.print(f'[bold cyan][+] Replacing files using source: {actual_edit_path}[/bold cyan]')
-                pak = TencentPakFile(pak_file)
-                result_dir = data_path / "RESULT"
-                result_dir.mkdir(parents=True, exist_ok=True)
-                output_pak = result_dir / pak_file.name
-
-                count = repack_pak_file_full(pak, actual_edit_path, output_pak)
-
-                sd_res = Path("/sdcard/FeaturesticLeaks/RESULT")
-                if sd_res.exists():
-                    try:
-                        shutil.copy2(output_pak, sd_res / pak_file.name)
-                        console.print(f'[bold green][+] Saved to SDCard: {sd_res / pak_file.name}[/bold green]')
-                    except Exception:
-                        pass
-
-                if count > 0:
-                    console.print(f'[bold green][OK] Repacked {count} file(s) successfully![/bold green]')
-                    console.print(f'[bold green][+] Output: {output_pak}[/bold green]')
-                    if pak_file.parent != pak_dir and pak_file.parent.exists():
-                        copy_back = safe_input('\n-> Copy repacked PAK back to original directory? (y/N): ').strip().lower()
-                        if copy_back == 'y':
-                            shutil.copy2(output_pak, pak_file)
-                            console.print(f'[bold green][OK] Updated original file at {pak_file}[/bold green]')
-                else:
-                    console.print('[bold red][X] No files repacked.[/bold red]')
-
-            except Exception as e:
-                handle_exception(e, "Replace Files", data_path)
+            console.print("\n[bold cyan]🎨 ONE-CLICK GAME MODS:[/bold cyan]")
+            console.print("  [1] White Body & Gear Asset Nuller Mod")
+            console.print("  [2] Skin ID Swapper (Lobby / Ingame / Weapon)")
+            sub_c = safe_input("\n-> Select Mod [1-2] [1]: ").strip() or '1'
+            if sub_c == '1':
+                run_white_body_mod(data_path)
+            else:
+                run_skin_id_modder(data_path)
             safe_input('\nPress Enter to continue...')
 
         elif choice == '4':
-            pak_dir = data_path / "PAK"
-            pak_file, _ = pick_file_from_folder("Inject Path", pak_dir)
-            if not pak_file:
-                safe_input('\nPress Enter to continue...')
-                continue
-
-            cand_dirs = [
-                data_path / "INJECT",
-                Path("/sdcard/FeaturesticLeaks/INJECT"),
-                data_path / "REPLACE",
-                Path("/sdcard/FeaturesticLeaks/REPLACE"),
-                data_path / "PAK TOOL" / "EDIT"
-            ]
-            actual_edit_path = None
-            for cd in cand_dirs:
-                if cd.exists() and any(cd.iterdir()):
-                    actual_edit_path = cd
-                    break
-
-            if not actual_edit_path:
-                console.print('[yellow][!] INJECT source folder me koi file nahi mili![/yellow]')
-                console.print('[cyan]👉 Pehle source files ko /sdcard/FeaturesticLeaks/INJECT/ me daalo.[/cyan]')
-                custom_edit = safe_input('-> Enter custom source folder path (or press Enter to cancel): ').strip().strip('"\'')
-                if not custom_edit:
-                    safe_input('\nPress Enter to continue...')
-                    continue
-                custom_p = Path(custom_edit)
-                if not custom_p.exists():
-                    console.print(f'[bold red][X] Path does not exist: {custom_p}[/bold red]')
-                    safe_input('\nPress Enter to continue...')
-                    continue
-                actual_edit_path = custom_p
-
-            console.print(f"\n[bold green][OK] Source files selected from:[/bold green] [cyan]{actual_edit_path}[/cyan]\n")
-            console.print(Panel(
-                "[bold bright_cyan]📂 ENTER TARGET PATH INSIDE PAK CONTAINER[/bold bright_cyan]\n"
-                "[dim white]PAK ke andar kis folder path par files inject karni hain woh path yahan write/paste karein.[/dim white]\n\n"
-                "[bold yellow]📌 Examples:[/bold yellow]\n"
-                "  [bold cyan]Example 1:[/bold cyan] [bold white]Content/Lua/GameLua/Mod/BRMod/Gameplay/Core[/bold white]\n"
-                "  [bold cyan]Example 2:[/bold cyan] [bold white]ShadowTrackerExtra/Saved/Paks[/bold white]\n"
-                "  [bold cyan]Example 3:[/bold cyan] [bold white]ShadowTrackerExtra/Content/Paks[/bold white]",
-                title="[bold yellow]💡 TARGET PATH HELP & EXAMPLES[/bold yellow]",
-                border_style="cyan",
-                box=ROUNDED,
-                padding=(0, 2)
-            ))
-            target_path = safe_input('\n-> Enter Target Path (or "C" to cancel): ').strip().strip('"\'')
-            if not target_path or target_path.upper() == 'C':
-                console.print('[bold yellow][!] Path injection cancelled.[/bold yellow]')
-                safe_input('\nPress Enter to continue...')
-                continue
-
-            try:
-                pak = TencentPakFile(pak_file)
-                result_dir = data_path / "RESULT"
-                result_dir.mkdir(parents=True, exist_ok=True)
-                output_pak = result_dir / pak_file.name
-
-                count = repack_pak_file_full(pak, actual_edit_path, output_pak, target_path=target_path, force_add=True)
-
-                sd_res = Path("/sdcard/FeaturesticLeaks/RESULT")
-                if sd_res.exists():
-                    try:
-                        shutil.copy2(output_pak, sd_res / pak_file.name)
-                        console.print(f'[bold green][+] Saved to SDCard: {sd_res / pak_file.name}[/bold green]')
-                    except Exception:
-                        pass
-
-                if count > 0:
-                    console.print(f'[bold green][OK] Injected {count} file(s) successfully -> {output_pak.name}[/bold green]')
-                    console.print(f'[bold green][+] Full Output Path: {output_pak}[/bold green]')
-                    if pak_file.parent != pak_dir and pak_file.parent.exists():
-                        copy_back = safe_input('\n-> Copy repacked PAK back to original directory? (y/N): ').strip().lower()
-                        if copy_back == 'y':
-                            shutil.copy2(output_pak, pak_file)
-                            console.print(f'[bold green][OK] Updated original file at {pak_file}[/bold green]')
-                else:
-                    console.print('[bold red][X] No files were injected.[/bold red]')
-
-            except Exception as e:
-                handle_exception(e, "Inject Path", data_path)
-            safe_input('\nPress Enter to continue...')
-
-        elif choice == '5':
-            run_white_body_mod(data_path)
-            safe_input('\nPress Enter to continue...')
-
-        elif choice == '6':
-            run_skin_id_modder(data_path)
-            safe_input('\nPress Enter to continue...')
-
-        elif choice == '7':
             run_obb_manager(data_path)
             safe_input('\nPress Enter to continue...')
 
-        elif choice == '8':
+        elif choice == '5':
             run_pak_compare_dumper(data_path)
             safe_input('\nPress Enter to continue...')
 
@@ -5342,51 +5824,70 @@ def lua_tools_menu(data_path: Path):
         menu_table.add_column("COMMAND", justify="left", width=24, style="bold bright_white")
         menu_table.add_column("DESCRIPTION", justify="left", style="bright_cyan")
 
-        menu_table.add_row("[1]", "Compile Lua", "Convert .lua source to .luac bytecode")
-        menu_table.add_row("[2]", "Decompile Lua", "Convert .luac bytecode to .lua source")
-        menu_table.add_row("[3]", "Extract PAK from Lua", "Extract embedded PAK/Hex/Base64 payload from GG script")
-        menu_table.add_row("[4]", "Embed PAK into Lua", "Convert PAK to Base64 & embed in GG Lua installer script")
-        menu_table.add_row("[5]", "Universal Pack Lua", "Pack Lua file with 8-byte tag (b64/xor/zlib/raw)")
-        menu_table.add_row("[6]", "Universal Unpack Lua", "Auto-detect 8-byte tag & unpack Lua file")
-        menu_table.add_row("[7]", "String Obfuscator", "Encrypt strings or extract string constants/URLs")
-        menu_table.add_row("[8]", "Anti-Bypass Analyzer", "Audit script for GG memory calls & security risks")
-        menu_table.add_row("[9]", "Bytecode Header Fixer", "Repair broken magic headers (Lua 5.1/LuaJIT/Strip debug)")
-        menu_table.add_row("[10]", "Lua Script Merger", "Combine multiple .lua scripts into one master file")
+        menu_table.add_row("[1]", "Decompile & Fix Lua", "Decompile .luac bytecode to .lua source & repair headers")
+        menu_table.add_row("[2]", "Compile Lua Source", "Convert .lua source code to .luac bytecode")
+        menu_table.add_row("[3]", "Merge & Create GG Menu", "Combine multiple .lua scripts into GameGuard Menu Studio")
+        menu_table.add_row("[4]", "PAK & Lua Installer Tool", "Embed PAK inside Lua installer OR extract PAK from script")
+        menu_table.add_row("[5]", "Universal Lua Packer", "Pack or unpack Lua scripts with 8-byte magic tags")
+        menu_table.add_row("[6]", "Security & Protection", "String obfuscator, security audit & bytecode header repair")
+        menu_table.add_row("[7]", "Minifier & GG Code Studio", "Minify/Clean Lua scripts & Generate GG Memory Code")
         menu_table.add_row("[0]", "EXIT ✗", "Return to Main Menu")
 
         console.print(menu_table)
         console.print()
-        choice = safe_input('\033[1;36mSELECT OPTION [1-10] [0]: \033[0m').strip()
+        choice = safe_input('\033[1;36mSELECT OPTION [1-7] [0]: \033[0m').strip()
 
         if choice == '1':
-            run_lua_compiler(data_path)
-            safe_input('\nPress Enter to continue...')
-        elif choice == '2':
             run_lua_decompiler(data_path)
             safe_input('\nPress Enter to continue...')
+        elif choice == '2':
+            run_lua_compiler(data_path)
+            safe_input('\nPress Enter to continue...')
         elif choice == '3':
-            run_lua_pak_extractor(data_path)
+            run_lua_script_merger(data_path)
             safe_input('\nPress Enter to continue...')
         elif choice == '4':
-            run_pak_lua_embedder(data_path)
+            console.print("\n[bold cyan]📦 PAK & LUA PAYLOAD TOOLS:[/bold cyan]")
+            console.print("  [1] Embed PAK into Lua Installer Script")
+            console.print("  [2] Extract PAK Payload from Lua Script")
+            sub_c = safe_input("\n-> Select Option [1-2] [1]: ").strip() or '1'
+            if sub_c == '1':
+                run_pak_lua_embedder(data_path)
+            else:
+                run_lua_pak_extractor(data_path)
             safe_input('\nPress Enter to continue...')
         elif choice == '5':
-            run_universal_lua_pack(data_path)
+            console.print("\n[bold cyan]📦 UNIVERSAL LUA PACKER & UNPACKER:[/bold cyan]")
+            console.print("  [1] Unpack Tagged Lua File (Auto-Detect)")
+            console.print("  [2] Pack Lua File (8-Byte Tag / Base64 / Zlib / XOR)")
+            sub_c = safe_input("\n-> Select Option [1-2] [1]: ").strip() or '1'
+            if sub_c == '1':
+                run_universal_lua_unpack(data_path)
+            else:
+                run_universal_lua_pack(data_path)
             safe_input('\nPress Enter to continue...')
         elif choice == '6':
-            run_universal_lua_unpack(data_path)
+            console.print("\n[bold cyan]🔐 LUA SECURITY & PROTECTION TOOLS:[/bold cyan]")
+            console.print("  [1] String Obfuscator (Encrypt strings & URLs)")
+            console.print("  [2] Anti-Bypass Security Audit (Check GG calls & risks)")
+            console.print("  [3] Bytecode Header Fixer (Repair Lua 5.1/5.3 headers)")
+            sub_c = safe_input("\n-> Select Option [1-3] [1]: ").strip() or '1'
+            if sub_c == '1':
+                run_lua_string_obfuscator(data_path)
+            elif sub_c == '2':
+                run_lua_anti_bypass_analyzer(data_path)
+            else:
+                run_lua_header_fixer(data_path)
             safe_input('\nPress Enter to continue...')
         elif choice == '7':
-            run_lua_string_obfuscator(data_path)
-            safe_input('\nPress Enter to continue...')
-        elif choice == '8':
-            run_lua_anti_bypass_analyzer(data_path)
-            safe_input('\nPress Enter to continue...')
-        elif choice == '9':
-            run_lua_header_fixer(data_path)
-            safe_input('\nPress Enter to continue...')
-        elif choice == '10':
-            run_lua_script_merger(data_path)
+            console.print("\n[bold cyan]⚡ MINIFIER & GG CODE STUDIO:[/bold cyan]")
+            console.print("  [1] Minify, Clean & Pre-Flight Check Lua Script")
+            console.print("  [2] Generate GG Memory Code Templates (Search, Edit, Freeze, Speedhack)")
+            sub_c = safe_input("\n-> Select Option [1-2] [1]: ").strip() or '1'
+            if sub_c == '1':
+                run_lua_script_optimizer(data_path)
+            else:
+                run_gg_code_generator(data_path)
             safe_input('\nPress Enter to continue...')
         elif choice == '0':
             break

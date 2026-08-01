@@ -42,8 +42,8 @@ export default function App() {
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h1 className="text-lg font-bold tracking-tight text-white">FeaturesticLeaks PAK Tool</h1>
-                <span className="px-2 py-0.5 text-xs font-semibold bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 rounded-full">v2.0</span>
+                <h1 className="text-lg font-bold tracking-tight text-white">FeaturesticLeaks Master Suite</h1>
+                <span className="px-2 py-0.5 text-xs font-semibold bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 rounded-full">v2.5</span>
               </div>
               <p className="text-xs text-slate-400">Termux-API GUI & Streaming I/O Engine</p>
             </div>
