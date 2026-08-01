@@ -4607,6 +4607,17 @@ def pick_file_from_folder(action_title: str, default_folder: Path, extensions: L
             if sd_sub.exists() and sd_sub not in scan_dirs:
                 scan_dirs.append(sd_sub)
             
+        # Multi-folder scan fallback for common workspace directories
+        extra_subdirs = ["LUA", "RESULT", "REPLACE", "UNPACK", "PAK"]
+        base_parent = default_folder.parent if hasattr(default_folder, 'parent') and default_folder.parent.exists() else default_folder
+        for sub in extra_subdirs:
+            cand = base_parent / sub
+            if cand.exists() and cand not in scan_dirs:
+                scan_dirs.append(cand)
+            sd_cand = Path("/sdcard/FeaturesticLeaks") / sub
+            if sd_cand.exists() and sd_cand not in scan_dirs:
+                scan_dirs.append(sd_cand)
+
         for sdir in scan_dirs:
             if sdir.exists() and sdir.is_dir():
                 for p in sdir.iterdir():
@@ -6028,6 +6039,83 @@ def pak_obb_tools_menu(data_path: Path):
             console.print('[bold red][X] Invalid choice.[/bold red]')
             time.sleep(1)
 
+def run_one_click_auto_lua_workflow(data_path: Path):
+    console.print(Panel(Align.center("[bold bright_cyan]🚀 1-CLICK AUTOMATIC LUA FIX & COMPILER WORKFLOW 🚀[/bold bright_cyan]\n[dim white]Auto-scans LUA/RESULT/REPLACE -> Auto-fixes syntax for Lua 5.1 -> Compiles to .luac -> Auto-syncs everywhere![/dim white]"), border_style="cyan", box=ROUNDED))
+    
+    lua_dir = data_path / "LUA"
+    lua_file, _ = pick_file_from_folder("1-Click Auto Lua Workflow", lua_dir, extensions=[".lua", ".txt"])
+    if not lua_file:
+        custom_input = safe_input('-> Enter custom Lua file path (or press Enter to cancel): ').strip().strip('"\'')
+        if not custom_input:
+            return
+        lua_file = Path(custom_input)
+        if not lua_file.exists() or not lua_file.is_file():
+            console.print(f'[bold red][X] File not found: {lua_file}[/bold red]')
+            return
+
+    console.print(f"\n[bold cyan][Step 1/3] Fixing syntax and 5.1 compatibility for '{lua_file.name}'...[/bold cyan]")
+    fixed_lua = fix_lua_syntax_for_lua51(lua_file)
+    console.print(f"[bold green]✅ Syntax fixed! Created patched file: {fixed_lua.name}[/bold green]")
+
+    console.print(f"\n[bold cyan][Step 2/3] Compiling to .luac bytecode...[/bold cyan]")
+    all_compilers = ["luac5.1", "luac51", "luac", "luajit", "luac5.2", "luac5.3", "luac5.4"]
+    available_compilers = [c for c in all_compilers if shutil.which(c)]
+
+    if not available_compilers:
+        console.print("[bold yellow][!] Installing lua51 and luajit via Termux pkg...[/bold yellow]")
+        try:
+            subprocess.run("pkg update -y && pkg install -y lua51 luajit", shell=True, check=True)
+            available_compilers = [c for c in all_compilers if shutil.which(c)]
+        except Exception as e:
+            console.print(f"[bold red][X] Could not auto-install compilers: {e}[/bold red]")
+
+    res_dir = data_path / "RESULT"
+    res_dir.mkdir(parents=True, exist_ok=True)
+    out_luac = res_dir / f"{lua_file.stem}.luac"
+
+    success = False
+    for compiler in available_compilers:
+        if compiler == "luajit":
+            cmd = ["luajit", "-b", str(fixed_lua), str(out_luac)]
+        else:
+            cmd = [compiler, "-o", str(out_luac), str(fixed_lua)]
+        
+        proc = subprocess.run(cmd, capture_output=True, text=True)
+        if proc.returncode == 0:
+            console.print(f"[bold green]✅ Compiled successfully with '{compiler}' -> {out_luac.name} ({out_luac.stat().st_size:,} bytes)[/bold green]")
+            success = True
+            break
+
+    if not success:
+        console.print(f"[bold red][X] Bytecode compilation failed. Using patched .lua script as fallback.[/bold red]")
+        out_luac = res_dir / f"{lua_file.stem}_fixed.lua"
+        shutil.copy2(fixed_lua, out_luac)
+
+    console.print(f"\n[bold cyan][Step 3/3] Auto-syncing compiled output across all workspace folders...[/bold cyan]")
+    target_dirs = [
+        data_path / "LUA",
+        data_path / "RESULT",
+        data_path / "REPLACE",
+        data_path / "INJECT",
+        Path("/sdcard/FeaturesticLeaks/LUA"),
+        Path("/sdcard/FeaturesticLeaks/RESULT"),
+        Path("/sdcard/FeaturesticLeaks/REPLACE"),
+        Path("/sdcard/FeaturesticLeaks/INJECT")
+    ]
+
+    synced_count = 0
+    for td in target_dirs:
+        try:
+            td.mkdir(parents=True, exist_ok=True)
+            dest = td / out_luac.name
+            shutil.copy2(out_luac, dest)
+            synced_count += 1
+        except Exception:
+            pass
+
+    console.print(f"[bold green]🎉 Auto-Sync Complete! Saved output to {synced_count} folders across workspace & SDCard![/bold green]")
+    console.print(f"[bold white]👉 You can now immediately run Repack / Replace without needing to move any files![/bold white]")
+
 def lua_tools_menu(data_path: Path):
     while True:
         print_banner()
@@ -6050,11 +6138,12 @@ def lua_tools_menu(data_path: Path):
         menu_table.add_row("[5]", "Universal Lua Packer", "Pack or unpack Lua scripts with 8-byte magic tags")
         menu_table.add_row("[6]", "Security & Protection", "String obfuscator, security audit & bytecode header repair")
         menu_table.add_row("[7]", "Minifier & GG Code Studio", "Minify/Clean Lua scripts & Generate GG Memory Code")
+        menu_table.add_row("[8]", "1-Click Auto Lua Workflow", "Auto-fix syntax -> Auto-compile -> Auto-sync to all folders")
         menu_table.add_row("[0]", "EXIT ✗", "Return to Main Menu")
 
         console.print(menu_table)
         console.print()
-        choice = safe_input('\033[1;36mSELECT OPTION [1-7] [0]: \033[0m').strip()
+        choice = safe_input('\033[1;36mSELECT OPTION [1-8] [0]: \033[0m').strip()
 
         if choice == '1':
             run_lua_decompiler(data_path)
@@ -6107,6 +6196,9 @@ def lua_tools_menu(data_path: Path):
                 run_lua_script_optimizer(data_path)
             else:
                 run_gg_code_generator(data_path)
+            safe_input('\nPress Enter to continue...')
+        elif choice == '8':
+            run_one_click_auto_lua_workflow(data_path)
             safe_input('\nPress Enter to continue...')
         elif choice == '0':
             break
