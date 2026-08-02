@@ -1,7 +1,7 @@
-# ⚡ FEATURESTIC LEAKS PAK & LUA MASTER SUITE v2.6
+# ⚡ FEATURESTIC LEAKS PAK & LUA MASTER SUITE v2.7
 
 > **Termux / Android Game Reverse Engineering, High-Speed PAK Manipulation & Universal Lua Suite**  
-> Complete high-performance reverse engineering suite for unpacking, repacking, path-injecting, rebuilding Unreal Engine / Tencent `.pak` & `.obb` containers, dumping skin assets, UAsset/UExp auto-pairing, and managing Lua bytecode natively on Termux, Android Linux, and PC.
+> Complete high-performance reverse engineering suite for unpacking, repacking, path-injecting, rebuilding Unreal Engine / Tencent `.pak` & `.obb` containers, dumping skin assets, UAsset/UExp auto-pairing, AI Lua repair, and managing Lua bytecode natively on Termux, Android Linux, and PC.
 
 ---
 
@@ -9,7 +9,7 @@
 
 * **Developer Telegram**: [@L359D](https://t.me/L359D) (VIP Developer)
 * **Official Telegram Channel**: [https://t.me/FeaturesticLeaks](https://t.me/FeaturesticLeaks)
-* **Tool Version**: `FeaturesticLeaks PAK & LUA Master Suite v2.6`
+* **Tool Version**: `FeaturesticLeaks PAK & LUA Master Suite v2.7`
 * **Supported Platform**: Termux / Android Linux / Windows / Linux
 
 ---
@@ -64,7 +64,7 @@ python FeaturesticLeaks.py
 
 ---
 
-## 💡 Quick Launch Shortcuts & One-Click Update
+## 💡 Quick Launch Shortcuts & One-Click Auto-Update
 
 Shortcut commands through tool ko Termux me kisi bhi location se launch kar sakte hain:
 
@@ -72,35 +72,37 @@ Shortcut commands through tool ko Termux me kisi bhi location se launch kar sakt
    ```bash
    leak
    ```
-2. **Category Direct Shortcuts**:
+2. **Category Direct Termux Shortcuts**:
    ```bash
    leak pak     # Launch PAK & OBB Tools Menu directly
    leak lua     # Launch LUA Master Suite directly
    leak watch   # Launch Watch Mode Engine directly
    leak ai      # Launch AI Tools & Multi-API Key Manager
    leak utils   # Launch Utilities & Setup Menu
+   leak update  # Run Instant Auto-Updater
    ```
 3. **`paktool` Command**:
    ```bash
    paktool
    ```
-4. **🚀 Instant Tool Update**:
-   - Tool **automatically** checks for updates on GitHub when launched.
-   - You can also force update anytime via **Utilities Menu -> Option [9] Check Tool Update 🚀**.
+4. **🚀 Instant Auto-Update & Update Banner System**:
+   - **Boot Update Banner**: Tool startup par GitHub check karta hai. Agar update available hai, toh banner notification screen par dikhayega.
+   - **Interactive One-Click Update**: Main Menu par **`U`** press karein ya **Utilities Menu -> Option [9] Check Tool Update** select karein. Tool update download karke, syntax verify karega, `.py.bak` backup create karega, aur auto-restart kar dega.
 
 ---
 
 ## 📂 Category-Wise Modular Menu Architecture
 
-Tool visual layout is restructured into 5 dedicated, clean category menus for a fast, clutter-free Termux experience:
+Tool visual layout is restructured into clean, high-performance category menus:
 
 ```text
 ⚡ MAIN CATEGORY MENU
 ├── [1] 📦 PAK Tools       --> Unpack, Repack, Replace, Inject, Skin Swapper, OBB Manager
 ├── [2] 🌙 LUA Tools       --> Compile, Decompile, Script Merger, Obfuscator, Universal Packer
-├── [3] 👁️ Watch Mode      --> Real-time auto-unpack (.pak) & auto-compile (.lua) folder watcher
-├── [4] 🤖 AI Tools        --> AI Lua Repair Engine & Multi-API Key Manager (Gemini / Groq)
-└── [5] 🛠️ Utilities       --> UE4 String Tool, Lib URL Patcher, Finder, Resizer, Auto-Setup & FAQ
+├── [3] 👁️ Watch Mode      --> Real-time auto-unpack (.pak) & auto-compile (.lua) folder watcher with shortcuts
+├── [4] 🤖 AI Tools        --> AI Lua Repair Engine & Multi-API Key Manager (Gemini / Groq / OpenRouter)
+├── [5] 🛠️ Utilities       --> UE4 String Tool, Lib Patcher, Finder, Resizer, FAQ & Diagnostic Benchmark
+└── [U] 🚀 Auto-Update     --> One-touch GitHub auto-update & auto-restart engine
 ```
 
 ---
@@ -124,7 +126,7 @@ Tool launch hote hi SDCard (`/sdcard/FeaturesticLeaks/`) me structured workspace
 │   ├── ⚙️ 3_COMPILED/           <-- Compiled .luac bytecode files
 │   └── 🎉 4_RESULT/             <-- Final processed & merged scripts
 │
-└── 📋 LOGS/                    <-- System logs & debug reports
+└── 📋 LOGS/                    <-- System logs & auto-trimmed debug reports
 ```
 
 > 💡 **Clean File Manager Experience**: Bikhre hue temporary folders auto-clean ho jaate hain. Aap ZArchiver me direct `/sdcard/FeaturesticLeaks/` open karke easily manage kar sakte hain.
@@ -158,14 +160,16 @@ Tool launch hote hi SDCard (`/sdcard/FeaturesticLeaks/`) me structured workspace
    - Uses AI models (Google Gemini, Groq, OpenRouter) to fix broken Lua syntax, missing end statements, and GameGuard errors.
    - Built-in Multi-API key manager with key rotation fallback and multi-provider selection.
 
-### 🛠️ 3. Utilities & Help
+### 🛠️ 3. Utilities, Diagnostic & Auto-Updater
 1. **UE4 String Tool**: Extract and repack readable string literals inside `.uasset` / `.uexp` binary files.
 2. **File Finder**: Search files inside PAK structure by keyword or extension.
 3. **Termux Auto-Setup**: Configures `leak` global terminal command and SDCard directories automatically.
 4. **File Resizer & Equalizer**: Match exact byte size of any PAK, OBB, or LUA file.
 5. **Workspace Cleanup**: Easily clear temporary working folders to free up storage space.
-6. **Check Tool Update 🚀**: Force instant GitHub update check to pull the latest code seamlessly.
-7. **Watch Mode 👁️**: Monitors PAK and LUA input folders in real-time and automatically unpacks `.pak` files or compiles `.lua` scripts as soon as they are dropped.
+6. **Check Tool Update 🚀 (`[U]`)**: Force instant GitHub update check to download verified updates and auto-restart.
+7. **Diagnostic & Benchmark ⚡ (`Option [10]`)**: Real-time system RAM inspection, Lua compiler speed test (in ms), and automatic log hygiene.
+8. **Watch Mode 👁️**: Monitors PAK and LUA input folders in real-time with direct menu shortcuts (`[1]-[5]`, `[U]`, `[help]`).
+9. **Filtered Telegram Bug Reporter**: Sends silent crash reports for actual code bugs to developer Telegram bot, while filtering out normal API limits and file missing notices.
 
 ---
 
@@ -174,3 +178,4 @@ Tool launch hote hi SDCard (`/sdcard/FeaturesticLeaks/`) me structured workspace
 * **Main Developer**: **[@L359D](https://t.me/L359D)**
 * **Official Telegram Channel**: **[t.me/FeaturesticLeaks](https://t.me/FeaturesticLeaks)**
 * **Platform**: Termux / Android Linux / Windows / Linux
+

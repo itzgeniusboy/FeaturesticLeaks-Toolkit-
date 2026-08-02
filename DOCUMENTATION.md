@@ -1,6 +1,6 @@
-# 📖 FeaturesticLeaks PAK & LUA Master Suite v2.6 — Official Step-by-Step Guide & Manual (Hinglish)
+# 📖 FeaturesticLeaks PAK & LUA Master Suite v2.7 — Official Step-by-Step Guide & Manual (Hinglish)
 
-Is official manual me **FeaturesticLeaks PAK & LUA Master Suite v2.6** ke har ek feature, menu option aur process ko bilkul saral aur detailed Hindi-English (Hinglish) me samjhaya gaya hai.
+Is official manual me **FeaturesticLeaks PAK & LUA Master Suite v2.7** ke har ek feature, menu option aur process ko bilkul saral aur detailed Hindi-English (Hinglish) me samjhaya gaya hai.
 
 ---
 
@@ -62,6 +62,7 @@ Tool ko baar-baar poora path likhe bina launch aur update karne ke liye Termux s
    leak watch   # Direct Watch Mode Engine
    leak ai      # Direct AI Tools & API Key Manager
    leak utils   # Direct Utilities & Setup Sub-Menu
+   leak update  # Direct Auto-Updater Check
    ```
 
 3. **`paktool` Shortcut**:
@@ -69,9 +70,9 @@ Tool ko baar-baar poora path likhe bina launch aur update karne ke liye Termux s
    paktool
    ```
 
-4. **🚀 Instant Update System**:
-   - Tool start hote hi automatically GitHub repository check karta hai. Agar koi naya commit/update aaya ho, toh bina user ka data khoye instant auto-update kar deta hai!
-   - Aap **Utilities Menu -> Option [9] Check Tool Update 🚀** par click karke kabhi bhi manual force update check kar sakte hain.
+4. **🚀 Instant Update & Banner System**:
+   - Tool start hote hi background me automatically GitHub check karta hai. Agar koi update milta hai, toh banner notification screen par dikhta hai.
+   - Main menu me **`U`** dabayein ya **Utilities Menu -> Option [9] Check Tool Update** chunien. Tool update download karke, syntax verify karega, `.py.bak` backup create karega, aur auto-restart ho jayega.
 
 ---
 
@@ -181,7 +182,7 @@ Option `2` chunte hi aapko 3 Modes milenge:
 
 ---
 
-### 🛠️ CATEGORY 3: UTILITIES & HELP
+### 🛠️ CATEGORY 3: UTILITIES, DIAGNOSTICS & UPDATES
 
 #### **[1] UE4 String Tool**: `.uasset` / `.uexp` binary files me se text strings dump karta hai aur modify karke wapas repack karta hai.
 #### **[2] File Finder**: PAK workspace ya folders me keyword dwara target files search karta hai.
@@ -189,17 +190,21 @@ Option `2` chunte hi aapko 3 Modes milenge:
 #### **[4] File Resizer & Equalizer**: Kisi bhi PAK, OBB, ya LUA file ka exact byte size match karta hai.
 #### **[5] Cleanup Workspace**: Extra temporary working folders ko delete karke storage space clear karta hai.
 #### **[6] Check Tool Update 🚀**: GitHub se instant latest update pull karta hai.
-#### **[8] Watch Mode 👁️**: Input folders ko real-time monitor karta hai. Jaise hi koi naye `.pak` ya `.lua` files drop ki jati hain, yeh unhe automatically unpack ya compile kar deta hai.
+#### **[10] Diagnostic & Benchmark ⚡**: Termux RAM usage inspect karta hai, Lua compiler speed (ms) check karta hai, aur old log files clear karta hai.
+#### **[8] Watch Mode 👁️**: Input folders ko real-time monitor karta hai. Jaise hi koi naye `.pak` ya `.lua` files drop ki jati hain, yeh unhe automatically unpack ya compile kar deta hai. Shortcuts panel include karta hai (`[1]-[5]`, `[U]`, `[help]`).
 
 ---
 
 ## ❓ Common FAQs & Troubleshooting
 
 ### **Q1: Tool ko update kaise karein?**
-* **Answer**: Tool start hote hi automatically GitHub se auto-update check kar leta hai. Ya aap Main Menu me **Utilities & Help -> Option [7] Check Tool Update 🚀** select karke instant update kar sakte hain.
+* **Answer**: Main Menu me **`U`** type karein ya **Utilities & Help -> Option [9] Check Tool Update 🚀** select karein. Tool automatically GitHub se verified update pull karke auto-restart ho jayega.
 
 ### **Q2: File Manager me folders clean kaise rahte hain?**
 * **Answer**: Purane bikhre hue folders auto-clean ho chuke hain! Ab sirf do organized main folders **`PAK_WORKSPACE`** aur **`LUA_WORKSPACE`** rahenge, jiske andar numeric sub-folders (`1_PAK_INPUT`, `2_UNPACK`, `3_REPLACE`, `4_INJECT`, `5_RESULT`) honge.
+
+### **Q3: Bug report developer ko kaise jata hai?**
+* **Answer**: Tool me automatic bug reporting engine shamil hai jo sirf actual python code errors developer ke Telegram bot par bhejta hai. Normal API rate limits aur user file missing error messages filter ho jaate hain.
 
 ---
 
@@ -208,3 +213,4 @@ Option `2` chunte hi aapko 3 Modes milenge:
 * **Main Developer**: **[@L359D](https://t.me/L359D)** (VIP Developer)
 * **Official Telegram Channel**: **[t.me/FeaturesticLeaks](https://t.me/FeaturesticLeaks)**
 * **Supported Platform**: Termux / Android Linux / Windows / Linux
+
