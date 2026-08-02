@@ -6153,11 +6153,11 @@ def pak_obb_tools_menu(data_path: Path):
                     all_dirs = sorted(list({str(d).strip() for d in pak._index.keys() if str(d).strip() and str(d).strip() != "."}))
 
                     preset_map = {
-                        "P1": ("Content/Lua/GameLua/Mod/BRMod/Gameplay/Core", "⭐ BR Mod / Gameplay Lua (BGMI / PUBG Mobile Recommended)"),
-                        "P2": ("Content/Lua/GameLua", "Main Game Lua Root"),
-                        "P3": ("Content/Lua/client", "Client Lua Scripts"),
-                        "P4": ("Content/Lua/slua", "slua Script Root"),
-                        "P5": ("ShadowTrackerExtra/Content/Lua/GameLua/Mod/BRMod/Gameplay/Core", "ShadowTrackerExtra Prefix (PUBG Global / KR / VNG PAKs)"),
+                        "P1": ("Content/Lua/GameLua/Mod/BRMod/Gameplay/Core", "⭐ BGMI / PUBG Mobile Main Lua Path (BRMod / Gameplay / Core)"),
+                        "P2": ("Content/Lua/GameLua", "⭐ BGMI / PUBG Mobile GameLua Root Folder"),
+                        "P3": ("Content/Lua/client", "Client Lua Scripts Directory"),
+                        "P4": ("Content/Lua/slua", "slua Engine Script Root"),
+                        "P5": ("ShadowTrackerExtra/Content/Lua/GameLua/Mod/BRMod/Gameplay/Core", "⭐ BGMI / PUBG Global / KR / VNG (ShadowTrackerExtra Prefix)"),
                         "P6": ("ShadowTrackerExtra/Saved/Paks", "Patch Paks Folder Location"),
                     }
 
