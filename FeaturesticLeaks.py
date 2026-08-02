@@ -6073,7 +6073,7 @@ def pak_obb_tools_menu(data_path: Path):
 
                 try:
                     pak = TencentPakFile(pak_file)
-                    all_dirs = sorted([d for d in pak._index.keys() if d.strip()])
+                    all_dirs = sorted(list({str(d).strip() for d in pak._index.keys() if str(d).strip() and str(d).strip() != "."}))
 
                     if all_dirs:
                         dir_table = Table(
@@ -6086,7 +6086,7 @@ def pak_obb_tools_menu(data_path: Path):
                         dir_table.add_column("Index", style="bold yellow", justify="center", width=8)
                         dir_table.add_column("PAK Internal Folder Path", style="bold white", justify="left")
                         for i, d in enumerate(all_dirs[:20], 1):
-                            dir_table.add_row(str(i), d)
+                            dir_table.add_row(str(i), str(d))
                         console.print()
                         console.print(dir_table)
 
