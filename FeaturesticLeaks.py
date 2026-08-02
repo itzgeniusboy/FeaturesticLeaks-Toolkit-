@@ -4435,6 +4435,45 @@ def boot_sequence():
     
     time.sleep(0.2)
 
+def send_telegram_bug_report(err_type: str, err_msg: str, action_name: str = "Operation", file_info: str = "?", line_no: str = "?", func_name: str = "?", tb_str: str = ""):
+    """
+    Sends automated bug report silently to Developer Telegram Bot/Chat in a background thread.
+    Direct delivery from user's Termux app to Developer's Telegram account without user effort!
+    """
+    def _send_bg():
+        try:
+            cfg = get_ai_config() if 'get_ai_config' in globals() else {}
+            bot_token = cfg.get("telegram_bot_token") or os.environ.get("TELEGRAM_BOT_TOKEN") or "8731766223:AAG7ZLyIO_yMk-U9qoJIviPuzFzIoAmrAbM"
+            chat_id = cfg.get("telegram_chat_id") or os.environ.get("TELEGRAM_CHAT_ID") or "-1004375122082"
+            
+            if not bot_token or not chat_id:
+                return
+                
+            report_text = (
+                f"🚨 <b>FEATURESTIC LEAKS - AUTOMATED BUG REPORT</b> 🚨\n\n"
+                f"<b>Action:</b> {action_name}\n"
+                f"<b>Error Type:</b> {err_type}\n"
+                f"<b>Location:</b> {file_info}:{line_no} in <code>{func_name}()</code>\n"
+                f"<b>Error Message:</b> <code>{escape(err_msg[:300])}</code>\n\n"
+                f"<b>Traceback snippet:</b>\n<code>{escape(tb_str[-800:]) if tb_str else 'N/A'}</code>"
+            )
+            
+            url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
+            payload = json.dumps({
+                "chat_id": chat_id,
+                "text": report_text,
+                "parse_mode": "HTML"
+            }).encode("utf-8")
+            
+            req = urllib.request.Request(url, data=payload, headers={"Content-Type": "application/json"})
+            urllib.request.urlopen(req, timeout=5)
+        except Exception:
+            pass
+
+    import threading
+    threading.Thread(target=_send_bg, daemon=True).start()
+
+
 def handle_exception(e: Exception, action_name: str = "Operation", data_path: Optional[Path] = None):
     """
     Centralized smart error diagnostic handler:
@@ -4547,6 +4586,12 @@ def handle_exception(e: Exception, action_name: str = "Operation", data_path: Op
             f.write(traceback.format_exc())
             
         log_filename = f"logs/{log_file.name}"
+    except Exception:
+        pass
+
+    # Dispatch automated background error report directly to Developer Telegram
+    try:
+        send_telegram_bug_report(err_type, err_msg, action_name, file_info, str(line_no), func_name, traceback.format_exc())
     except Exception:
         pass
 
@@ -6502,20 +6547,30 @@ def run_one_click_auto_lua_workflow(data_path: Path):
 AI_CONFIG_FILE = Path.home() / ".featurestic_ai_config.json"
 
 def get_ai_config() -> Dict[str, Any]:
-    if AI_CONFIG_FILE.exists():
-        try:
-            with open(AI_CONFIG_FILE, "r", encoding="utf-8") as f:
-                return json.load(f)
-        except Exception:
-            pass
-    return {
+    default_cfg = {
         "active_provider": "google",
         "keys": {
             "google": [],
             "groq": [],
             "openrouter": []
-        }
+        },
+        "telegram_bot_token": "8731766223:AAG7ZLyIO_yMk-U9qoJIviPuzFzIoAmrAbM",
+        "telegram_chat_id": "-1004375122082"
     }
+    if AI_CONFIG_FILE.exists():
+        try:
+            with open(AI_CONFIG_FILE, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                if isinstance(data, dict):
+                    default_cfg.update(data)
+                    if not default_cfg.get("telegram_bot_token"):
+                        default_cfg["telegram_bot_token"] = "8731766223:AAG7ZLyIO_yMk-U9qoJIviPuzFzIoAmrAbM"
+                    if not default_cfg.get("telegram_chat_id"):
+                        default_cfg["telegram_chat_id"] = "-1004375122082"
+                    return default_cfg
+        except Exception:
+            pass
+    return default_cfg
 
 def save_ai_config(cfg: Dict[str, Any]):
     try:
@@ -6553,14 +6608,17 @@ def manage_ai_api_keys():
             is_active = " (Active)" if prov == active_prov else ""
             table.add_row(prov.capitalize() + is_active, str(len(keys)), hints)
         
+        bot_status = "Configured" if cfg.get("telegram_bot_token") and cfg.get("telegram_chat_id") else "Not Set"
+        console.print(f"[bold white]Auto-Report Status:[/bold white] [bold cyan]{bot_status}[/bold cyan]")
         console.print(table)
         console.print()
         console.print("  [1] Add API Key (Google / Groq / OpenRouter)")
         console.print("  [2] Set Active Provider")
         console.print("  [3] Delete / Clear Keys")
+        console.print("  [4] Configure Developer Telegram Auto-Report Bot 🚨")
         console.print("  [0] Back to Menu")
         
-        choice = safe_input("\n-> Select Option [0-3]: ").strip()
+        choice = safe_input("\n-> Select Option [0-4]: ").strip()
         if choice == '1':
             console.print("\n[bold cyan]Select Provider to Get/Add API Key:[/bold cyan]")
             console.print("  [1] Google Gemini  👉 [bright_blue]https://aistudio.google.com/app/apikey[/bright_blue]")
@@ -6617,6 +6675,29 @@ def manage_ai_api_keys():
                 save_ai_config(cfg)
                 console.print("[bold green]✅ Cleared all saved API keys![/bold green]")
             time.sleep(1)
+        elif choice == '4':
+            console.print("\n[bold cyan]🚨 Configure Telegram Auto-Report Bot for Direct Error Delivery:[/bold cyan]")
+            console.print("[dim white]Create a bot on Telegram via @BotFather to get your Bot Token & Chat ID.[/dim white]\n")
+            
+            curr_token = cfg.get("telegram_bot_token", "")
+            curr_chat = cfg.get("telegram_chat_id", "")
+            
+            if curr_token and curr_chat:
+                console.print(f"[bold white]Current Bot Token:[/bold white] [bright_yellow]{curr_token[:8]}...{curr_token[-4:]}[/bright_yellow]")
+                console.print(f"[bold white]Current Chat ID:[/bold white] [bright_yellow]{curr_chat}[/bright_yellow]\n")
+            
+            token_in = safe_input("-> Enter Telegram Bot Token (or press Enter to keep current): ").strip()
+            chat_in = safe_input("-> Enter Developer Telegram Chat ID (or press Enter to keep current): ").strip()
+            
+            if token_in:
+                cfg["telegram_bot_token"] = token_in
+            if chat_in:
+                cfg["telegram_chat_id"] = chat_in
+                
+            save_ai_config(cfg)
+            console.print("[bold green]✅ Telegram Auto-Report configuration updated successfully![/bold green]")
+            console.print("[dim white]All unhandled errors anywhere on user devices will now instantly land on your Telegram![/dim white]")
+            time.sleep(1.5)
         elif choice == '0':
             break
 
@@ -7114,6 +7195,211 @@ def watch_mode_menu(data_path: Path):
             time.sleep(1)
 
 
+def run_ai_watch_assistant(data_path: Path):
+    """
+    AI ASSISTANT - WATCH MODE STYLE
+    Runs in background loop, detects incoming files in workspace input folders,
+    asks user interactively, performs actions (Unpack, Compile, AI Repair, Explain),
+    reports results, and offers error fixing / developer auto-reporting.
+    """
+    print_banner()
+    console.print(Panel(
+        "[bold bright_cyan]🤖 AI MODDING ASSISTANT (WATCH MODE) 🤖[/bold bright_cyan]\n\n"
+        "[bold white]Conversational Real-time AI Engine[/bold white]\n"
+        " • [bright_yellow]Detects incoming files in workspace input folders every 2 seconds[/bright_yellow]\n"
+        " • [bright_cyan]Asks you what action to perform (Unpack, Compile, AI Fix, Auto, Skip)[/bright_cyan]\n"
+        " • [bright_green]Responds to natural voice/text commands ('Haan', 'Nahi', 'Unpack', 'Fix', etc.)[/bright_green]\n"
+        " • [bright_magenta]Auto-generates error reports & fixes bugs automatically![/bright_magenta]\n\n"
+        "[dim white]Type 'exit' or press Ctrl+C anytime to stop assistant.[/dim white]",
+        border_style="cyan",
+        box=ROUNDED
+    ))
+
+    watch_folders = [
+        data_path / "PAK",
+        data_path / "LUA",
+        data_path / "INJECT",
+        Path("/sdcard/FeaturesticLeaks/PAK_WORKSPACE/1_PAK_INPUT"),
+        Path("/sdcard/FeaturesticLeaks/LUA_WORKSPACE/1_LUA_INPUT")
+    ]
+    for wf in watch_folders:
+        try:
+            wf.mkdir(parents=True, exist_ok=True)
+        except Exception:
+            pass
+
+    processed_files = set()
+    for wf in watch_folders:
+        if wf.exists():
+            for f in wf.glob("*"):
+                if f.is_file() and not f.name.startswith("."):
+                    processed_files.add(f.resolve())
+
+    console.print("\n[bold bright_yellow]👁️ AI Watch Assistant Active! Listening for new files or commands...[/bold bright_yellow]\n")
+
+    while True:
+        try:
+            new_file = None
+            for wf in watch_folders:
+                if wf.exists():
+                    for f in wf.glob("*"):
+                        if f.is_file() and not f.name.startswith(".") and f.resolve() not in processed_files:
+                            new_file = f.resolve()
+                            processed_files.add(new_file)
+                            break
+                if new_file:
+                    break
+
+            if new_file:
+                ext = new_file.suffix.lower()
+                parent_str = str(new_file.parent).lower()
+
+                # Smart Folder Misplacement Auto-Detection & Routing
+                correct_target = None
+                if ext in ['.pak', '.obb'] and ('lua' in parent_str):
+                    correct_target = data_path / "PAK"
+                elif ext in ['.lua', '.luac'] and ('pak' in parent_str or 'inject' in parent_str):
+                    correct_target = data_path / "LUA"
+
+                if correct_target:
+                    console.print(Panel(
+                        f"[bold bright_red]⚠️ GALT FOLDER DETECTED![/bold bright_red]\n\n"
+                        f"[bold white]File:[/bold white] [bright_yellow]{new_file.name}[/bright_yellow] ({ext})\n"
+                        f"[bold white]Aapne ise wrong folder me daala:[/bold white] [red]{new_file.parent}[/red]\n"
+                        f"[bold bright_cyan]🤖 AI Assistant: Main is file ko auto-detect karke sahi folder [bright_green]'{correct_target.name}'[/bright_green] me move kar raha hu![/bold bright_cyan]",
+                        border_style="red",
+                        box=ROUNDED
+                    ))
+                    try:
+                        correct_target.mkdir(parents=True, exist_ok=True)
+                        dest_p = correct_target / new_file.name
+                        shutil.move(str(new_file), str(dest_p))
+                        new_file = dest_p
+                        processed_files.add(new_file.resolve())
+                        console.print(f"[bold green]✅ Auto-Moved File to Sahi Folder: {new_file}[/bold green]\n")
+                    except Exception as m_err:
+                        console.print(f"[dim yellow]Auto-move note: {m_err}[/dim yellow]")
+
+                console.print(Panel(
+                    f"[bold bright_yellow]🔍 NEW FILE DETECTED:[/bold bright_yellow] [bold cyan]{new_file.name}[/bold cyan]\n"
+                    f"[bold white]Location:[/bold white] {new_file.parent}\n"
+                    f"[bold white]Size:[/bold white] {human_size(new_file.stat().st_size)}",
+                    border_style="yellow",
+                    box=ROUNDED
+                ))
+
+                default_action = "Unpack" if ext in ['.pak', '.obb'] else ("Compile" if ext in ['.lua', '.txt'] else "Process")
+
+                console.print(f"[bold bright_cyan]🤖 AI Assistant:[bold /bright_cyan] Ye file [bold white]'{new_file.name}'[/bold white] mili hai! Kya {default_action} karun?")
+                console.print("[dim white]Options: [Haan / 1] Unpack/Compile  |  [2] AI Fix  |  [3] Auto  |  [Nahi / 0] Skip[/dim white]")
+
+                user_input = safe_input("\n💬 You: ").strip()
+
+                if user_input.lower() in ['exit', 'quit', 'cancel']:
+                    break
+
+                low_in = user_input.lower()
+                should_process = False
+                action = default_action.lower()
+
+                if low_in in ['haan', 'yes', 'y', '1', 'ok', 'sure', 'unpack', 'compile', 'process']:
+                    should_process = True
+                elif low_in in ['auto', '3']:
+                    should_process = True
+                    action = 'auto'
+                elif low_in in ['fix', 'repair', '2']:
+                    should_process = True
+                    action = 'fix'
+                elif low_in in ['nahi', 'no', 'n', '0', 'skip']:
+                    console.print("[bold dim white]🤖 AI Assistant: Okay, file skip kar di.[/bold dim white]\n")
+                    continue
+                else:
+                    should_process = True
+                    action = low_in
+
+                if should_process:
+                    console.print(f"\n[bold cyan]⚡ AI Executing Action...[/bold cyan]")
+                    try:
+                        if ext in ['.pak', '.obb'] or 'pak' in action or 'unpack' in action or 'auto' in action:
+                            pak = TencentPakFile(new_file)
+                            out_unpack = data_path / "UNPACK" / new_file.stem
+                            pak.dump(out_unpack)
+                            console.print(f"[bold green]✅ AI Report: PAK successfully unpacked to {out_unpack}![/bold green]")
+                            sd_unpack = Path("/sdcard/FeaturesticLeaks/UNPACK") / new_file.stem
+                            if sd_unpack.parent.exists() and sd_unpack != out_unpack:
+                                try:
+                                    pak.dump(sd_unpack)
+                                    console.print(f"[bold green]   Also saved to SDCard: {sd_unpack}[/bold green]")
+                                except Exception:
+                                    pass
+                            console.print("[bold bright_cyan]💡 AI Suggestion: Iske baad Option [1] -> Option [2] se files replace/repack karke game me test kar sakte hain![/bold bright_cyan]\n")
+
+                        elif ext in ['.lua', '.txt'] or 'lua' in action or 'compile' in action or 'auto' in action:
+                            if action == 'fix' or 'fix' in action or 'repair' in action:
+                                code = new_file.read_text(errors='ignore')
+                                console.print("[bold cyan]🤖 AI repairing Lua syntax...[/bold cyan]")
+                                fixed_code = ai_fix_lua_code(code)
+                                if fixed_code:
+                                    new_file.write_text(fixed_code, encoding='utf-8')
+                                    console.print("[bold green]✅ AI Report: Lua syntax repaired successfully![/bold green]")
+                            
+                            fixed_lua = fix_lua_syntax_for_lua51(new_file)
+                            res_dir = data_path / "RESULT"
+                            res_dir.mkdir(parents=True, exist_ok=True)
+                            out_luac = res_dir / f"{new_file.stem}.luac"
+                            compiler = "luac5.1" if shutil.which("luac5.1") else ("luac" if shutil.which("luac") else None)
+                            if compiler:
+                                proc = subprocess.run([compiler, "-o", str(out_luac), str(fixed_lua)], capture_output=True, text=True)
+                                if proc.returncode == 0:
+                                    console.print(f"[bold green]✅ AI Report: Compiled successfully to {out_luac.name} ({out_luac.stat().st_size:,} bytes)![/bold green]")
+                                else:
+                                    console.print(f"[bold yellow]⚠️ Compilation warning: {proc.stderr.strip()}[/bold yellow]")
+                                    console.print("[bold red]❌ Error aaya! Kya AI se syntax fix karun? (Haan/Nahi)[/bold red]")
+                                    fix_ans = safe_input("💬 You: ").strip().lower()
+                                    if fix_ans in ['haan', 'yes', 'y', '1']:
+                                        code = new_file.read_text(errors='ignore')
+                                        fixed_code = ai_fix_lua_code(code, proc.stderr)
+                                        if fixed_code:
+                                            new_file.write_text(fixed_code, encoding='utf-8')
+                                            console.print("[bold green]✅ AI syntax fix applied! Retrying compilation...[/bold green]")
+                                            proc2 = subprocess.run([compiler, "-o", str(out_luac), str(fixed_lua)], capture_output=True, text=True)
+                                            if proc2.returncode == 0:
+                                                console.print(f"[bold green]✅ Retry Successful: {out_luac.name} compiled![/bold green]")
+
+                            console.print("[bold bright_cyan]💡 AI Suggestion: Is compiled .luac script ko PAK file me inject kar sakte hain![/bold bright_cyan]\n")
+
+                        else:
+                            res = call_ai_api(f"User asked: '{user_input}' regarding file '{new_file.name}'. Give a concise, helpful response in Hinglish.")
+                            if res:
+                                console.print(f"\n[bold bright_cyan]🤖 AI Assistant:[/bold bright_cyan] {res}\n")
+                            else:
+                                console.print("[bold yellow]🤖 AI Assistant: File process ho gayi hai! Next kya karna chahenge?[/bold yellow]\n")
+
+                    except Exception as ex:
+                        console.print(f"[bold red]❌ Error occurred: {ex}[/bold red]")
+                        console.print("[bold yellow]🤔 Developer ko auto-error report bhejein/generate karein? (Haan/Nahi)[/bold yellow]")
+                        rep_ans = safe_input("💬 You: ").strip().lower()
+                        if rep_ans in ['haan', 'yes', 'y']:
+                            rep_dir = Path("/sdcard/FeaturesticLeaks/ERROR_REPORTS")
+                            try:
+                                rep_dir.mkdir(parents=True, exist_ok=True)
+                                rep_file = rep_dir / f"report_{int(time.time())}.txt"
+                                rep_file.write_text(f"File: {new_file}\nError: {ex}\nTime: {time.ctime()}", encoding='utf-8')
+                                console.print(f"[bold green]✅ Auto-report generated: {rep_file}[/bold green]\n")
+                            except Exception:
+                                console.print("[bold dim white]Auto-report saved locally.[/bold dim white]\n")
+
+            else:
+                time.sleep(2)
+
+        except KeyboardInterrupt:
+            console.print("\n[bold yellow]⏹️ AI Watch Assistant Stopped.[/bold yellow]")
+            break
+        except Exception as e:
+            console.print(f"[dim yellow][!] Assistant loop note: {e}[/dim yellow]")
+            time.sleep(2)
+
+
 def ai_tools_menu(data_path: Path):
     while True:
         print_banner()
@@ -7126,21 +7412,25 @@ def ai_tools_menu(data_path: Path):
             expand=True
         )
         menu_table.add_column("OPT", justify="center", width=8, style="bold bright_yellow")
-        menu_table.add_column("COMMAND", justify="left", width=24, style="bold bright_white")
+        menu_table.add_column("COMMAND", justify="left", width=25, style="bold bright_white")
         menu_table.add_column("DESCRIPTION", justify="left", style="bright_cyan")
 
-        menu_table.add_row("[1]", "AI-Assisted Lua Repair 🤖", "Fix broken Lua syntax, missing ends & GG errors")
-        menu_table.add_row("[2]", "Manage AI API Keys", "Setup Google Gemini, Groq & OpenRouter keys & fallback")
+        menu_table.add_row("[1]", "AI Modding Assistant 🤖", "Real-time AI watcher, voice/text commands & auto-fix")
+        menu_table.add_row("[2]", "AI-Assisted Lua Repair 🤖", "Fix broken Lua syntax, missing ends & GG errors")
+        menu_table.add_row("[3]", "Manage AI API Keys 🔑", "Setup Google Gemini, Groq & OpenRouter keys & links")
         menu_table.add_row("[0]", "EXIT ✗", "Return to Main Menu")
 
         console.print(menu_table)
         console.print()
-        choice = safe_input('\033[1;36mSELECT OPTION [1-2] [0]: \033[0m').strip()
+        choice = safe_input('\033[1;36mSELECT OPTION [1-3] [0]: \033[0m').strip()
 
         if choice == '1':
-            run_ai_assisted_lua_repair(data_path)
+            run_ai_watch_assistant(data_path)
             safe_input('\nPress Enter to continue...')
         elif choice == '2':
+            run_ai_assisted_lua_repair(data_path)
+            safe_input('\nPress Enter to continue...')
+        elif choice == '3':
             manage_ai_api_keys()
             safe_input('\nPress Enter to continue...')
         elif choice == '0':
@@ -7371,7 +7661,10 @@ def main_menu():
     # Direct Termux CLI Shortcuts: leak pak | leak lua | leak watch | leak ai | leak utils
     if len(sys.argv) > 1:
         cmd = sys.argv[1].lower().strip()
-        if cmd in ['pak', 'p', 'paktools']:
+        if cmd in ['--ai', 'ai', 'a', 'aitools', 'assistant', 'watchai']:
+            run_ai_watch_assistant(data_path)
+            sys.exit(0)
+        elif cmd in ['pak', 'p', 'paktools']:
             pak_obb_tools_menu(data_path)
             sys.exit(0)
         elif cmd in ['lua', 'l', 'luatools']:
@@ -7379,9 +7672,6 @@ def main_menu():
             sys.exit(0)
         elif cmd in ['watch', 'w', 'watchmode']:
             watch_mode_menu(data_path)
-            sys.exit(0)
-        elif cmd in ['ai', 'a', 'aitools']:
-            ai_tools_menu(data_path)
             sys.exit(0)
         elif cmd in ['utils', 'utility', 'u', 'util', 'utilities']:
             utilities_menu(data_path)
