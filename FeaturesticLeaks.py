@@ -4317,49 +4317,18 @@ def install_termux_shortcut_and_sdcard(data_path: Path):
 def print_banner():
     os.system('cls' if os.name == 'nt' else 'clear')
     
-    ascii_banner = (
-        "[bold bright_cyan]"
-        " ⚡ ══════════════════════════════════════════════════════════════════════════ ⚡\n"
-        "   █▀▀ █▀▀ █▀█ ▀█▀ █  █ █▀▀█ █▀▀ ▀█▀ ▀█▀ █▀▀ █   █▀▀ █▀▀█ █  █ █▀▀ \n"
-        "   █▀▀ █▀▀ █▀█  █  █  █ █▄▄▀ █▀▀  █   █  ▀▀█ █   █▀▀ █▄▄█ █▀▀█ ▀▀█ \n"
-        "   ▀   ▀▀▀ ▀ ▀  ▀  ▀▀▀▀ ▀  ▀ ▀▀▀  ▀   ▀  ▀▀▀ ▀▀▀ ▀▀▀ ▀  ▀ ▀  ▀ ▀▀▀ \n"
-        " ⚡ ══════════════════════════════════════════════════════════════════════════ ⚡"
-        "[/bold bright_cyan]"
+    banner_content = (
+        "[bold bright_cyan]⚡ FEATURESTIC LEAKS v2.5 ⚡[/bold bright_cyan] [dim white]│[/dim white] [bold bright_yellow]VIP EXPLOIT ENGINE[/bold bright_yellow]\n"
+        "[bold white]DEV:[bold cyan] @L359D[/bold cyan] [dim white]│[/dim white] TG:[bold cyan] t.me/FeaturesticLeaks[/bold cyan] [dim white]│[/dim white] STATUS:[bold bright_green] 🟢 READY[/bold bright_green][/bold white]"
     )
-    
-    sub_title = (
-        "[bold bright_white]🔥 ULTIMATE PAK & LUA SUITE v2.5 🔥[/bold bright_white]\n"
-        "[bold bright_yellow]BGMI • PUBG MOBILE • KR • TW • JP • VNG ✓[/bold bright_yellow]\n"
-        "[bold bright_cyan]DEVELOPER:[/bold bright_cyan] [bold bright_white]@L359D[/bold bright_white]  [dim white]│[/dim white]  "
-        "[bold bright_cyan]CHANNEL:[/bold bright_cyan] [bold bright_white]t.me/FeaturesticLeaks[/bold bright_white]"
-    )
-    
-    top_box = Panel(
-        Align.center(f"{ascii_banner}\n\n{sub_title}"),
-        title="[bold bright_yellow] 👑 MADE IN INDIA | HIGH SPEED ENGINE 👑 [/bold bright_yellow]",
+    console.print(Panel(
+        Align.center(banner_content),
+        title="[bold bright_yellow] 👑 HIGH SPEED ENGINE 👑 [/bold bright_yellow]",
         title_align="center",
         border_style="bright_cyan",
         box=ROUNDED,
         padding=(0, 1)
-    )
-    console.print(top_box)
-
-    # USER INFO panel
-    user_info_text = (
-        "[bold bright_cyan]DEVELOPER  :[bold bright_white] @L359D (VIP DEV)[/bold bright_white]\n"
-        "TELEGRAM   :[bold bright_white] t.me/FeaturesticLeaks[/bold bright_white]\n"
-        "TOOL SUITE :[bold bright_white] PAK & LUA HIGH-SPEED EXPLOIT ENGINE[/bold bright_white]\n"
-        "STATUS     :[bold bright_green] 🟢 ACTIVE & READY[/bold bright_green]"
-    )
-    user_panel = Panel(
-        user_info_text,
-        title="[bold bright_white]💎 SYSTEM INFORMATION 💎[/bold bright_white]",
-        title_align="center",
-        border_style="bright_cyan",
-        box=ROUNDED,
-        padding=(0, 2)
-    )
-    console.print(user_panel)
+    ))
 
 def boot_sequence():
     """
@@ -4865,17 +4834,9 @@ def pick_file_from_folder(action_title: str, default_folder: Path, extensions: L
                     continue
             current_path_str = str(target_path)
         
-        try:
-            idx = int(choice) - 1
-            if 0 <= idx < len(found_files):
-                selected = found_files[idx]
-                size_mb = selected.stat().st_size / (1024 * 1024)
-                console.print(f"[bold green][OK] Selected: {selected.name} ({size_mb:.2f} MB)[/bold green]")
-                return selected, found_files
-            else:
-                console.print(f"[bold red][X] Selection out of range (1-{len(found_files)})[/bold red]")
-        except ValueError:
-            console.print("[bold red][X] Invalid input. Enter a number or 'C'[/bold red]")
+        if not user_input and not found_files:
+            console.print("[bold red][X] No files found. Please enter a valid directory path containing target files or type 'C' to cancel.[/bold red]")
+
 
 def display_file_selector(title, folder_path, file_pattern="*.pak"):
     """Backward compatibility alias for pick_file_from_folder"""
@@ -7423,7 +7384,7 @@ def main_menu():
 
     while True:
         print_banner()
-        display_workspace_summary(data_path)
+        console.print("[bold bright_cyan]📂 SDCard Workspace:[bold bright_white] /sdcard/FeaturesticLeaks/[/bold bright_white] [dim white](Opt [3] me workspace summary dekhein)[/dim white]\n")
         menu_table = Table(
             title="[bold bright_cyan]⚡ MAIN MENU ⚡[/bold bright_cyan]",
             show_header=True,
