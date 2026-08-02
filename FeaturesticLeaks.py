@@ -4361,6 +4361,8 @@ def install_termux_shortcut_and_sdcard(data_path: Path):
     console.print("[bold green][OK] Created shortcuts: 'leak' & 'paktool'[/bold green]")
     console.print("\n[bold green]🎉 Complete! Next time Termux me kahin bhi 'leak' ya 'paktool' type karke directly open kar sakte hain![/bold green]")
 
+UPDATE_NOTIF_BANNER = ""
+
 def print_banner():
     os.system('cls' if os.name == 'nt' else 'clear')
     
@@ -4376,6 +4378,14 @@ def print_banner():
         box=ROUNDED,
         padding=(0, 1)
     ))
+    
+    if UPDATE_NOTIF_BANNER:
+        console.print(Panel(
+            Align.center(UPDATE_NOTIF_BANNER),
+            border_style="yellow",
+            box=ROUNDED,
+            padding=(0, 1)
+        ))
 
 def boot_sequence():
     """
@@ -4697,14 +4707,14 @@ def handle_exception(e: Exception, action_name: str = "Operation", data_path: Op
     console.print()
     console.print(error_panel)
 
-def check_and_auto_update():
+def check_and_auto_update(interactive: bool = False):
     """
-    Silent background auto-updater:
-    - Checks GitHub API for latest commit hash of itzgeniusboy/FeaturesticLeaks-Toolkit-
-    - Auto-pulls via git or downloads raw updated FeaturesticLeaks.py
-    - Restarts tool if updated
-    - Silently skips on network failures or offline mode
+    Auto-updater & update notifier for FeaturesticLeaks:
+    - Checks GitHub commits & raw repository version
+    - If interactive=True (Option 9 in Utilities or 'U' shortcut): downloads fresh script, verifies python compilation, backs up current file, updates, and auto-restarts tool.
+    - If interactive=False (background boot check): checks if remote version/hash is newer, and sets UPDATE_NOTIF_BANNER notice banner.
     """
+    global UPDATE_NOTIF_BANNER
     try:
         if getattr(sys, 'frozen', False):
             script_path = Path(sys.executable)
@@ -4717,61 +4727,97 @@ def check_and_auto_update():
         local_hash = ""
         if hash_file.exists():
             local_hash = hash_file.read_text(encoding='utf-8').strip()
-        else:
-            if (script_dir / ".git").exists():
-                try:
-                    res = subprocess.run(["git", "rev-parse", "HEAD"], cwd=script_dir, capture_output=True, text=True, timeout=2)
-                    if res.returncode == 0:
-                        local_hash = res.stdout.strip()
-                except Exception:
-                    pass
+        elif (script_dir / ".git").exists():
+            try:
+                res = subprocess.run(["git", "rev-parse", "HEAD"], cwd=script_dir, capture_output=True, text=True, timeout=2)
+                if res.returncode == 0:
+                    local_hash = res.stdout.strip()
+            except Exception:
+                pass
 
+        if interactive:
+            console.print("[bold cyan]🔄 Checking GitHub for latest FeaturesticLeaks updates...[/bold cyan]")
+
+        headers = {"User-Agent": "FeaturesticLeaks-Termux/2.5"}
         url = "https://api.github.com/repos/itzgeniusboy/FeaturesticLeaks-Toolkit-/commits/main"
-        headers = {"User-Agent": "FeaturesticLeaks-Termux/2.0"}
-        
-        resp = requests.get(url, headers=headers, timeout=3)
-        if resp.status_code != 200:
-            return
-        
-        data = resp.json()
-        remote_hash = data.get("sha", "").strip()
-        
+        remote_hash = ""
+
+        try:
+            resp = requests.get(url, headers=headers, timeout=4)
+            if resp.status_code == 200:
+                remote_hash = resp.json().get("sha", "").strip()
+        except Exception:
+            pass
+
+        raw_url = "https://raw.githubusercontent.com/itzgeniusboy/FeaturesticLeaks-Toolkit-/main/FeaturesticLeaks.py"
+        raw_resp = None
+
+        if not remote_hash or interactive:
+            try:
+                raw_resp = requests.get(raw_url, headers=headers, timeout=8)
+                if raw_resp and raw_resp.status_code == 200 and len(raw_resp.content) > 5000:
+                    remote_hash = hashlib.md5(raw_resp.content).hexdigest()
+            except Exception:
+                pass
+
         if not remote_hash:
+            if interactive:
+                console.print("[bold yellow]⚠️ Network check failed or offline mode. Unable to reach GitHub update server.[/bold yellow]")
             return
-            
+
+        has_update = False
         if not local_hash:
-            # Force set local hash and check if remote is different or if update is forced
-            local_hash = "1"
+            local_hash = hashlib.md5(script_path.read_bytes()).hexdigest() if script_path.exists() else "1"
 
         if remote_hash != local_hash:
-            console.print("[bold green][OK] New update found! Updating to latest version...[/bold green]")
-            updated = False
-            
-            if (script_dir / ".git").exists():
+            has_update = True
+            UPDATE_NOTIF_BANNER = "🔥 [bold bright_yellow]NEW TOOL UPDATE AVAILABLE![/bold bright_yellow] [dim white]Press [bold cyan][U][/bold cyan] or run [bold cyan]Option [5] -> [9][/bold cyan] to Auto-Update Instantly![/dim white]"
+
+        if interactive:
+            if not has_update and not raw_resp:
+                console.print("[bold green]✅ Tool is already running the latest FeaturesticLeaks version![/bold green]")
+                return
+
+            console.print("[bold green]🚀 New update detected! Downloading latest FeaturesticLeaks engine...[/bold green]")
+            if not raw_resp:
+                raw_resp = requests.get(raw_url, headers=headers, timeout=12)
+
+            if raw_resp and raw_resp.status_code == 200 and len(raw_resp.content) > 5000:
+                temp_file = script_path.with_suffix(".update_tmp")
+                temp_file.write_bytes(raw_resp.content)
+
+                import py_compile
                 try:
-                    pull_res = subprocess.run(["git", "pull", "origin", "main"], cwd=script_dir, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=10)
-                    if pull_res.returncode == 0:
-                        updated = True
+                    py_compile.compile(str(temp_file), doraise=True)
+                except Exception as compile_err:
+                    console.print(f"[bold red]❌ Downloaded update syntax check failed: {compile_err}. Update cancelled.[/bold red]")
+                    temp_file.unlink(missing_ok=True)
+                    return
+
+                bak_file = script_path.with_suffix(".py.bak")
+                try:
+                    shutil.copy2(script_path, bak_file)
                 except Exception:
                     pass
-            
-            if not updated:
-                raw_url = "https://raw.githubusercontent.com/itzgeniusboy/FeaturesticLeaks-Toolkit-/main/FeaturesticLeaks.py"
-                raw_resp = requests.get(raw_url, headers=headers, timeout=10)
-                if raw_resp.status_code == 200 and len(raw_resp.content) > 5000:
-                    temp_file = script_path.with_suffix(".tmp")
-                    temp_file.write_bytes(raw_resp.content)
-                    shutil.move(temp_file, script_path)
-                    updated = True
 
-            if updated:
+                shutil.move(str(temp_file), str(script_path))
                 hash_file.write_text(remote_hash, encoding='utf-8')
-                console.print("[bold green][OK] Updated successfully! Restarting tool...[/bold green]")
-                time.sleep(1)
-                os.execv(sys.executable, [sys.executable] + sys.argv)
+                UPDATE_NOTIF_BANNER = ""
 
-    except Exception:
-        pass
+                console.print(Panel(
+                    "[bold bright_green]🎉 FEATURESTIC LEAKS AUTO-UPDATED SUCCESSFULLY! 🎉[/bold bright_green]\n\n"
+                    "[bold white]Engine script has been updated & verified.[/bold white]\n"
+                    "[bold cyan]Restarting application automatically now...[/bold cyan]",
+                    border_style="green",
+                    box=ROUNDED
+                ))
+                time.sleep(1.5)
+                os.execv(sys.executable, [sys.executable] + sys.argv)
+            else:
+                console.print("[bold red][X] Failed to download update file from raw GitHub source.[/bold red]")
+    except Exception as ex:
+        if interactive:
+            console.print(f"[bold red][X] Auto-update error: {ex}[/bold red]")
 
 def styled_prompt(message: str = "", context: str = "~") -> str:
     """
@@ -7406,10 +7452,8 @@ def utilities_menu(data_path: Path):
         elif choice == '8':
             delete_folder(data_path)
             safe_input('\nPress Enter to continue...')
-        elif choice == '9':
-            console.print("\n[bold cyan]🔄 Checking GitHub for latest update...[/bold cyan]")
-            check_and_auto_update()
-            console.print("[bold green][OK] Tool is already running the latest version![/bold green]")
+        elif choice == '9' or choice.lower() == 'u':
+            check_and_auto_update(interactive=True)
             safe_input('\nPress Enter to continue...')
         elif choice == '0':
             break
@@ -7668,6 +7712,13 @@ def run_ai_watch_assistant(data_path: Path):
                             pass
 
             if not new_file:
+                console.print(Panel(
+                    "[bold bright_yellow]⚡ QUICK SHORTCUTS (Type and Press Enter):[/bold bright_yellow]\n"
+                    " [bold white][1] PAK Tools  [2] Lua Tools  [3] AI Repair  [4] AI Config  [5] Utilities  [U] Auto-Update[/bold white]\n"
+                    " [bold bright_cyan][inject] Auto-Inject  [repack] Repack PAK  [scan] Folder Status  [help] Guide[/bold bright_cyan]",
+                    border_style="dim cyan",
+                    box=ROUNDED
+                ))
                 user_msg = safe_input("\n💬 You (Type command/query or press Enter to scan): ").strip()
                 if user_msg.lower() in ['exit', 'quit', 'back', 'cancel', '0']:
                     console.print("[bold cyan]🤖 AI Assistant: Watch mode stopped. Main menu me wapas aa gaye![/bold cyan]")
@@ -7689,14 +7740,37 @@ def run_ai_watch_assistant(data_path: Path):
                         lua_tools_menu(data_path)
                         handled_command = True
 
-                    elif low_um in ['4', 'ai', 'ai tools', 'ai tool', 'keys', 'telegram']:
+                    elif low_um in ['3', 'ai tools', 'ai tool', 'keys', 'telegram', 'repair']:
                         console.print("[bold cyan]🚀 Opening AI Tools & Multi-API Manager...[/bold cyan]\n")
+                        ai_tools_menu(data_path)
+                        handled_command = True
+
+                    elif low_um in ['4', 'ai config', 'config']:
+                        console.print("[bold cyan]🚀 Opening AI Configuration...[/bold cyan]\n")
                         ai_tools_menu(data_path)
                         handled_command = True
 
                     elif low_um in ['5', 'util', 'utils', 'utility', 'utilities', 'patcher']:
                         console.print("[bold cyan]🚀 Opening Utilities Module...[/bold cyan]\n")
                         utilities_menu(data_path)
+                        handled_command = True
+
+                    elif low_um in ['u', 'update', 'autoupdate', 'auto-update', 'check update']:
+                        check_and_auto_update(interactive=True)
+                        handled_command = True
+
+                    elif any(kw in low_um for kw in ['help', 'kaise kare', 'samajh nahi', 'confused', 'kya karu', 'options', 'guide']):
+                        console.print(Panel(
+                            "[bold bright_cyan]💡 FEATURESTIC LEAKS AI QUICK GUIDANCE - DIRECT SELECTION[/bold bright_cyan]\n\n"
+                            " [bold bright_yellow][1][/bold bright_yellow] [bold white]PAK/OBB Unpack ya Repack karna hai[/bold white] → Direct enter [bold yellow]1[/bold yellow]\n"
+                            " [bold bright_yellow][2][/bold bright_yellow] [bold white]Lua Script Compile / Decompile / Obfuscate[/bold white] → Direct enter [bold yellow]2[/bold yellow]\n"
+                            " [bold bright_yellow][3][/bold bright_yellow] [bold white]Broken Lua Syntax Repair karna hai[/bold white] → Direct enter [bold yellow]3[/bold yellow]\n"
+                            " [bold bright_yellow][4][/bold bright_yellow] [bold white]Utilities & Termux Shortcuts[/bold white] → Direct enter [bold yellow]5[/bold yellow]\n"
+                            " [bold bright_yellow][5][/bold bright_yellow] [bold white]Check Tool Auto-Update[/bold white] → Direct enter [bold yellow]u[/bold yellow]\n\n"
+                            "[dim white]Tip: Input folders me `.pak` ya `.lua` file drop karein, AI automatic detect karke process kar dega![/dim white]",
+                            border_style="cyan",
+                            box=ROUNDED
+                        ))
                         handled_command = True
 
                     elif 'inject' in low_um:
@@ -8141,7 +8215,7 @@ def main_menu():
         install_termux_shortcut_and_sdcard(data_path)
     except Exception:
         pass
-    check_and_auto_update()
+    check_and_auto_update(interactive=False)
 
     # Direct Termux CLI Shortcuts: leak pak | leak lua | leak watch | leak ai | leak utils
     if len(sys.argv) > 1:
@@ -8167,7 +8241,7 @@ def main_menu():
 
     while True:
         print_banner()
-        console.print("[bold bright_cyan]📂 Termux Shortcuts:[bold bright_white] leak pak | leak lua | leak watch | leak ai | leak utils[/bold bright_white]\n")
+        console.print("[bold bright_cyan]📂 Termux Shortcuts:[bold bright_white] leak pak | leak lua | leak watch | leak ai | leak utils | leak update[/bold bright_white]\n")
         menu_table = Table(
             title="[bold bright_cyan]⚡ MAIN CATEGORY MENU ⚡[/bold bright_cyan]",
             show_header=True,
@@ -8185,11 +8259,12 @@ def main_menu():
         menu_table.add_row("[3]", "Watch Mode 👁️", "Real-time auto-unpack & auto-compile watcher")
         menu_table.add_row("[4]", "AI Tools 🤖", "AI Lua Repair & Multi-API Key Manager (Gemini/Groq)")
         menu_table.add_row("[5]", "Utilities 🛠️", "UE4 String Tool, Lib Patcher, Finder & FAQ Guide")
+        menu_table.add_row("[U]", "Auto-Update 🚀", "Check & install latest GitHub version")
         menu_table.add_row("[0]", "EXIT ✗", "Close application")
 
         console.print(menu_table)
         console.print()
-        choice = safe_input('\033[1;36mSELECT OPTION [0-5]: \033[0m').strip()
+        choice = safe_input('\033[1;36mSELECT OPTION [0-5 / U]: \033[0m').strip()
 
         if choice == '1':
             pak_obb_tools_menu(data_path)
@@ -8201,6 +8276,9 @@ def main_menu():
             ai_tools_menu(data_path)
         elif choice == '5':
             utilities_menu(data_path)
+        elif choice.lower() in ['u', 'update', 'autoupdate', 'auto-update']:
+            check_and_auto_update(interactive=True)
+            safe_input('\nPress Enter to continue...')
         elif choice == '0':
             console.print("[dim white]Exiting Featurestic Leaks. Goodbye![/dim white]")
             time.sleep(1)
