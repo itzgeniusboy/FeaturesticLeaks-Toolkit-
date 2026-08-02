@@ -111,14 +111,21 @@ def play_welcome_audio():
     threading.Thread(target=_speak, daemon=True).start()
 
 # Auto-install missing dependencies if run directly with python
-def _ensure_package(pkg_name, import_name=None):
+def _ensure_package(pkg_name, import_name=None, required=True):
     if import_name is None:
         import_name = pkg_name
     try:
         __import__(import_name)
     except ImportError:
         print(f"[+] Installing missing dependency: {pkg_name}...")
-        subprocess.check_call([sys.executable, "-m", "pip", "install", pkg_name])
+        try:
+            subprocess.run([sys.executable, "-m", "pip", "install", pkg_name, "--timeout", "10"], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            print(f"[OK] Installed {pkg_name}")
+        except Exception as e:
+            if required:
+                print(f"[!] Warning: Could not install {pkg_name} ({e}). Ensure internet connection if needed.")
+            else:
+                print(f"[!] Optional package {pkg_name} skip ho gaya (Offline / Network issue).")
 
 _ensure_package("rich")
 _ensure_package("requests")
@@ -127,7 +134,7 @@ _ensure_package("pytz")
 _ensure_package("gmalg")
 _ensure_package("pycryptodome", "Crypto")
 _ensure_package("zstandard")
-_ensure_package("watchdog")
+_ensure_package("watchdog", required=False)
 
 try:
     from watchdog.observers import Observer
