@@ -6153,30 +6153,40 @@ def pak_obb_tools_menu(data_path: Path):
                     all_dirs = sorted(list({str(d).strip() for d in pak._index.keys() if str(d).strip() and str(d).strip() != "."}))
 
                     preset_map = {
-                        "P1": ("Content/Lua/GameLua/Mod/BRMod/Gameplay/Core", "⭐ BGMI / PUBG Mobile Main Lua Path (BRMod / Gameplay / Core)"),
-                        "P2": ("Content/Lua/GameLua", "⭐ BGMI / PUBG Mobile GameLua Root Folder"),
-                        "P3": ("Content/Lua/client", "Client Lua Scripts Directory"),
-                        "P4": ("Content/Lua/slua", "slua Engine Script Root"),
-                        "P5": ("ShadowTrackerExtra/Content/Lua/GameLua/Mod/BRMod/Gameplay/Core", "⭐ BGMI / PUBG Global / KR / VNG (ShadowTrackerExtra Prefix)"),
-                        "P6": ("ShadowTrackerExtra/Saved/Paks", "Patch Paks Folder Location"),
+                        "P1": ("Content/Lua/GameLua/Mod/BRMod/Gameplay/Core", "🇮🇳 [BGMI / PUBG] BRMod Gameplay Core (BEST FOR BGMI)"),
+                        "P2": ("Content/Lua/GameLua", "🇮🇳 [BGMI / PUBG] GameLua Main Root Folder"),
+                        "P3": ("Content/Lua/client", "🌐 Client Lua Folder"),
+                        "P4": ("Content/Lua/slua", "⚙️ slua Engine Script Root"),
+                        "P5": ("ShadowTrackerExtra/Content/Lua/GameLua/Mod/BRMod/Gameplay/Core", "🇮🇳 [BGMI / Global] ShadowTrackerExtra Prefix Path"),
+                        "P6": ("ShadowTrackerExtra/Saved/Paks", "📦 Patch Paks Folder Location"),
                     }
 
                     preset_table = Table(
-                        title="[bold green]🔥 Popular Game Modding Target Paths (Presets)[/bold green]",
+                        title="[bold bright_green]🔥 POPULAR GAME MODDING TARGET PATHS (PRESETS)[/bold bright_green]",
                         show_header=True,
-                        header_style="bold green",
+                        header_style="bold bright_green",
                         box=ROUNDED,
-                        border_style="green"
+                        border_style="bright_green"
                     )
                     preset_table.add_column("Key", style="bold yellow", justify="center", width=8)
                     preset_table.add_column("Target Path", style="bold white", justify="left")
-                    preset_table.add_column("Description", style="dim cyan", justify="left")
+                    preset_table.add_column("Description / Recommendation", style="bold cyan", justify="left")
 
                     for p_key, (p_path, p_desc) in preset_map.items():
                         preset_table.add_row(p_key, p_path, p_desc)
 
                     console.print()
                     console.print(preset_table)
+
+                    console.print(Panel(
+                        "[bold bright_yellow]🇮🇳 BGMI LUA MODDING QUICK HELP:[/bold bright_yellow]\n\n"
+                        "• [bold white]BGMI me Lua file inject karne ke liye:[/bold white] Seedha [bold bright_green]ENTER[/bold bright_green] dabayein! ([bold cyan]Preset P1[/bold cyan] select ho jayega).\n"
+                        "• [bold white]Target Path:[/bold white] [bold yellow]Content/Lua/GameLua/Mod/BRMod/Gameplay/Core[/bold yellow]\n"
+                        "• [dim white]Aapko koi bhi complicated path type karne ki zaroorat nahi hai! Just press ENTER.[/dim white]",
+                        title="[bold bright_yellow] 🎮 BGMI SPECIAL PRESET INSTRUCTION 🎮 [/bold bright_yellow]",
+                        border_style="yellow",
+                        box=ROUNDED
+                    ))
 
                     if all_dirs:
                         dir_table = Table(
