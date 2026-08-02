@@ -2397,18 +2397,20 @@ def _reg_name(proto, reg_idx: int) -> str:
 def _pseudo_decompile_lua(proto, depth: int = 0, func_name: str = "main") -> str:
     indent = "  " * depth
     lines = []
+    declared_regs = set()
 
     params = []
     for i in range(proto.np):
-        if i < len(proto.locs) and proto.locs[i][0]:
-            params.append(proto.locs[i][0])
-        else:
-            params.append(f"arg{i}")
+        pname = proto.locs[i][0] if (i < len(proto.locs) and proto.locs[i][0]) else f"arg{i}"
+        params.append(pname)
+        declared_regs.add(pname)
+        declared_regs.add(f"R{i}")
+
     if proto.va: params.append("...")
     param_str = ", ".join(params)
 
     if depth == 0:
-        lines.append("--[[ Decompiled by FeaturesticLeaks (Python Lua Engine) ]]")
+        lines.append("--[[ Decompiled by FeaturesticLeaks (Clean Lua Standard Engine) ]]")
         lines.append("--[[ Official Telegram: https://t.me/FeaturesticLeaks ]]")
         lines.append("")
 
@@ -2417,6 +2419,25 @@ def _pseudo_decompile_lua(proto, depth: int = 0, func_name: str = "main") -> str
     if proto.upvs:
         for uv in proto.upvs:
             lines.append(f"{indent}  -- upvalue: {uv}")
+
+    def assign_reg(rn: str, expr: str) -> str:
+        if rn in declared_regs:
+            return f"{rn} = {expr}"
+        else:
+            declared_regs.add(rn)
+            return f"local {rn} = {expr}"
+
+    def assign_regs(regs: list, expr: str) -> str:
+        if not regs:
+            return expr
+        new_regs = [r for r in regs if r not in declared_regs]
+        for r in regs:
+            declared_regs.add(r)
+        reg_str = ", ".join(regs)
+        if new_regs and len(new_regs) == len(regs):
+            return f"local {reg_str} = {expr}"
+        else:
+            return f"{reg_str} = {expr}"
 
     pc = 0
     while pc < len(proto.ins):
@@ -2431,27 +2452,25 @@ def _pseudo_decompile_lua(proto, depth: int = 0, func_name: str = "main") -> str
             if Bx < len(proto.K):
                 const = _format_lua_const(proto.K[Bx])
                 rn = _reg_name(proto, A)
-                line = f"local {rn} = {const}"
+                line = assign_reg(rn, const)
 
         elif op_name == "LOADNIL":
             rn_start = _reg_name(proto, A)
             if B > A:
-                rn_end = _reg_name(proto, B)
-                line = f"local {rn_start}, ..., {rn_end} = nil"
+                regs = [_reg_name(proto, i) for i in range(A, B + 1)]
+                line = assign_regs(regs, "nil")
             else:
-                line = f"local {rn_start} = nil"
+                line = assign_reg(rn_start, "nil")
 
         elif op_name == "LOADBOOL":
             val = "true" if B != 0 else "false"
             rn = _reg_name(proto, A)
-            line = f"local {rn} = {val}"
+            line = assign_reg(rn, val)
 
         elif op_name == "GETUPVAL":
             rn = _reg_name(proto, A)
-            if B < len(proto.upvs):
-                line = f"local {rn} = {proto.upvs[B]}"
-            else:
-                line = f"local {rn} = upval_{B}"
+            upv_str = proto.upvs[B] if B < len(proto.upvs) else f"upval_{B}"
+            line = assign_reg(rn, upv_str)
 
         elif op_name == "GETTABUP":
             rn = _reg_name(proto, A)
@@ -2460,7 +2479,7 @@ def _pseudo_decompile_lua(proto, depth: int = 0, func_name: str = "main") -> str
                 key = _format_lua_const(proto.K[C & 0xFF]) if (C & 0xFF) < len(proto.K) else f"K{C & 0xFF}"
             else:
                 key = _reg_name(proto, C)
-            line = f"local {rn} = {upval}[{key}]"
+            line = assign_reg(rn, f"{upval}[{key}]")
 
         elif op_name == "SETTABUP":
             upval = proto.upvs[B] if B < len(proto.upvs) else "_ENV"
@@ -2480,7 +2499,7 @@ def _pseudo_decompile_lua(proto, depth: int = 0, func_name: str = "main") -> str
                 key = _format_lua_const(proto.K[C & 0xFF]) if (C & 0xFF) < len(proto.K) else f"K{C & 0xFF}"
             else:
                 key = _reg_name(proto, C)
-            line = f"local {rn} = {_reg_name(proto, B)}[{key}]"
+            line = assign_reg(rn, f"{_reg_name(proto, B)}[{key}]")
 
         elif op_name == "SETTABLE":
             if C & 0x100:
@@ -2509,7 +2528,7 @@ def _pseudo_decompile_lua(proto, depth: int = 0, func_name: str = "main") -> str
             else:
                 right = _reg_name(proto, C)
             rn = _reg_name(proto, A)
-            line = f"local {rn} = {left} {op_sym} {right}"
+            line = assign_reg(rn, f"{left} {op_sym} {right}")
 
         elif op_name in ("UNM", "BNOT", "NOT", "LEN"):
             ops = {"UNM": "-", "BNOT": "~", "NOT": "not ", "LEN": "#"}
@@ -2519,12 +2538,12 @@ def _pseudo_decompile_lua(proto, depth: int = 0, func_name: str = "main") -> str
             else:
                 val = _reg_name(proto, B)
             rn = _reg_name(proto, A)
-            line = f"local {rn} = {op_sym}{val}"
+            line = assign_reg(rn, f"{op_sym}{val}")
 
         elif op_name == "CONCAT":
             parts = [_reg_name(proto, i) for i in range(B, C + 1)]
             rn = _reg_name(proto, A)
-            line = f"local {rn} = {' .. '.join(parts)}"
+            line = assign_reg(rn, f"{' .. '.join(parts)}")
 
         elif op_name == "JMP":
             target = pc + 1 + sBx
@@ -2559,14 +2578,14 @@ def _pseudo_decompile_lua(proto, depth: int = 0, func_name: str = "main") -> str
             if B == 0: args = "..."
             elif B == 1: args = ""
             else: args = ", ".join([_reg_name(proto, i) for i in range(A + 1, A + B)])
-            if C == 0: ret = "..."
-            elif C == 1: ret = ""
-            else: ret = ", ".join([_reg_name(proto, i) for i in range(A, A + C - 1)])
             fn = _reg_name(proto, A)
-            if ret:
-                line = f"local {ret} = {fn}({args})"
-            else:
+            if C == 0:
+                line = assign_reg(_reg_name(proto, A), f"{fn}({args})")
+            elif C == 1:
                 line = f"{fn}({args})"
+            else:
+                ret_regs = [_reg_name(proto, i) for i in range(A, A + C - 1)]
+                line = assign_regs(ret_regs, f"{fn}({args})")
 
         elif op_name == "TAILCALL":
             if B == 0: args = "..."
@@ -2582,27 +2601,27 @@ def _pseudo_decompile_lua(proto, depth: int = 0, func_name: str = "main") -> str
 
         elif op_name == "NEWTABLE":
             rn = _reg_name(proto, A)
-            line = f"local {rn} = {{}}"
+            line = assign_reg(rn, "{}")
 
         elif op_name == "CLOSURE":
             rn = _reg_name(proto, A)
             if Bx < len(proto.subs):
                 sub_name = f"sub_func_{pc}"
-                line = f"local {rn} = {sub_name}"
+                line = assign_reg(rn, sub_name)
             else:
-                line = f"local {rn} = closure_{Bx}"
+                line = assign_reg(rn, f"closure_{Bx}")
 
         elif op_name == "VARARG":
             if B == 0:
-                line = f"local {_reg_name(proto, A)}... = ..."
+                line = assign_reg(_reg_name(proto, A), "...")
             else:
-                vars = ", ".join([_reg_name(proto, A + i) for i in range(B - 1)])
-                line = f"local {vars} = ..."
+                vars = [_reg_name(proto, A + i) for i in range(B - 1)]
+                line = assign_regs(vars, "...")
 
         elif op_name == "MOVE":
             rn_a = _reg_name(proto, A)
             rn_b = _reg_name(proto, B)
-            line = f"local {rn_a} = {rn_b}"
+            line = assign_reg(rn_a, rn_b)
 
         else:
             line = f"-- {op_name} A={A} B={B} C={C}"
