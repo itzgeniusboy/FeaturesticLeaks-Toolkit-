@@ -4438,8 +4438,12 @@ def boot_sequence():
 def get_device_user_info() -> str:
     try:
         cfg = get_ai_config() if 'get_ai_config' in globals() else {}
-        if cfg.get("user_nickname"):
-            return str(cfg.get("user_nickname"))
+        tg_uname = cfg.get("telegram_username") or cfg.get("user_nickname")
+        if tg_uname:
+            tg_clean = str(tg_uname).strip()
+            if not tg_clean.startswith("@") and " " not in tg_clean and not tg_clean.startswith("http"):
+                tg_clean = f"@{tg_clean}"
+            return f"{tg_clean}"
     except Exception:
         pass
     
@@ -4456,6 +4460,51 @@ def get_device_user_info() -> str:
     except Exception:
         h = "Android"
     return f"{u}@{h}"
+
+def cleanup_old_logs(logs_dir: Optional[Path] = None, max_age_days: float = 2.0, max_files: int = 15):
+    """
+    Auto-cleans local log files and error reports to prevent phone storage accumulation!
+    Deletes logs older than max_age_days or trims excess logs if count > max_files.
+    """
+    try:
+        dirs_to_clean = []
+        if logs_dir:
+            dirs_to_clean.append(logs_dir)
+        dirs_to_clean.extend([
+            Path(__file__).parent / "logs",
+            Path("/sdcard/FeaturesticLeaks/ERROR_REPORTS"),
+            Path("/sdcard/FeaturesticLeaks/logs")
+        ])
+        
+        now = time.time()
+        max_age_sec = max_age_days * 86400
+        
+        for d in set(dirs_to_clean):
+            if not d.exists() or not d.is_dir():
+                continue
+            
+            log_files = sorted([f for f in d.iterdir() if f.is_file() and (f.suffix in ['.log', '.txt'])], key=lambda x: x.stat().st_mtime, reverse=True)
+            
+            # 1. Delete files older than max_age_days
+            remaining_files = []
+            for f in log_files:
+                try:
+                    if (now - f.stat().st_mtime) > max_age_sec:
+                        f.unlink()
+                    else:
+                        remaining_files.append(f)
+                except Exception:
+                    pass
+            
+            # 2. If file count exceeds max_files limit, delete oldest excess log files
+            if len(remaining_files) > max_files:
+                for f in remaining_files[max_files:]:
+                    try:
+                        f.unlink()
+                    except Exception:
+                        pass
+    except Exception:
+        pass
 
 def send_telegram_bug_report(err_type: str, err_msg: str, action_name: str = "Operation", file_info: str = "?", line_no: str = "?", func_name: str = "?", tb_str: str = ""):
     """
@@ -4475,7 +4524,7 @@ def send_telegram_bug_report(err_type: str, err_msg: str, action_name: str = "Op
             
             report_text = (
                 f"🚨 <b>FEATURESTIC LEAKS - AUTOMATED REPORT</b> 🚨\n\n"
-                f"👤 <b>User / Device:</b> <code>{escape(dev_user)}</code>\n"
+                f"👤 <b>User / Telegram:</b> <code>{escape(dev_user)}</code>\n"
                 f"📌 <b>Action:</b> {action_name}\n"
                 f"⚠️ <b>Error Type:</b> {err_type}\n"
                 f"📍 <b>Location:</b> {file_info}:{line_no} in <code>{func_name}()</code>\n"
@@ -4597,6 +4646,9 @@ def handle_exception(e: Exception, action_name: str = "Operation", data_path: Op
         base = data_path if data_path else Path(__file__).parent
         logs_dir = base / "logs"
         logs_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Auto-clean old logs/reports to save phone storage
+        cleanup_old_logs(logs_dir)
         
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         log_file = logs_dir / f"error_{timestamp}.log"
@@ -6634,8 +6686,8 @@ def manage_ai_api_keys():
             table.add_row(prov.capitalize() + is_active, str(len(keys)), hints)
         
         bot_status = "Configured" if cfg.get("telegram_bot_token") and cfg.get("telegram_chat_id") else "Not Set"
-        user_nick = cfg.get("user_nickname") or get_device_user_info()
-        console.print(f"[bold white]Auto-Report Status:[/bold white] [bold cyan]{bot_status}[/bold cyan]  |  [bold white]User Tag:[/bold white] [bold yellow]{user_nick}[/bold yellow]")
+        user_nick = cfg.get("telegram_username") or cfg.get("user_nickname") or get_device_user_info()
+        console.print(f"[bold white]Auto-Report Status:[/bold white] [bold cyan]{bot_status}[/bold cyan]  |  [bold white]Telegram User Tag:[/bold white] [bold yellow]{user_nick}[/bold yellow]")
         console.print(table)
         console.print()
         console.print("  [1] Add API Key (Google / Groq / OpenRouter)")
@@ -6643,7 +6695,7 @@ def manage_ai_api_keys():
         console.print("  [3] Delete / Clear Keys")
         console.print("  [4] Configure Developer Telegram Auto-Report Bot 🚨")
         console.print("  [5] Test All API Keys Live (Check Key Limits / Exhaustion) ⚡")
-        console.print("  [6] Set Custom Nickname/Username (for Telegram Reports) 👤")
+        console.print("  [6] Set Your Telegram Username (for Telegram Error Reports) 💬")
         console.print("  [0] Back to Menu")
         
         choice = safe_input("\n-> Select Option [0-6]: ").strip()
@@ -6775,16 +6827,20 @@ def manage_ai_api_keys():
                 console.print("[bold green]📲 Auto-sent exhaustion alert directly to developer Telegram group![/bold green]")
             time.sleep(2)
         elif choice == '6':
-            console.print("\n[bold cyan]👤 Set Custom Username / Nickname:[/bold cyan]")
-            console.print("[dim white]This name will be attached to all automated Telegram bug reports from your device.[/dim white]\n")
-            curr_n = cfg.get("user_nickname", "")
-            if curr_n:
-                console.print(f"[bold white]Current Nickname:[/bold white] [bold yellow]{curr_n}[/bold yellow]")
-            new_n = safe_input("-> Enter your name or Telegram username (e.g. Rahul_VIP): ").strip()
-            if new_n:
-                cfg["user_nickname"] = new_n
+            console.print("\n[bold cyan]👤 Set Your Telegram Username:[/bold cyan]")
+            console.print("[dim white]Enter your Telegram Handle (e.g. @itzraviking). This will be attached to all automated Telegram bug reports from your device so the developer can contact you directly.[/dim white]\n")
+            curr_tg = cfg.get("telegram_username") or cfg.get("user_nickname", "")
+            if curr_tg:
+                console.print(f"[bold white]Current Telegram Username:[/bold white] [bold yellow]{curr_tg}[/bold yellow]")
+            new_tg = safe_input("-> Enter your Telegram Username (e.g. @itzraviking): ").strip()
+            if new_tg:
+                if not new_tg.startswith("@") and " " not in new_tg and not new_tg.startswith("http"):
+                    new_tg = f"@{new_tg}"
+                cfg["telegram_username"] = new_tg
+                cfg["user_nickname"] = new_tg
                 save_ai_config(cfg)
-                console.print(f"[bold green]✅ User nickname saved as '{new_n}'![/bold green]")
+                console.print(f"[bold green]✅ Telegram Username saved as '{new_tg}'![/bold green]")
+                console.print("[dim white]Developer will now see this tag in all error reports from your app![/dim white]")
             time.sleep(1.5)
         elif choice == '0':
             break
@@ -7901,6 +7957,10 @@ def main_menu():
     else:
         data_path = Path(__file__).parent
     ensure_directories(data_path)
+    try:
+        cleanup_old_logs(data_path / "logs")
+    except Exception:
+        pass
     try:
         install_termux_shortcut_and_sdcard(data_path)
     except Exception:
