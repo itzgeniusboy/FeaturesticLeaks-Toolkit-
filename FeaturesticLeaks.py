@@ -6616,9 +6616,10 @@ def manage_ai_api_keys():
         console.print("  [2] Set Active Provider")
         console.print("  [3] Delete / Clear Keys")
         console.print("  [4] Configure Developer Telegram Auto-Report Bot 🚨")
+        console.print("  [5] Test All API Keys Live (Check Key Limits / Exhaustion) ⚡")
         console.print("  [0] Back to Menu")
         
-        choice = safe_input("\n-> Select Option [0-4]: ").strip()
+        choice = safe_input("\n-> Select Option [0-5]: ").strip()
         if choice == '1':
             console.print("\n[bold cyan]Select Provider to Get/Add API Key:[/bold cyan]")
             console.print("  [1] Google Gemini  👉 [bright_blue]https://aistudio.google.com/app/apikey[/bright_blue]")
@@ -6696,34 +6697,203 @@ def manage_ai_api_keys():
                 
             save_ai_config(cfg)
             console.print("[bold green]✅ Telegram Auto-Report configuration updated successfully![/bold green]")
+            console.print("[dim white]Sending test connection report to your Telegram group...[/dim white]")
+            send_telegram_bug_report("TEST_PING", "Telegram Bot Connection Verified Successfully!", "Telegram Bot Config Test", "FeaturesticLeaks.py", "6699", "manage_ai_api_keys", "No errors! Bot is connected and working.")
             console.print("[dim white]All unhandled errors anywhere on user devices will now instantly land on your Telegram![/dim white]")
             time.sleep(1.5)
+        elif choice == '5':
+            console.print("\n[bold cyan]⚡ Live Testing All Saved API Keys...[/bold cyan]")
+            all_dead = True
+            all_keys_list = []
+            for p_name in ["google", "groq", "openrouter"]:
+                for k in cfg.get("keys", {}).get(p_name, []):
+                    all_keys_list.append((p_name, k))
+            
+            if not all_keys_list:
+                console.print("[bold yellow]⚠️ No API keys saved yet! Option [1] se Google Gemini key paste karein.[/bold yellow]")
+            else:
+                for p_name, k in all_keys_list:
+                    k_hint = k[:6] + "..." + k[-4:] if len(k) > 10 else k
+                    try:
+                        if p_name == "google":
+                            url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={k}"
+                            res = requests.post(url, json={"contents": [{"parts": [{"text": "hi"}]}]}, timeout=10)
+                            if res.status_code == 200:
+                                console.print(f" • [bold green]Google Gemini Key ({k_hint}): ✅ ACTIVE & WORKING[/bold green]")
+                                all_dead = False
+                            else:
+                                console.print(f" • [bold red]Google Gemini Key ({k_hint}): ❌ EXHAUSTED / RATE LIMITED (HTTP {res.status_code})[/bold red]")
+                        elif p_name == "groq":
+                            url = "https://api.groq.com/openai/v1/chat/completions"
+                            res = requests.post(url, headers={"Authorization": f"Bearer {k}"}, json={"model": "llama-3.3-70b-versatile", "messages": [{"role": "user", "content": "hi"}]}, timeout=10)
+                            if res.status_code == 200:
+                                console.print(f" • [bold green]Groq Key ({k_hint}): ✅ ACTIVE & WORKING[/bold green]")
+                                all_dead = False
+                            else:
+                                console.print(f" • [bold red]Groq Key ({k_hint}): ❌ EXHAUSTED / RATE LIMITED (HTTP {res.status_code})[/bold red]")
+                        elif p_name == "openrouter":
+                            url = "https://openrouter.ai/api/v1/chat/completions"
+                            res = requests.post(url, headers={"Authorization": f"Bearer {k}"}, json={"model": "google/gemini-flash-1.5", "messages": [{"role": "user", "content": "hi"}]}, timeout=10)
+                            if res.status_code == 200:
+                                console.print(f" • [bold green]OpenRouter Key ({k_hint}): ✅ ACTIVE & WORKING[/bold green]")
+                                all_dead = False
+                            else:
+                                console.print(f" • [bold red]OpenRouter Key ({k_hint}): ❌ EXHAUSTED / RATE LIMITED (HTTP {res.status_code})[/bold red]")
+                    except Exception as e_k:
+                        console.print(f" • [bold red]{p_name.capitalize()} Key ({k_hint}): ❌ Error: {e_k}[/bold red]")
+
+            if all_dead and all_keys_list:
+                console.print("\n[bold red]🚨 ALERT: SAARE API KEYS EXHAUSTED YA RATE LIMITED HO GAYE HAIN![/bold red]")
+                send_telegram_bug_report("API_KEY_EXHAUSTION", "All user API keys were found exhausted or rate limited during live test!", "API Manager", "FeaturesticLeaks.py", "6705", "manage_ai_api_keys", "HTTP 429/401 Key Limit Exceeded")
+                console.print("[bold green]📲 Auto-sent exhaustion alert directly to developer Telegram group![/bold green]")
+            time.sleep(2)
         elif choice == '0':
             break
 
-def query_ai_for_lua_fix(lua_code: str, error_msg: str) -> Optional[str]:
-    cfg = get_ai_config()
-    provider = cfg.get("active_provider", "google")
-    keys = cfg.get("keys", {}).get(provider, [])
-    
-    if not keys:
-        # Check environment fallback
-        env_key = os.environ.get("GEMINI_API_KEY") or os.environ.get("GROQ_API_KEY") or os.environ.get("OPENROUTER_API_KEY")
-        if env_key:
-            keys = [env_key]
-        else:
-            console.print(Panel(
-                f"[bold red][X] No API keys saved for provider '{provider.upper()}'.[/bold red]\n\n"
-                f"[bold white]Get a free API key directly from these sites:[/bold white]\n"
-                f" • [bold yellow]Google Gemini:[bold /yellow]   [bold underline bright_blue]https://aistudio.google.com/app/apikey[/bold underline bright_blue]\n"
-                f" • [bold yellow]Groq Cloud:[bold /yellow]      [bold underline bright_blue]https://console.groq.com/keys[/bold underline bright_blue]\n"
-                f" • [bold yellow]OpenRouter:[bold /yellow]      [bold underline bright_blue]https://openrouter.ai/keys[/bold underline bright_blue]\n\n"
-                f"[dim white]Add keys in AI Tools -> Option [2] Manage API Keys.[/dim white]",
-                border_style="red",
-                box=ROUNDED
-            ))
-            return None
+def call_ai_api(prompt: str) -> Optional[str]:
+    # Extract last user query for quick conversational matching
+    clean_p = prompt.strip()
+    low_p = clean_p.lower()
+    last_user_query = ""
+    if "User:" in clean_p:
+        last_user_query = clean_p.split("User:")[-1].split("\n")[0].strip().lower()
+    else:
+        last_user_query = low_p
 
+    # Local instant conversational fallback mapping for smooth 24/7 AI chat responses
+    quick_chat_responses = {
+        'hi': "Hello brother! 👋 Main Featurestic Leaks AI Engine hu! Main PAK/OBB unpacking, Lua compiling, aur auto-fixing me aapki help kar sakta hu. Bolo kya karna hai?",
+        'hii': "Hii buddy! Welcome to Featurestic Leaks! Aaj kya modding ya leak karni hai?",
+        'hiii': "Hiii! Kaise ho? Direct apana question poochho!",
+        'hiiiii': "Hiii brother! Main ready hu, batao kya modding assistance chahiye?",
+        'hello': "Hey! Main Featurestic Leaks AI Companion hu. PAK unpack, Lua repair, ya koi bhi game modding query batao!",
+        'hlw': "Hello ji! Kaise ho? Direct sawaal pucho ya tool options ke bare me jaano!",
+        'helo': "Helooo! Kaise ho bhai? Featurestic Leaks Engine 24/7 ready hai!",
+        'hey': "Yo! Kaise ho bhai? Batao aaj kya hack/mod karna hai!",
+        'kaise ho': "Main bilkul mast aur 100% High-Speed ready hu! Aap batao aaj kya leak/mod karna hai?",
+        'kon ho': "Main Featurestic Leaks AI Assistant hu! Created to assist you with PAK/OBB & Lua modding!",
+        'who are you': "I am Featurestic Leaks AI Engine — your ultimate GameGuard, PAK/OBB & Lua 5.1 modding buddy!",
+        'help': "💡 **FEATURESTIC LEAKS AI QUICK GUIDANCE:**\n• **Option [1]**: AI Watch Assistant (Folder auto-listen & auto-process)\n• **Option [2]**: Friendly Chat (Aap yahan mughse kuch bhi poochh sakte hain)\n• **Option [3]**: AI Lua Syntax Repair (Broken .lua auto-fix)\n• **Option [4]**: Manage API Keys & Telegram Auto-Report Bot",
+        'options': "💡 Main FeaturesticLeaks tool options:\n[1] PAK/OBB Tool  |  [2] Lua Compiler  |  [3] AI Tools  |  [4] Utilities",
+        'pak': "📦 **PAK Unpacking Guide:**\nOption [1] (PAK/OBB Tool) -> Option [1] (Unpack PAK File) select karein. Unpacked files `UNPACK/<stem>` folder me save hongi!",
+        'lua': "📜 **Lua Compiler Guide:**\nOption [2] (Lua Compiler) -> Option [1] se `.lua` source code ko `.luac` bytecode me compile kar sakte hain!",
+    }
+
+    # Build key queue across all available providers
+    cfg = get_ai_config()
+    active_prov = cfg.get("active_provider", "google")
+    key_queue = [] # list of (provider, key)
+
+    # 1. Add active provider keys
+    for k in cfg.get("keys", {}).get(active_prov, []):
+        if k and (active_prov, k) not in key_queue:
+            key_queue.append((active_prov, k))
+
+    # 2. Add other provider keys
+    for prov in ["google", "groq", "openrouter"]:
+        if prov != active_prov:
+            for k in cfg.get("keys", {}).get(prov, []):
+                if k and (prov, k) not in key_queue:
+                    key_queue.append((prov, k))
+
+    # 3. Add environment variable keys
+    env_gemini = os.environ.get("GEMINI_API_KEY")
+    if env_gemini and ("google", env_gemini) not in key_queue:
+        key_queue.append(("google", env_gemini))
+    env_groq = os.environ.get("GROQ_API_KEY")
+    if env_groq and ("groq", env_groq) not in key_queue:
+        key_queue.append(("groq", env_groq))
+    env_or = os.environ.get("OPENROUTER_API_KEY")
+    if env_or and ("openrouter", env_or) not in key_queue:
+        key_queue.append(("openrouter", env_or))
+
+    if key_queue:
+        gemini_models = ["gemini-1.5-flash", "gemini-2.0-flash", "gemini-1.5-pro"]
+        groq_models = ["llama-3.3-70b-versatile", "llama3-8b-8192", "mixtral-8x7b-32768"]
+        openrouter_models = ["google/gemini-flash-1.5", "meta-llama/llama-3.3-70b-instruct"]
+
+        for prov, key in key_queue:
+            try:
+                if prov == "google":
+                    for g_model in gemini_models:
+                        url = f"https://generativelanguage.googleapis.com/v1beta/models/{g_model}:generateContent?key={key}"
+                        payload = {"contents": [{"parts": [{"text": prompt}]}]}
+                        resp = requests.post(url, json=payload, timeout=15)
+                        if resp.status_code == 200:
+                            data = resp.json()
+                            try:
+                                txt = data['candidates'][0]['content']['parts'][0]['text']
+                                if txt:
+                                    return txt.strip()
+                            except (KeyError, IndexError):
+                                pass
+
+                elif prov == "groq":
+                    for g_model in groq_models:
+                        url = "https://api.groq.com/openai/v1/chat/completions"
+                        headers = {"Authorization": f"Bearer {key}", "Content-Type": "application/json"}
+                        payload = {
+                            "model": g_model,
+                            "messages": [{"role": "user", "content": prompt}],
+                            "temperature": 0.3
+                        }
+                        resp = requests.post(url, json=payload, headers=headers, timeout=15)
+                        if resp.status_code == 200:
+                            data = resp.json()
+                            try:
+                                txt = data['choices'][0]['message']['content']
+                                if txt:
+                                    return txt.strip()
+                            except (KeyError, IndexError):
+                                pass
+
+                elif prov == "openrouter":
+                    for or_model in openrouter_models:
+                        url = "https://openrouter.ai/api/v1/chat/completions"
+                        headers = {"Authorization": f"Bearer {key}", "Content-Type": "application/json"}
+                        payload = {
+                            "model": or_model,
+                            "messages": [{"role": "user", "content": prompt}],
+                            "temperature": 0.3
+                        }
+                        resp = requests.post(url, json=payload, headers=headers, timeout=15)
+                        if resp.status_code == 200:
+                            data = resp.json()
+                            try:
+                                txt = data['choices'][0]['message']['content']
+                                if txt:
+                                    return txt.strip()
+                            except (KeyError, IndexError):
+                                pass
+            except Exception:
+                continue
+
+    # If all API calls failed or no keys were available:
+    # 1. First check if we can respond instantly via local conversational matcher
+    for trigger, resp_str in quick_chat_responses.items():
+        if trigger == last_user_query or (len(trigger) > 2 and trigger in last_user_query):
+            return resp_str
+
+    # 2. Automatically notify Telegram bot about key exhaustion
+    send_telegram_bug_report(
+        error_type="API_KEYS_EXHAUSTED",
+        error_msg="All configured AI API keys returned rate limit / limit reached or no key configured!",
+        context=f"User AI query: '{last_user_query[:50]}'",
+        file_name="FeaturesticLeaks.py",
+        line_no="6780",
+        func_name="call_ai_api",
+        stack_trace="HTTP 429 Rate Limit Exceeded / No active API keys left"
+    )
+
+    return (
+        "⚠️ **ALL API KEYS EXHAUSTED / RATE LIMITED!**\n\n"
+        "Bhai, aapke paas saare API keys ki limit khatam ho gayi hai. "
+        "Aap [bright_blue]https://aistudio.google.com/app/apikey[/bright_blue] se ek nayi free Gemini Key lekar "
+        "Option [4] Manage API Keys me paste karein! 🚀"
+    )
+
+
+def ai_fix_lua_code(lua_code: str, error_msg: str = "") -> Optional[str]:
     prompt = f"""You are an expert Lua 5.1 and GameGuard script engineer.
 Fix the syntax errors, missing functions, or bugs in the following Lua script so that it compiles perfectly with luac 5.1 and runs smoothly without syntax/runtime crashes.
 
@@ -6738,68 +6908,15 @@ COMPILATION ERROR / BUG DESCRIPTION:
 ORIGINAL LUA SCRIPT:
 {lua_code}
 """
-
-    console.print(f"[bold cyan]🤖 Sending request to AI model using provider '{provider.capitalize()}' ({len(keys)} key(s) available)...[/bold cyan]")
-
-    for idx, key in enumerate(keys, 1):
-        try:
-            console.print(f"[dim white]-> Trying API Key #{idx}...[/dim white]")
-            if provider == "google":
-                url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={key}"
-                payload = {
-                    "contents": [{"parts": [{"text": prompt}]}]
-                }
-                resp = requests.post(url, json=payload, timeout=25)
-                if resp.status_code == 200:
-                    data = resp.json()
-                    text = data['candidates'][0]['content']['parts'][0]['text']
-                    return text
-                else:
-                    console.print(f"[dim red]API Key #{idx} returned HTTP {resp.status_code}: {resp.text[:100]}[/dim red]")
-            
-            elif provider == "groq":
-                url = "https://api.groq.com/openai/v1/chat/completions"
-                headers = {
-                    "Authorization": f"Bearer {key}",
-                    "Content-Type": "application/json"
-                }
-                payload = {
-                    "model": "llama-3.3-70b-versatile",
-                    "messages": [{"role": "user", "content": prompt}],
-                    "temperature": 0.2
-                }
-                resp = requests.post(url, json=payload, headers=headers, timeout=25)
-                if resp.status_code == 200:
-                    data = resp.json()
-                    text = data['choices'][0]['message']['content']
-                    return text
-                else:
-                    console.print(f"[dim red]API Key #{idx} returned HTTP {resp.status_code}: {resp.text[:100]}[/dim red]")
-
-            elif provider == "openrouter":
-                url = "https://openrouter.ai/api/v1/chat/completions"
-                headers = {
-                    "Authorization": f"Bearer {key}",
-                    "Content-Type": "application/json"
-                }
-                payload = {
-                    "model": "google/gemini-flash-1.5",
-                    "messages": [{"role": "user", "content": prompt}],
-                    "temperature": 0.2
-                }
-                resp = requests.post(url, json=payload, headers=headers, timeout=25)
-                if resp.status_code == 200:
-                    data = resp.json()
-                    text = data['choices'][0]['message']['content']
-                    return text
-                else:
-                    console.print(f"[dim red]API Key #{idx} returned HTTP {resp.status_code}: {resp.text[:100]}[/dim red]")
-
-        except Exception as e:
-            console.print(f"[dim red]Key #{idx} request error: {e}[/dim red]")
-
-    console.print("[bold red][X] All API keys failed or timed out.[/bold red]")
+    result = call_ai_api(prompt)
+    if result:
+        cleaned = re.sub(r'^```(?:lua)?\n', '', result, flags=re.MULTILINE)
+        cleaned = re.sub(r'\n```$', '', cleaned, flags=re.MULTILINE).strip()
+        return cleaned
     return None
+
+query_ai_for_lua_fix = ai_fix_lua_code
+
 
 def run_ai_assisted_lua_repair(data_path: Path):
     console.print(Panel(Align.center("[bold bright_cyan]🤖 AI-ASSISTED LUA SCRIPT REPAIR ENGINE 🤖[/bold bright_cyan]\n[dim white]Uses Google Gemini / Groq / OpenRouter AI to fix broken Lua syntax, missing end statements, & GameGuard errors![/dim white]"), border_style="cyan", box=ROUNDED))
@@ -7377,17 +7494,24 @@ def run_ai_watch_assistant(data_path: Path):
 
                     except Exception as ex:
                         console.print(f"[bold red]❌ Error occurred: {ex}[/bold red]")
-                        console.print("[bold yellow]🤔 Developer ko auto-error report bhejein/generate karein? (Haan/Nahi)[/bold yellow]")
-                        rep_ans = safe_input("💬 You: ").strip().lower()
-                        if rep_ans in ['haan', 'yes', 'y']:
-                            rep_dir = Path("/sdcard/FeaturesticLeaks/ERROR_REPORTS")
-                            try:
-                                rep_dir.mkdir(parents=True, exist_ok=True)
-                                rep_file = rep_dir / f"report_{int(time.time())}.txt"
-                                rep_file.write_text(f"File: {new_file}\nError: {ex}\nTime: {time.ctime()}", encoding='utf-8')
-                                console.print(f"[bold green]✅ Auto-report generated: {rep_file}[/bold green]\n")
-                            except Exception:
-                                console.print("[bold dim white]Auto-report saved locally.[/bold dim white]\n")
+                        send_telegram_bug_report(
+                            error_type=type(ex).__name__,
+                            error_msg=str(ex),
+                            context=f"AI Watch Assistant processing file '{new_file.name}'",
+                            file_name="FeaturesticLeaks.py",
+                            line_no="7395",
+                            func_name="run_ai_watch_assistant",
+                            stack_trace=traceback.format_exc()
+                        )
+                        console.print("[bold green]📲 Auto-sent error bug report directly to developer Telegram group![/bold green]")
+                        rep_dir = Path("/sdcard/FeaturesticLeaks/ERROR_REPORTS")
+                        try:
+                            rep_dir.mkdir(parents=True, exist_ok=True)
+                            rep_file = rep_dir / f"report_{int(time.time())}.txt"
+                            rep_file.write_text(f"File: {new_file}\nError: {ex}\nTime: {time.ctime()}\n\n{traceback.format_exc()}", encoding='utf-8')
+                            console.print(f"[bold green]✅ Local report saved: {rep_file}[/bold green]\n")
+                        except Exception:
+                            pass
 
             else:
                 time.sleep(2)
@@ -7398,6 +7522,63 @@ def run_ai_watch_assistant(data_path: Path):
         except Exception as e:
             console.print(f"[dim yellow][!] Assistant loop note: {e}[/dim yellow]")
             time.sleep(2)
+
+
+def run_ai_chat_mode(data_path: Path):
+    """
+    FRIENDLY CONVERSATIONAL AI CHAT COMPANION
+    User can directly chat with AI (say 'hlw', ask modding questions, ask how to use tools, get script advice, etc.)
+    """
+    print_banner()
+    console.print(Panel(
+        "[bold bright_cyan]💬 FRIENDLY AI CHAT COMPANION 💬[/bold bright_cyan]\n\n"
+        "[bold white]Apne AI Modding Buddy se kuch bhi poochho![/bold white]\n"
+        " • [bright_yellow]'Hello', 'Kaise ho', 'PAK kaise unpack karu?', 'Lua fix kaise karein?'[/bright_yellow]\n"
+        " • [bright_cyan]Full GameGuard, Unreal Engine, PAK/OBB & Lua 5.1 Expert Knowledge![/bright_cyan]\n\n"
+        "[dim white]Type 'exit' or 'back' anytime to return to menu.[/dim white]",
+        border_style="cyan",
+        box=ROUNDED
+    ))
+
+    system_context = (
+        "You are Featurestic Leaks AI, a super friendly, intelligent, and helpful AI modding companion. "
+        "You talk in casual, enthusiastic Hinglish (Hindi + English). "
+        "You assist users with PAK/OBB unpacking, LUA script compilation, GameGuard bypasses, UE4 asset editing, "
+        "and using the FeaturesticLeaks tool commands (`leak`, `leak pak`, `leak lua`, `leak watch`, `leak ai`, `leak utils`). "
+        "Be friendly, polite, encouraging, and use clear formatting with emojis!"
+    )
+
+    history = []
+
+    while True:
+        try:
+            user_msg = safe_input("\n[bold bright_yellow]💬 You:[bold /bright_yellow] ").strip()
+            if not user_msg:
+                continue
+            if user_msg.lower() in ['exit', 'quit', 'back', '0']:
+                console.print("[bold cyan]🤖 AI: Alvida! Phir milenge dosto! Happy Modding! 🚀[/bold cyan]\n")
+                break
+
+            prompt = f"{system_context}\n"
+            if history:
+                prompt += "Recent Chat History:\n" + "\n".join(history[-6:]) + "\n"
+            prompt += f"User: {user_msg}\nAI Assistant:"
+
+            console.print("[dim cyan]🤖 AI Assistant is thinking...[/dim cyan]")
+            response = call_ai_api(prompt)
+
+            if response:
+                console.print(f"\n[bold bright_cyan]🤖 AI Assistant:[/bold bright_cyan]\n{response.strip()}\n")
+                history.append(f"User: {user_msg}")
+                history.append(f"AI: {response.strip()}")
+            else:
+                console.print("[bold yellow]🤖 AI Assistant: Hey! Main abhi yahan hu. Kuch bhi poochho PAK, OBB ya Lua modding ke bare me![/bold yellow]\n")
+
+        except KeyboardInterrupt:
+            console.print("\n[bold yellow]Chat ended.[/bold yellow]")
+            break
+        except Exception as ex:
+            console.print(f"[dim red]Chat note: {ex}[/dim red]")
 
 
 def ai_tools_menu(data_path: Path):
@@ -7412,25 +7593,29 @@ def ai_tools_menu(data_path: Path):
             expand=True
         )
         menu_table.add_column("OPT", justify="center", width=8, style="bold bright_yellow")
-        menu_table.add_column("COMMAND", justify="left", width=25, style="bold bright_white")
+        menu_table.add_column("COMMAND", justify="left", width=26, style="bold bright_white")
         menu_table.add_column("DESCRIPTION", justify="left", style="bright_cyan")
 
-        menu_table.add_row("[1]", "AI Modding Assistant 🤖", "Real-time AI watcher, voice/text commands & auto-fix")
-        menu_table.add_row("[2]", "AI-Assisted Lua Repair 🤖", "Fix broken Lua syntax, missing ends & GG errors")
-        menu_table.add_row("[3]", "Manage AI API Keys 🔑", "Setup Google Gemini, Groq & OpenRouter keys & links")
+        menu_table.add_row("[1]", "AI Modding Assistant 🤖", "Real-time AI watcher, folder auto-fix & voice/text commands")
+        menu_table.add_row("[2]", "Friendly AI Chat Companion 💬", "Talk to AI directly ('hlw', ask modding questions & tips)")
+        menu_table.add_row("[3]", "AI-Assisted Lua Repair 🛠️", "Fix broken Lua syntax, missing ends & GG errors")
+        menu_table.add_row("[4]", "Manage AI API Keys & Telegram 🔑", "Setup Gemini/Groq keys & Telegram Auto-Report Bot")
         menu_table.add_row("[0]", "EXIT ✗", "Return to Main Menu")
 
         console.print(menu_table)
         console.print()
-        choice = safe_input('\033[1;36mSELECT OPTION [1-3] [0]: \033[0m').strip()
+        choice = safe_input('\033[1;36mSELECT OPTION [1-4] [0]: \033[0m').strip()
 
         if choice == '1':
             run_ai_watch_assistant(data_path)
             safe_input('\nPress Enter to continue...')
         elif choice == '2':
-            run_ai_assisted_lua_repair(data_path)
+            run_ai_chat_mode(data_path)
             safe_input('\nPress Enter to continue...')
         elif choice == '3':
+            run_ai_assisted_lua_repair(data_path)
+            safe_input('\nPress Enter to continue...')
+        elif choice == '4':
             manage_ai_api_keys()
             safe_input('\nPress Enter to continue...')
         elif choice == '0':
@@ -7661,7 +7846,10 @@ def main_menu():
     # Direct Termux CLI Shortcuts: leak pak | leak lua | leak watch | leak ai | leak utils
     if len(sys.argv) > 1:
         cmd = sys.argv[1].lower().strip()
-        if cmd in ['--ai', 'ai', 'a', 'aitools', 'assistant', 'watchai']:
+        if cmd in ['chat', 'talk', 'aichat', 'bot']:
+            run_ai_chat_mode(data_path)
+            sys.exit(0)
+        elif cmd in ['--ai', 'ai', 'a', 'aitools', 'assistant', 'watchai']:
             run_ai_watch_assistant(data_path)
             sys.exit(0)
         elif cmd in ['pak', 'p', 'paktools']:
