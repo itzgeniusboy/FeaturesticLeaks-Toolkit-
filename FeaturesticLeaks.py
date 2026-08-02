@@ -4519,8 +4519,14 @@ def cleanup_old_logs(logs_dir: Optional[Path] = None, max_age_days: float = 2.0,
 def send_telegram_bug_report(err_type: str, err_msg: str, action_name: str = "Operation", file_info: str = "?", line_no: str = "?", func_name: str = "?", tb_str: str = ""):
     """
     Sends automated bug report silently to Developer Telegram Bot/Chat in a background thread.
+    Filter out API key limit / exhaustion alerts so developer group isn't spammed!
     Includes User/Device identification so developer knows who generated the report!
     """
+    # Filter out API rate limit / key limit alerts
+    if any(k in str(err_type).upper() or k in str(err_msg).upper() for k in ["API_KEY", "EXHAUSTED", "RATE_LIMIT", "HTTP 429"]):
+        if err_type != "TEST_PING":
+            return
+
     def _send_bg():
         try:
             cfg = get_ai_config() if 'get_ai_config' in globals() else {}
@@ -4533,7 +4539,7 @@ def send_telegram_bug_report(err_type: str, err_msg: str, action_name: str = "Op
             dev_user = get_device_user_info()
             
             report_text = (
-                f"🚨 <b>FEATURESTIC LEAKS - AUTOMATED REPORT</b> 🚨\n\n"
+                f"🚨 <b>FEATURESTIC LEAKS - CODE BUG REPORT</b> 🚨\n\n"
                 f"👤 <b>User / Telegram:</b> <code>{escape(dev_user)}</code>\n"
                 f"📌 <b>Action:</b> {action_name}\n"
                 f"⚠️ <b>Error Type:</b> {err_type}\n"
@@ -4676,11 +4682,12 @@ def handle_exception(e: Exception, action_name: str = "Operation", data_path: Op
     except Exception:
         pass
 
-    # Dispatch automated background error report directly to Developer Telegram
-    try:
-        send_telegram_bug_report(err_type, err_msg, action_name, file_info, str(line_no), func_name, traceback.format_exc())
-    except Exception:
-        pass
+    # Dispatch automated background error report directly to Developer Telegram ONLY for actual TOOL CODE BUGS
+    if not is_file_issue and not any(k in str(err_type).upper() or k in str(err_msg).upper() for k in ["API_KEY", "EXHAUSTED", "RATE_LIMIT"]):
+        try:
+            send_telegram_bug_report(err_type, err_msg, action_name, file_info, str(line_no), func_name, traceback.format_exc())
+        except Exception:
+            pass
 
     # Build clean ERROR DETAILS panel for terminal display
     panel_content = (
@@ -6869,8 +6876,7 @@ def manage_ai_api_keys():
 
             if all_dead and all_keys_list:
                 console.print("\n[bold red]🚨 ALERT: SAARE API KEYS EXHAUSTED YA RATE LIMITED HO GAYE HAIN![/bold red]")
-                send_telegram_bug_report("API_KEY_EXHAUSTION", "All user API keys were found exhausted or rate limited during live test!", "API Manager", "FeaturesticLeaks.py", "6705", "manage_ai_api_keys", "HTTP 429/401 Key Limit Exceeded")
-                console.print("[bold green]📲 Auto-sent exhaustion alert directly to developer Telegram group![/bold green]")
+                console.print("[dim white]Naye free API key add karne ke liye Option [1] select karein.[/dim white]")
             time.sleep(2)
         elif choice == '6':
             console.print("\n[bold cyan]👤 Set Your Telegram Username:[/bold cyan]")
@@ -7073,17 +7079,6 @@ def call_ai_api(prompt: str) -> Optional[str]:
         return "📜 **Lua Compiler Guide:**\nLua compile karne ke liye: Main Menu -> Option [2] (Lua Compiler) select karein! Broken Lua syntax repair karne ke liye: Main Menu -> Option [3] AI Tools -> [3] AI Lua Repair use karein."
     elif any(k in last_user_query for k in ['help', 'option', 'menu', 'kya kar']):
         return "💡 **Featurestic Leaks Tool Options:**\n[1] PAK/OBB Unpack/Repack  |  [2] Lua Compiler  |  [3] AI Watch & Repair  |  [4] API Keys & Telegram"
-
-    # Automatically notify Telegram bot about key exhaustion
-    send_telegram_bug_report(
-        error_type="API_KEYS_EXHAUSTED",
-        error_msg="All configured AI API keys returned rate limit / limit reached or no key configured!",
-        action_name=f"User AI Query: '{last_user_query[:50]}'",
-        file_info="FeaturesticLeaks.py",
-        line_no="6810",
-        func_name="call_ai_api",
-        tb_str="HTTP 429 Rate Limit Exceeded / No active API keys left"
-    )
 
     return (
         "⚠️ **ALL API KEYS EXHAUSTED / RATE LIMITED!**\n\n"
@@ -7397,6 +7392,56 @@ def run_watch_mode(data_path: Path):
     observer.join()
 
 
+def run_diagnostic_benchmark(data_path: Path):
+    print_banner()
+    console.print(Panel(
+        "[bold bright_cyan]⚡ TERMUX PERFORMANCE BENCHMARK & DIAGNOSTIC LOG SUMMARY ⚡[/bold bright_cyan]\n"
+        "[dim white]Testing system response time, Lua compiler speed, memory usage & log hygiene...[/dim white]",
+        border_style="cyan",
+        box=ROUNDED
+    ))
+    
+    # 1. System Memory & Storage Info
+    try:
+        import psutil
+        mem = psutil.virtual_memory()
+        mem_str = f"{mem.used / (1024**2):.1f} MB / {mem.total / (1024**2):.1f} MB ({mem.percent}%)"
+    except Exception:
+        mem_str = "Available (Termux System)"
+
+    # 2. Test Lua Compiler Performance
+    compiler_speed = "N/A"
+    luac_bin = shutil.which("luac5.1") or shutil.which("luac") or shutil.which("luajit")
+    if luac_bin:
+        t0 = time.perf_counter()
+        test_script = data_path / ".speed_test.lua"
+        test_out = data_path / ".speed_test.luac"
+        test_script.write_text("print('Benchmark Speed Test')")
+        proc = subprocess.run([luac_bin, "-o", str(test_out), str(test_script)], capture_output=True)
+        t1 = time.perf_counter()
+        elapsed_ms = (t1 - t0) * 1000
+        compiler_speed = f"{elapsed_ms:.2f} ms ({Path(luac_bin).name})"
+        test_script.unlink(missing_ok=True)
+        test_out.unlink(missing_ok=True)
+
+    # 3. Log Hygiene & Cleanup
+    logs_dir = data_path / "logs"
+    log_files = list(logs_dir.glob("*.log")) if logs_dir.exists() else []
+    cleanup_old_logs(logs_dir, max_age_days=2.0, max_files=10)
+
+    # Display Diagnostic Table
+    diag_table = Table(title="[bold green]System Diagnostic Results[/bold green]", box=ROUNDED)
+    diag_table.add_column("Component", style="bold yellow")
+    diag_table.add_column("Status / Speed / Details", style="bold white")
+
+    diag_table.add_row("Memory (RAM)", mem_str)
+    diag_table.add_row("Lua Compiler Speed", compiler_speed)
+    diag_table.add_row("Log Files Hygiene", f"{len(log_files)} log(s) scanned & trimmed")
+    diag_table.add_row("Python Engine", f"Python {sys.version.split()[0]} ({os.name.upper()})")
+
+    console.print(diag_table)
+    console.print("\n[bold green]✅ System benchmark & log diagnostic completed successfully![/bold green]")
+
 def utilities_menu(data_path: Path):
     while True:
         print_banner()
@@ -7421,11 +7466,12 @@ def utilities_menu(data_path: Path):
         menu_table.add_row("[7]", "Beginner Guide & FAQ 🔰", "Beginner Quick Start & Modding Help")
         menu_table.add_row("[8]", "Cleanup Workspace", "Delete workspace folders")
         menu_table.add_row("[9]", "Check Tool Update 🚀", "Force update tool to latest GitHub version")
+        menu_table.add_row("[10]", "Diagnostic & Benchmark ⚡", "Check execution speed, RAM & log hygiene")
         menu_table.add_row("[0]", "EXIT ✗", "Return to Main Menu")
 
         console.print(menu_table)
         console.print()
-        choice = safe_input('\033[1;36mSELECT OPTION [1-9] [0]: \033[0m').strip()
+        choice = safe_input('\033[1;36mSELECT OPTION [1-10] [0]: \033[0m').strip()
 
         if choice == '1':
             run_ue4_string_tool(data_path)
@@ -7454,6 +7500,9 @@ def utilities_menu(data_path: Path):
             safe_input('\nPress Enter to continue...')
         elif choice == '9' or choice.lower() == 'u':
             check_and_auto_update(interactive=True)
+            safe_input('\nPress Enter to continue...')
+        elif choice == '10':
+            run_diagnostic_benchmark(data_path)
             safe_input('\nPress Enter to continue...')
         elif choice == '0':
             break
