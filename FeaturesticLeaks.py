@@ -6153,12 +6153,12 @@ def pak_obb_tools_menu(data_path: Path):
                     all_dirs = sorted(list({str(d).strip() for d in pak._index.keys() if str(d).strip() and str(d).strip() != "."}))
 
                     preset_map = {
-                        "P1": ("Content/Lua/GameLua/Mod/BRMod/Gameplay/Core", "⭐ BR Mod / Gameplay Lua (PUBG/BGMI Recommended)"),
+                        "P1": ("Content/Lua/GameLua/Mod/BRMod/Gameplay/Core", "⭐ BR Mod / Gameplay Lua (BGMI / PUBG Mobile Recommended)"),
                         "P2": ("Content/Lua/GameLua", "Main Game Lua Root"),
                         "P3": ("Content/Lua/client", "Client Lua Scripts"),
                         "P4": ("Content/Lua/slua", "slua Script Root"),
-                        "P5": ("ShadowTrackerExtra/Saved/Paks", "Patch Paks Location"),
-                        "P6": ("Content/Paks", "Main Paks Directory"),
+                        "P5": ("ShadowTrackerExtra/Content/Lua/GameLua/Mod/BRMod/Gameplay/Core", "ShadowTrackerExtra Prefix (PUBG Global / KR / VNG PAKs)"),
+                        "P6": ("ShadowTrackerExtra/Saved/Paks", "Patch Paks Folder Location"),
                     }
 
                     preset_table = Table(
@@ -6217,12 +6217,12 @@ def pak_obb_tools_menu(data_path: Path):
                     console.print(f"[bold cyan][+] Normalized Target Path: {target_path}[/bold cyan]")
 
                     # Interactive Lua Pre-Injection Assistant
-                    lua_files = [p for p in actual_edit_path.rglob('*') if p.is_file() and p.suffix.lower() == '.lua']
+                    lua_files = [p for p in actual_edit_path.rglob('*') if p.is_file() and p.suffix.lower() in ('.lua', '.luac')]
                     if lua_files:
                         console.print(f"\n[bold yellow]📜 Found {len(lua_files)} .lua script(s) in INJECT folder.[/bold yellow]")
                         console.print("[dim]Choose Lua Injection Preparation:[/dim]")
                         console.print("  [1] Auto-Fix Syntax & Inject Source (.lua) [Default - Recommended]")
-                        console.print("  [2] Auto-Compile to Bytecode & Inject (.luac) [Fastest & Anti-Cheat Safe]")
+                        console.print("  [2] Auto-Compile Bytecode & Preserve .lua Name [Fastest & UE4 Game Safe]")
                         console.print("  [3] Inject As-Is (No pre-processing)")
                         lua_prep = safe_input("-> Select Option [1-3] [1]: ").strip() or '1'
                         if lua_prep == '1':
@@ -6233,26 +6233,27 @@ def pak_obb_tools_menu(data_path: Path):
                             compiled_cnt = 0
                             for lf in lua_files:
                                 fix_lua_syntax_for_lua51(lf)
-                                out_luac = lf.with_suffix('.luac')
+                                tmp_luac = lf.with_suffix('.tmp_luac')
                                 ok = False
                                 try:
-                                    res = subprocess.run(["luac5.1", "-o", str(out_luac), str(lf)], capture_output=True, text=True)
-                                    if res.returncode == 0 and out_luac.exists():
+                                    res = subprocess.run(["luac5.1", "-o", str(tmp_luac), str(lf)], capture_output=True, text=True)
+                                    if res.returncode == 0 and tmp_luac.exists():
                                         ok = True
                                 except Exception:
                                     pass
                                 if not ok:
                                     try:
-                                        res = subprocess.run(["luajit", "-b", str(lf), str(out_luac)], capture_output=True, text=True)
-                                        if res.returncode == 0 and out_luac.exists():
+                                        res = subprocess.run(["luajit", "-b", str(lf), str(tmp_luac)], capture_output=True, text=True)
+                                        if res.returncode == 0 and tmp_luac.exists():
                                             ok = True
                                     except Exception:
                                         pass
-                                if ok:
-                                    lf.unlink(missing_ok=True)
+                                if ok and tmp_luac.exists():
+                                    lf.write_bytes(tmp_luac.read_bytes())
+                                    tmp_luac.unlink(missing_ok=True)
                                     compiled_cnt += 1
                             if compiled_cnt > 0:
-                                console.print(f"[bold green]✓ Successfully compiled {compiled_cnt} Lua script(s) to bytecode (.luac)![/bold green]")
+                                console.print(f"[bold green]✓ Compiled {compiled_cnt} script(s) to 5.1 bytecode while preserving .lua filename for UE4 engine![/bold green]")
 
                     result_dir = data_path / "RESULT"
                     result_dir.mkdir(parents=True, exist_ok=True)
@@ -6270,6 +6271,16 @@ def pak_obb_tools_menu(data_path: Path):
 
                     if count > 0:
                         console.print(f'[bold green][OK] Injected {count} file(s) successfully -> {output_pak.name}[/bold green]')
+                        console.print(Panel(
+                            "[bold bright_green]✅ LUA INJECTION COMPLETE![/bold bright_green]\n\n"
+                            "[bold white]🎮 Game me Lua execute na hone standard reasons & solution:[/bold white]\n"
+                            " 1. [bold yellow]Filename Match:[/bold yellow] Script ka name game ke require filename se match hona chahiye (e.g. `BRMod.lua`, `Main.lua`, `BattleMain.lua`).\n"
+                            " 2. [bold yellow]Target Path:[/bold yellow] BGMI me [bold cyan]Preset P1[/bold cyan] (`Content/Lua/GameLua/Mod/BRMod/Gameplay/Core`) ya Global me [bold cyan]Preset P5[/bold cyan] use karein.\n"
+                            " 3. [bold yellow]Lua 5.1 Syntax:[/bold yellow] Pehle [bold cyan]Option [2] -> Option [8] (1-Click Auto Lua Workflow)[/bold cyan] chalayein taaki Lua 5.1 syntax errors fix ho jayein!",
+                            title="[bold bright_yellow] 💡 GAME LUA RUNNING TIPS [/bold bright_yellow]",
+                            border_style="bright_green",
+                            box=ROUNDED
+                        ))
                     else:
                         console.print('[bold red][X] No files were injected.[/bold red]')
 
