@@ -7679,7 +7679,51 @@ def run_ai_watch_assistant(data_path: Path):
                     # Direct Command Execution: Scan and Process existing files in workspace!
                     handled_command = False
                     
-                    if any(kw in low_um for kw in ['unpack', 'pak', 'obb']):
+                    if low_um in ['1', 'pak', 'obb', 'pak tool', 'pak tools', 'pak/obb']:
+                        console.print("[bold cyan]🚀 Opening PAK/OBB Tools Module...[/bold cyan]\n")
+                        pak_obb_tools_menu(data_path)
+                        handled_command = True
+
+                    elif low_um in ['2', 'lua', 'luac', 'lua tool', 'lua tools']:
+                        console.print("[bold cyan]🚀 Opening LUA Tools Module...[/bold cyan]\n")
+                        lua_tools_menu(data_path)
+                        handled_command = True
+
+                    elif low_um in ['4', 'ai', 'ai tools', 'ai tool', 'keys', 'telegram']:
+                        console.print("[bold cyan]🚀 Opening AI Tools & Multi-API Manager...[/bold cyan]\n")
+                        ai_tools_menu(data_path)
+                        handled_command = True
+
+                    elif low_um in ['5', 'util', 'utils', 'utility', 'utilities', 'patcher']:
+                        console.print("[bold cyan]🚀 Opening Utilities Module...[/bold cyan]\n")
+                        utilities_menu(data_path)
+                        handled_command = True
+
+                    elif 'inject' in low_um:
+                        found_paks = list((data_path / "1_PAK_INPUT").glob("*.pak")) + list((data_path / "1_PAK_INPUT").glob("*.obb"))
+                        found_luas = list((data_path / "1_LUA_INPUT").glob("*.lua")) + list((data_path / "1_LUA_INPUT").glob("*.luac")) + list((data_path / "RESULT").glob("*.luac"))
+                        if found_paks and found_luas:
+                            console.print(f"[bold cyan]⚡ AI Auto-Injecting {found_luas[0].name} into {found_paks[0].name}...[/bold cyan]")
+                            try:
+                                pak = TencentPakFile(found_paks[0])
+                                rel_path = f"Asset/Scripts/{found_luas[0].name}"
+                                pak.add_file(rel_path, found_luas[0].read_bytes())
+                                out_p = data_path / "RESULT" / found_paks[0].name
+                                pak.save(out_p)
+                                console.print(f"[bold green]✅ Injected & saved to: {out_p}![/bold green]\n")
+                            except Exception as ex:
+                                console.print(f"[bold red]❌ Inject error: {ex}[/bold red]\n")
+                        else:
+                            console.print("[bold cyan]🚀 Launching PAK Injector Tool...[/bold cyan]\n")
+                            pak_obb_tools_menu(data_path)
+                        handled_command = True
+
+                    elif 'repack' in low_um:
+                        console.print("[bold cyan]🚀 Launching PAK Repacker...[/bold cyan]\n")
+                        pak_obb_tools_menu(data_path)
+                        handled_command = True
+
+                    elif any(kw in low_um for kw in ['unpack', 'pak file']):
                         found_paks = []
                         for wf in watch_folders:
                             if wf.exists():
