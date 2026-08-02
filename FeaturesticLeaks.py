@@ -4801,7 +4801,8 @@ def pick_file_from_folder(action_title: str, default_folder: Path, extensions: L
             if len(found_files) == 1:
                 selected = found_files[0]
                 size_mb = selected.stat().st_size / (1024 * 1024)
-                console.print(f"\n[bold green][OK] Auto-selected single file: {selected.name} ({size_mb:.2f} MB)[/bold green]")
+                console.print(f"\n[bold green][OK] Auto-selected file: {selected.name} ({size_mb:.2f} MB)[/bold green]")
+                console.print(f"[dim white]📂 Folder Location: {selected.parent}[/dim white]")
                 return selected, found_files
 
             # Multiple files found -> Display clean table directly without asking for folder path
@@ -6081,8 +6082,16 @@ def pak_obb_tools_menu(data_path: Path):
                             break
 
                 if not actual_edit_path:
-                    console.print('[yellow][!] REPLACE source folder me koi file nahi mili![/yellow]')
-                    console.print('[cyan]👉 Pehle edited files ko /sdcard/FeaturesticLeaks/REPLACE/ me daalo.[/cyan]')
+                    console.print(Panel(
+                        "[bold red]⚠️ NO FILES FOUND IN REPLACE FOLDER![/bold red]\n\n"
+                        "[bold white]Please copy/move your edited files into one of these folders:[/bold white]\n"
+                        " 📂 [bold bright_cyan]/sdcard/FeaturesticLeaks/REPLACE/[/bold bright_cyan]\n"
+                        " 📂 [bold bright_cyan]/sdcard/FeaturesticLeaks/PAK_WORKSPACE/3_REPLACE/[/bold bright_cyan]\n\n"
+                        "[dim white]Tip: Put your modified files inside the REPLACE folder above, or enter custom path below.[/dim white]",
+                        title="[bold yellow] 📂 REPLACE FOLDER PATH GUIDE [/bold yellow]",
+                        border_style="yellow",
+                        box=ROUNDED
+                    ))
                     custom_edit = safe_input('-> Enter custom source folder path (or press Enter to cancel): ').strip().strip('"\'')
                     if not custom_edit:
                         safe_input('\nPress Enter to continue...')
@@ -6093,6 +6102,9 @@ def pak_obb_tools_menu(data_path: Path):
                         safe_input('\nPress Enter to continue...')
                         continue
                     actual_edit_path = custom_p
+                else:
+                    valid_cnt = len([p for p in actual_edit_path.rglob('*') if p.is_file() and p.name.lower() not in ignored_names and not p.name.startswith('.')])
+                    console.print(f"\n[bold green]✓ Found {valid_cnt} file(s) in REPLACE folder:[/bold green] [bold cyan]{actual_edit_path}[/bold cyan]")
 
                 try:
                     console.print(f'[bold cyan][+] Replacing files using source: {actual_edit_path}[/bold cyan]')
@@ -6149,9 +6161,18 @@ def pak_obb_tools_menu(data_path: Path):
                             break
 
                 if not actual_edit_path:
-                    console.print('[yellow][!] INJECT source folder me koi file nahi mili![/yellow]')
-                    console.print('[cyan]👉 Advice: Apni .lua ya mod file ko `/sdcard/FeaturesticLeaks/INJECT/` ya `/sdcard/FeaturesticLeaks/PAK_WORKSPACE/4_INJECT/` me daalo.[/cyan]')
-                    console.print('[dim white]Agar aapne kisi aur folder me file rakhi hai, toh niche exact full folder path paste karein (ya Enter dabayein cancel ke liye):[/dim white]')
+                    console.print(Panel(
+                        "[bold red]⚠️ NO FILES FOUND IN INJECT FOLDER![/bold red]\n\n"
+                        "[bold white]Please copy/move your .lua or mod files into one of these folders:[/bold white]\n"
+                        " 📂 [bold bright_yellow]/sdcard/FeaturesticLeaks/INJECT/[/bold bright_yellow]\n"
+                        " 📂 [bold bright_yellow]/sdcard/FeaturesticLeaks/PAK_WORKSPACE/4_INJECT/[/bold bright_yellow]\n\n"
+                        "[dim white]Instructions:[/dim white]\n"
+                        "1. Open your File Manager and put your files inside [/dim white][bold yellow]/sdcard/FeaturesticLeaks/INJECT/[/bold yellow]\n"
+                        "2. Or enter your custom folder path below:",
+                        title="[bold yellow] 📂 INJECT FOLDER PATH GUIDE [/bold yellow]",
+                        border_style="yellow",
+                        box=ROUNDED
+                    ))
                     custom_edit = safe_input('-> Enter custom source folder path (or press Enter to cancel): ').strip().strip('"\'')
                     if not custom_edit:
                         safe_input('\nPress Enter to continue...')
@@ -6162,6 +6183,9 @@ def pak_obb_tools_menu(data_path: Path):
                         safe_input('\nPress Enter to continue...')
                         continue
                     actual_edit_path = custom_p
+                else:
+                    valid_cnt = len([p for p in actual_edit_path.rglob('*') if p.is_file() and p.name.lower() not in ignored_names and not p.name.startswith('.')])
+                    console.print(f"\n[bold green]✓ Found {valid_cnt} source file(s) in INJECT folder:[/bold green] [bold cyan]{actual_edit_path}[/bold cyan]")
 
                 try:
                     pak = TencentPakFile(pak_file)
