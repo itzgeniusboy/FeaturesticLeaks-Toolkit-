@@ -162,6 +162,15 @@ Option `2` chunte hi aapko 3 Modes milenge:
 #### **[4] Embed PAK into Lua Installer**
 * **Kya Kaam Karta Hai**: PAK file ko Base64 me encode karke direct Lua script me inject karta hai taaki GameGuard bypass script directly memory me load kar sake.
 
+#### **[9] 🤖 AI-Assisted Lua Repair & Multi-API Key Manager**
+* **Kya Kaam Karta Hai**:
+  - Google Gemini, Groq, aur OpenRouter API AI models ka upayog karke broken/syntax error wale Lua scripts ko automatically scan aur repair karta hai.
+  - Multi-API Key Manager system ke dwara aap multiple API keys save kar sakte hain. Jab ek API key limit reach kare gi, toh tool automatically doosri key par switch karke request handle karega!
+* **Setup Step**:
+  1. Lua Master Suite me Option `9` press karein -> Option `2` (Manage AI API Keys).
+  2. Apni Google Gemini API Key (`https://aistudio.google.com`) ya Groq Key (`https://console.groq.com`) paste karein.
+  3. Active Provider set karein aur Option `1` (Run AI-Assisted Lua Repair) par click karke kisi bhi broken Lua script ko instantly fix karein!
+
 ---
 
 ### 🛠️ CATEGORY 3: UTILITIES & HELP

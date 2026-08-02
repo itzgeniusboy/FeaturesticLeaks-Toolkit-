@@ -6489,6 +6489,277 @@ def run_one_click_auto_lua_workflow(data_path: Path):
     console.print(f"[bold green]🎉 Auto-Sync Complete! Saved output to {synced_count} folders across workspace & SDCard![/bold green]")
     console.print(f"[bold white]👉 You can now immediately run Repack / Replace without needing to move any files![/bold white]")
 
+# ==================== AI-ASSISTED REPAIR & MULTI-API ENGINE ====================
+
+AI_CONFIG_FILE = Path.home() / ".featurestic_ai_config.json"
+
+def get_ai_config() -> Dict[str, Any]:
+    if AI_CONFIG_FILE.exists():
+        try:
+            with open(AI_CONFIG_FILE, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            pass
+    return {
+        "active_provider": "google",
+        "keys": {
+            "google": [],
+            "groq": [],
+            "openrouter": []
+        }
+    }
+
+def save_ai_config(cfg: Dict[str, Any]):
+    try:
+        with open(AI_CONFIG_FILE, "w", encoding="utf-8") as f:
+            json.dump(cfg, f, indent=4)
+    except Exception as e:
+        console.print(f"[bold red][X] Could not save AI config: {e}[/bold red]")
+
+def manage_ai_api_keys():
+    cfg = get_ai_config()
+    while True:
+        print_banner()
+        console.print(Panel("[bold bright_cyan]🤖 AI API KEYS & PROVIDER MANAGEMENT 🤖[/bold bright_cyan]\n[dim white]Manage API keys for Google Gemini, Groq, and OpenRouter with multi-key rotation fallback.[/dim white]", border_style="cyan", box=ROUNDED))
+        
+        active_prov = cfg.get("active_provider", "google")
+        console.print(f"[bold white]Active Provider:[/bold white] [bold bright_green]{active_prov.upper()}[/bold bright_green]\n")
+        
+        table = Table(title="[bold cyan]Saved API Keys[/bold cyan]", box=ROUNDED)
+        table.add_column("Provider", style="bold yellow")
+        table.add_column("Total Keys Saved", style="bold white", justify="center")
+        table.add_column("Key Hints", style="dim white")
+        
+        for prov in ["google", "groq", "openrouter"]:
+            keys = cfg.get("keys", {}).get(prov, [])
+            hints = ", ".join([k[:6] + "..." + k[-4:] if len(k) > 10 else "Saved" for k in keys]) if keys else "[dim red]No keys saved[/dim red]"
+            is_active = " (Active)" if prov == active_prov else ""
+            table.add_row(prov.capitalize() + is_active, str(len(keys)), hints)
+        
+        console.print(table)
+        console.print()
+        console.print("  [1] Add API Key (Google / Groq / OpenRouter)")
+        console.print("  [2] Set Active Provider")
+        console.print("  [3] Delete / Clear Keys")
+        console.print("  [0] Back to Lua Menu")
+        
+        choice = safe_input("\n-> Select Option [0-3]: ").strip()
+        if choice == '1':
+            console.print("\n[bold cyan]Select Provider to Add Key:[/bold cyan]")
+            console.print("  [1] Google Gemini (Get free key from https://aistudio.google.com)")
+            console.print("  [2] Groq (Get free fast key from https://console.groq.com)")
+            console.print("  [3] OpenRouter (Get free key from https://openrouter.ai)")
+            p_choice = safe_input("-> Select Provider [1-3]: ").strip()
+            prov_map = {"1": "google", "2": "groq", "3": "openrouter"}
+            prov = prov_map.get(p_choice)
+            if not prov:
+                console.print("[bold red][X] Invalid provider.[/bold red]")
+                time.sleep(1)
+                continue
+            
+            key_val = safe_input(f"-> Paste your {prov.capitalize()} API key: ").strip().strip('"\'')
+            if key_val:
+                if prov not in cfg["keys"]:
+                    cfg["keys"][prov] = []
+                if key_val not in cfg["keys"][prov]:
+                    cfg["keys"][prov].append(key_val)
+                    save_ai_config(cfg)
+                    console.print(f"[bold green]✅ Added API key for {prov.capitalize()}![/bold green]")
+                else:
+                    console.print("[bold yellow][!] Key already exists.[/bold yellow]")
+            time.sleep(1)
+        elif choice == '2':
+            console.print("\n[bold cyan]Select Active Provider:[/bold cyan]")
+            console.print("  [1] Google Gemini")
+            console.print("  [2] Groq")
+            console.print("  [3] OpenRouter")
+            p_choice = safe_input("-> Select Active Provider [1-3]: ").strip()
+            prov_map = {"1": "google", "2": "groq", "3": "openrouter"}
+            prov = prov_map.get(p_choice)
+            if prov:
+                cfg["active_provider"] = prov
+                save_ai_config(cfg)
+                console.print(f"[bold green]✅ Active provider set to {prov.capitalize()}![/bold green]")
+            time.sleep(1)
+        elif choice == '3':
+            console.print("\n[bold cyan]Clear Keys for Provider:[/bold cyan]")
+            console.print("  [1] Google Gemini")
+            console.print("  [2] Groq")
+            console.print("  [3] OpenRouter")
+            console.print("  [4] Clear ALL Keys")
+            p_choice = safe_input("-> Select Option [1-4]: ").strip()
+            prov_map = {"1": "google", "2": "groq", "3": "openrouter"}
+            if p_choice in prov_map:
+                prov = prov_map[p_choice]
+                cfg["keys"][prov] = []
+                save_ai_config(cfg)
+                console.print(f"[bold green]✅ Cleared keys for {prov.capitalize()}![/bold green]")
+            elif p_choice == '4':
+                cfg["keys"] = {"google": [], "groq": [], "openrouter": []}
+                save_ai_config(cfg)
+                console.print("[bold green]✅ Cleared all saved API keys![/bold green]")
+            time.sleep(1)
+        elif choice == '0':
+            break
+
+def query_ai_for_lua_fix(lua_code: str, error_msg: str) -> Optional[str]:
+    cfg = get_ai_config()
+    provider = cfg.get("active_provider", "google")
+    keys = cfg.get("keys", {}).get(provider, [])
+    
+    if not keys:
+        # Check environment fallback
+        env_key = os.environ.get("GEMINI_API_KEY") or os.environ.get("GROQ_API_KEY") or os.environ.get("OPENROUTER_API_KEY")
+        if env_key:
+            keys = [env_key]
+        else:
+            console.print(f"[bold red][X] No API keys saved for provider '{provider}'.[/bold red]")
+            console.print("[bold yellow]Please configure API keys in Lua Menu -> AI-Assisted Repair -> Option [2] Manage API Keys.[/bold yellow]")
+            return None
+
+    prompt = f"""You are an expert Lua 5.1 and GameGuard script engineer.
+Fix the syntax errors, missing functions, or bugs in the following Lua script so that it compiles perfectly with luac 5.1 and runs smoothly without syntax/runtime crashes.
+
+CRITICAL RULES:
+1. Output ONLY valid, runnable Lua code. Do NOT wrap in markdown code blocks like ```lua ... ``` if possible, or keep it strictly clean.
+2. Ensure strict compatibility with Lua 5.1 and GameGuard (gg.* calls).
+3. Do not modify the functional business logic, menu items, or memory search values unless they contain invalid syntax.
+
+COMPILATION ERROR / BUG DESCRIPTION:
+{error_msg}
+
+ORIGINAL LUA SCRIPT:
+{lua_code}
+"""
+
+    console.print(f"[bold cyan]🤖 Sending request to AI model using provider '{provider.capitalize()}' ({len(keys)} key(s) available)...[/bold cyan]")
+
+    for idx, key in enumerate(keys, 1):
+        try:
+            console.print(f"[dim white]-> Trying API Key #{idx}...[/dim white]")
+            if provider == "google":
+                url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={key}"
+                payload = {
+                    "contents": [{"parts": [{"text": prompt}]}]
+                }
+                resp = requests.post(url, json=payload, timeout=25)
+                if resp.status_code == 200:
+                    data = resp.json()
+                    text = data['candidates'][0]['content']['parts'][0]['text']
+                    return text
+                else:
+                    console.print(f"[dim red]API Key #{idx} returned HTTP {resp.status_code}: {resp.text[:100]}[/dim red]")
+            
+            elif provider == "groq":
+                url = "https://api.groq.com/openai/v1/chat/completions"
+                headers = {
+                    "Authorization": f"Bearer {key}",
+                    "Content-Type": "application/json"
+                }
+                payload = {
+                    "model": "llama-3.1-70b-versatile",
+                    "messages": [{"role": "user", "content": prompt}],
+                    "temperature": 0.2
+                }
+                resp = requests.post(url, json=payload, headers=headers, timeout=25)
+                if resp.status_code == 200:
+                    data = resp.json()
+                    text = data['choices'][0]['message']['content']
+                    return text
+                else:
+                    console.print(f"[dim red]API Key #{idx} returned HTTP {resp.status_code}: {resp.text[:100]}[/dim red]")
+
+            elif provider == "openrouter":
+                url = "https://openrouter.ai/api/v1/chat/completions"
+                headers = {
+                    "Authorization": f"Bearer {key}",
+                    "Content-Type": "application/json"
+                }
+                payload = {
+                    "model": "google/gemini-flash-1.5",
+                    "messages": [{"role": "user", "content": prompt}],
+                    "temperature": 0.2
+                }
+                resp = requests.post(url, json=payload, headers=headers, timeout=25)
+                if resp.status_code == 200:
+                    data = resp.json()
+                    text = data['choices'][0]['message']['content']
+                    return text
+                else:
+                    console.print(f"[dim red]API Key #{idx} returned HTTP {resp.status_code}: {resp.text[:100]}[/dim red]")
+
+        except Exception as e:
+            console.print(f"[dim red]Key #{idx} request error: {e}[/dim red]")
+
+    console.print("[bold red][X] All API keys failed or timed out.[/bold red]")
+    return None
+
+def run_ai_assisted_lua_repair(data_path: Path):
+    console.print(Panel(Align.center("[bold bright_cyan]🤖 AI-ASSISTED LUA SCRIPT REPAIR ENGINE 🤖[/bold bright_cyan]\n[dim white]Uses Google Gemini / Groq / OpenRouter AI to fix broken Lua syntax, missing end statements, & GameGuard errors![/dim white]"), border_style="cyan", box=ROUNDED))
+    
+    lua_dir = data_path / "LUA"
+    lua_file, _ = pick_file_from_folder("AI Lua Repair", lua_dir, extensions=[".lua", ".txt"])
+    if not lua_file:
+        custom_input = safe_input('-> Enter custom Lua file path (or press Enter to cancel): ').strip().strip('"\'')
+        if not custom_input:
+            return
+        lua_file = Path(custom_input)
+        if not lua_file.exists() or not lua_file.is_file():
+            console.print(f'[bold red][X] File not found: {lua_file}[/bold red]')
+            return
+
+    try:
+        raw_code = lua_file.read_text(encoding='utf-8', errors='ignore')
+    except Exception as e:
+        console.print(f"[bold red][X] Could not read file: {e}[/bold red]")
+        return
+
+    # Test local compilation first to detect error
+    compiler = "luac5.1" if shutil.which("luac5.1") else ("luac" if shutil.which("luac") else None)
+    error_msg = "Manual user requested AI code cleanup & syntax repair for Lua 5.1 compatibility."
+    
+    if compiler:
+        tmp_test = lua_file.with_suffix('.tmp_compile_test')
+        proc = subprocess.run([compiler, "-o", str(tmp_test), str(lua_file)], capture_output=True, text=True)
+        tmp_test.unlink(missing_ok=True)
+        if proc.returncode != 0:
+            error_msg = proc.stderr.strip()
+            console.print(f"[bold yellow][!] Compilation Error Detected:\n{error_msg}[/bold yellow]\n")
+        else:
+            console.print("[bold green]✓ File compiles locally, but AI will optimize and refactor code for Lua 5.1.[/bold green]\n")
+
+    ai_result = query_ai_for_lua_fix(raw_code, error_msg)
+    if not ai_result:
+        return
+
+    # Clean markdown formatting if present
+    cleaned_code = re.sub(r'^```(?:lua)?\n', '', ai_result, flags=re.MULTILINE)
+    cleaned_code = re.sub(r'\n```$', '', cleaned_code, flags=re.MULTILINE).strip()
+
+    res_dir = data_path / "RESULT"
+    res_dir.mkdir(parents=True, exist_ok=True)
+    out_repaired = res_dir / f"{lua_file.stem}_ai_repaired.lua"
+    out_repaired.write_text(cleaned_code, encoding='utf-8')
+
+    console.print(f"\n[bold green]🎉 AI Repair Successful! Saved repaired script to:[/bold green] [bold cyan]{out_repaired}[/bold cyan]")
+    
+    # Auto-compile check
+    if compiler:
+        out_luac = res_dir / f"{lua_file.stem}_ai_repaired.luac"
+        proc2 = subprocess.run([compiler, "-o", str(out_luac), str(out_repaired)], capture_output=True, text=True)
+        if proc2.returncode == 0:
+            console.print(f"[bold green]✅ Compiled repaired script to bytecode -> {out_luac.name} ({out_luac.stat().st_size:,} bytes)[/bold green]")
+        else:
+            console.print(f"[bold yellow][!] Compiled bytecode warning: {proc2.stderr.strip()}[/bold yellow]")
+
+    sd_res = Path("/sdcard/FeaturesticLeaks/RESULT")
+    if sd_res.exists():
+        try:
+            shutil.copy2(out_repaired, sd_res / out_repaired.name)
+            console.print(f"[bold green][+] Saved to SDCard: {sd_res / out_repaired.name}[/bold green]")
+        except Exception:
+            pass
+
 def lua_tools_menu(data_path: Path):
     while True:
         print_banner()
@@ -6512,11 +6783,12 @@ def lua_tools_menu(data_path: Path):
         menu_table.add_row("[6]", "Security & Protection", "String obfuscator, security audit & bytecode header repair")
         menu_table.add_row("[7]", "Minifier & GG Code Studio", "Minify/Clean Lua scripts & Generate GG Memory Code")
         menu_table.add_row("[8]", "1-Click Auto Lua Workflow", "Auto-fix syntax -> Auto-compile -> Auto-sync to all folders")
+        menu_table.add_row("[9]", "🤖 AI-Assisted Lua Repair", "Fix broken Lua syntax & manage multi-API keys (Google/Groq)")
         menu_table.add_row("[0]", "EXIT ✗", "Return to Main Menu")
 
         console.print(menu_table)
         console.print()
-        choice = safe_input('\033[1;36mSELECT OPTION [1-8] [0]: \033[0m').strip()
+        choice = safe_input('\033[1;36mSELECT OPTION [1-9] [0]: \033[0m').strip()
 
         if choice == '1':
             run_lua_decompiler(data_path)
@@ -6572,6 +6844,16 @@ def lua_tools_menu(data_path: Path):
             safe_input('\nPress Enter to continue...')
         elif choice == '8':
             run_one_click_auto_lua_workflow(data_path)
+            safe_input('\nPress Enter to continue...')
+        elif choice == '9':
+            console.print("\n[bold cyan]🤖 AI-ASSISTED LUA ENGINE & API MANAGER:[/bold cyan]")
+            console.print("  [1] Run AI-Assisted Lua Repair & Syntax Fixer")
+            console.print("  [2] Manage AI API Keys & Active Provider (Google / Groq / OpenRouter)")
+            sub_c = safe_input("\n-> Select Option [1-2] [1]: ").strip() or '1'
+            if sub_c == '1':
+                run_ai_assisted_lua_repair(data_path)
+            else:
+                manage_ai_api_keys()
             safe_input('\nPress Enter to continue...')
         elif choice == '0':
             break

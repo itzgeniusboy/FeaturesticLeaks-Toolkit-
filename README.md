@@ -131,6 +131,9 @@ Tool launch hote hi SDCard (`/sdcard/FeaturesticLeaks/`) me structured workspace
 6. **Anti-Bypass & Security Analyzer**: Audits Lua scripts for GameGuard memory calls and outputs a 0-100 risk score report.
 7. **Bytecode Header Fixer**: Repairs corrupted magic headers for Lua 5.1 (`1B 4C 75 61 51 00...`) or LuaJIT (`1B 4C 4A 02...`).
 8. **Lua Script Merger**: Merges multiple `.lua` scripts into a clean, modular `Master_Merged_Script.lua` file wrapped in `do...end` blocks.
+9. **AI-Assisted Lua Repair & Multi-API Key Engine**:
+   - Uses AI models (Google Gemini, Groq, OpenRouter) to fix broken Lua syntax, missing end statements, and GameGuard errors.
+   - Built-in Multi-API key manager with key rotation fallback and multi-provider selection.
 
 ### 🛠️ 3. Utilities & Help
 1. **UE4 String Tool**: Extract and repack readable string literals inside `.uasset` / `.uexp` binary files.
