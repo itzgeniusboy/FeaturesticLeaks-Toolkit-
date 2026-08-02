@@ -6850,17 +6850,24 @@ def call_ai_api(prompt: str) -> Optional[str]:
     clean_p = prompt.strip()
     low_p = clean_p.lower()
     last_user_query = ""
-    if "User:" in clean_p:
-        last_user_query = clean_p.split("User:")[-1].split("\n")[0].strip().lower()
+    if "user typed: '" in low_p:
+        try:
+            last_user_query = low_p.split("user typed: '")[1].split("'")[0].strip()
+        except Exception:
+            last_user_query = low_p.strip()
+    elif "user:" in low_p:
+        try:
+            last_user_query = low_p.split("user:")[-1].split("\n")[0].strip()
+        except Exception:
+            last_user_query = low_p.strip()
     else:
-        last_user_query = low_p
+        last_user_query = low_p.strip()
 
-    # Local instant conversational fallback mapping for smooth 24/7 AI chat responses (0 tokens spent!)
+    # Local instant conversational fallback mapping for exact greetings (0 tokens spent!)
     quick_chat_responses = {
-        'hi': "Hello brother! 👋 Main Featurestic Leaks AI Engine hu! Main PAK/OBB unpacking, Lua compiling, aur auto-fixing me aapki help kar sakta hu. Bolo kya karna hai?",
+        'hi': "Hello brother! 👋 Main Featurestic Leaks AI Engine hu! PAK/OBB unpacking, Lua compiling, aur auto-fixing me kya help chahiye?",
         'hii': "Hii buddy! Welcome to Featurestic Leaks! Aaj kya modding ya leak karni hai?",
         'hiii': "Hiii! Kaise ho? Direct apana question poochho!",
-        'hiiiii': "Hiii brother! Main ready hu, batao kya modding assistance chahiye?",
         'hello': "Hey! Main Featurestic Leaks AI Companion hu. PAK unpack, Lua repair, ya koi bhi game modding query batao!",
         'hlw': "Hello ji! Kaise ho? Direct sawaal pucho ya tool options ke bare me jaano!",
         'helo': "Helooo! Kaise ho bhai? Featurestic Leaks Engine 24/7 ready hai!",
@@ -6871,8 +6878,6 @@ def call_ai_api(prompt: str) -> Optional[str]:
         'who are you': "I am Featurestic Leaks AI Engine — your ultimate GameGuard, PAK/OBB & Lua 5.1 modding buddy!",
         'help': "💡 **FEATURESTIC LEAKS AI QUICK GUIDANCE:**\n• **Option [1]**: AI Watch Assistant (Folder auto-listen & auto-process)\n• **Option [2]**: Friendly Chat (Aap yahan mughse kuch bhi poochh sakte hain)\n• **Option [3]**: AI Lua Syntax Repair (Broken .lua auto-fix)\n• **Option [4]**: Manage API Keys & Telegram Auto-Report Bot",
         'options': "💡 Main FeaturesticLeaks tool options:\n[1] PAK/OBB Tool  |  [2] Lua Compiler  |  [3] AI Tools  |  [4] Utilities",
-        'pak': "📦 **PAK Unpacking Guide:**\nOption [1] (PAK/OBB Tool) -> Option [1] (Unpack PAK File) select karein. Unpacked files `UNPACK/<stem>` folder me save hongi!",
-        'lua': "📜 **Lua Compiler Guide:**\nOption [2] (Lua Compiler) -> Option [1] se `.lua` source code ko `.luac` bytecode me compile kar sakte hain!",
         'bhai': "Haan bhai bolo! Main aapka Featurestic Leaks AI Assistant hu. Batao kya help chahiye?",
         'bro': "Yo bro! What's up? Direct apana query ya script question poochho!",
         'thanks': "Arey koi nahi bhai! Always happy to help! Enjoy modding! 🚀",
@@ -6882,10 +6887,25 @@ def call_ai_api(prompt: str) -> Optional[str]:
         'by': "Bye brother! Stay safe and happy modding!",
     }
 
-    # Instant check for exact or clean conversational match to save API quota
-    for trigger, resp_str in quick_chat_responses.items():
-        if last_user_query == trigger or last_user_query.strip() == trigger:
-            return resp_str
+    # Instant check for EXACT isolated conversational match to save API quota
+    if last_user_query in quick_chat_responses:
+        return quick_chat_responses[last_user_query]
+
+    SYSTEM_PROMPT = (
+        "You are Featurestic Leaks AI Engine — a concise, tool-focused AI assistant built specifically for Featurestic Leaks v2.5 "
+        "(PAK/OBB Unpacker & Repacker, Lua 5.1 Compiler/Decompiler, AI Syntax Repair, Auto-Report Bot).\n\n"
+        "STRICT RESPONSE RULES:\n"
+        "1. Be extremely short, direct, and to-the-point (maximum 2-3 short sentences).\n"
+        "2. ONLY answer regarding Featurestic Leaks tool options, PAK/OBB operations, Lua 5.1 scripts, GameGuard, and API configuration.\n"
+        "3. NEVER suggest external PC tools (like Visual Studio, Notepad++, Android Studio, PC software). Everything is done directly inside Featurestic Leaks on Termux/Android.\n"
+        "4. If asked how to do something (e.g. 'pak file bna', 'lua compile', 'fix script'):\n"
+        "   - Give direct, step-by-step menu directions within Featurestic Leaks:\n"
+        "     * PAK Unpack/Repack: Main Menu -> Option [1] PAK/OBB Tool -> Option [2] Repack\n"
+        "     * Lua Compile/Decompile: Main Menu -> Option [2] Lua Compiler\n"
+        "     * AI Syntax Fix: Main Menu -> Option [3] AI Tools -> Option [3] AI Lua Repair\n"
+        "5. Speak in polite, friendly Hinglish with emojis. Use 'bhai' or 'brother'. NEVER call the user 'beta' or strange names.\n"
+        "6. Do NOT write long paragraphs or off-topic advice. Keep replies brief and accurate."
+    )
 
     # Determine task complexity to pick models smartly (saves API limits!)
     is_complex_code = any(kw in low_p for kw in [
@@ -6937,7 +6957,11 @@ def call_ai_api(prompt: str) -> Optional[str]:
                 if prov == "google":
                     for g_model in gemini_models:
                         url = f"https://generativelanguage.googleapis.com/v1beta/models/{g_model}:generateContent?key={key}"
-                        payload = {"contents": [{"parts": [{"text": prompt}]}]}
+                        payload = {
+                            "system_instruction": {"parts": [{"text": SYSTEM_PROMPT}]},
+                            "contents": [{"parts": [{"text": prompt}]}],
+                            "generationConfig": {"maxOutputTokens": 250, "temperature": 0.2}
+                        }
                         resp = requests.post(url, json=payload, timeout=15)
                         if resp.status_code == 200:
                             data = resp.json()
@@ -6954,8 +6978,12 @@ def call_ai_api(prompt: str) -> Optional[str]:
                         headers = {"Authorization": f"Bearer {key}", "Content-Type": "application/json"}
                         payload = {
                             "model": g_model,
-                            "messages": [{"role": "user", "content": prompt}],
-                            "temperature": 0.3
+                            "messages": [
+                                {"role": "system", "content": SYSTEM_PROMPT},
+                                {"role": "user", "content": prompt}
+                            ],
+                            "max_tokens": 250,
+                            "temperature": 0.2
                         }
                         resp = requests.post(url, json=payload, headers=headers, timeout=15)
                         if resp.status_code == 200:
@@ -6973,8 +7001,12 @@ def call_ai_api(prompt: str) -> Optional[str]:
                         headers = {"Authorization": f"Bearer {key}", "Content-Type": "application/json"}
                         payload = {
                             "model": or_model,
-                            "messages": [{"role": "user", "content": prompt}],
-                            "temperature": 0.3
+                            "messages": [
+                                {"role": "system", "content": SYSTEM_PROMPT},
+                                {"role": "user", "content": prompt}
+                            ],
+                            "max_tokens": 250,
+                            "temperature": 0.2
                         }
                         resp = requests.post(url, json=payload, headers=headers, timeout=15)
                         if resp.status_code == 200:
@@ -6988,13 +7020,15 @@ def call_ai_api(prompt: str) -> Optional[str]:
             except Exception:
                 continue
 
-    # If all API calls failed or no keys were available:
-    # 1. First check if we can respond via fuzzy local conversational matcher
-    for trigger, resp_str in quick_chat_responses.items():
-        if trigger in last_user_query:
-            return resp_str
+    # Offline / local direct fallbacks for tool commands when API keys are offline
+    if "pak" in last_user_query:
+        return "📦 **PAK File Guide:**\nPAK file create/repack karne ke liye: Main Menu -> Option [1] (PAK/OBB Tool) -> Option [2] (Repack Folder) select karein! Unpacked files `UNPACK/<folder>` me honi chahiye."
+    elif "lua" in last_user_query:
+        return "📜 **Lua Compiler Guide:**\nLua compile karne ke liye: Main Menu -> Option [2] (Lua Compiler) select karein! Broken Lua syntax repair karne ke liye: Main Menu -> Option [3] AI Tools -> [3] AI Lua Repair use karein."
+    elif any(k in last_user_query for k in ['help', 'option', 'menu', 'kya kar']):
+        return "💡 **Featurestic Leaks Tool Options:**\n[1] PAK/OBB Unpack/Repack  |  [2] Lua Compiler  |  [3] AI Watch & Repair  |  [4] API Keys & Telegram"
 
-    # 2. Automatically notify Telegram bot about key exhaustion
+    # Automatically notify Telegram bot about key exhaustion
     send_telegram_bug_report(
         error_type="API_KEYS_EXHAUSTED",
         error_msg="All configured AI API keys returned rate limit / limit reached or no key configured!",
@@ -7634,18 +7668,102 @@ def run_ai_watch_assistant(data_path: Path):
                             pass
 
             if not new_file:
-                user_msg = safe_input("\n💬 You (Type chat query or press Enter to scan files): ").strip()
+                user_msg = safe_input("\n💬 You (Type command/query or press Enter to scan): ").strip()
                 if user_msg.lower() in ['exit', 'quit', 'back', 'cancel', '0']:
                     console.print("[bold cyan]🤖 AI Assistant: Watch mode stopped. Main menu me wapas aa gaye![/bold cyan]")
                     break
                 
                 if user_msg:
-                    console.print("[dim cyan]🤖 AI Assistant is thinking...[/dim cyan]")
-                    resp = call_ai_api(f"You are Featurestic Leaks AI Assistant in Watch Mode. User typed: '{user_msg}'. Respond in friendly Hinglish with emojis.")
-                    if resp:
-                        console.print(f"\n[bold bright_cyan]🤖 AI Assistant:[/bold bright_cyan]\n{resp.strip()}\n")
-                    else:
-                        console.print("\n[bold bright_cyan]🤖 AI Assistant:[/bold bright_cyan] Hello! Main Featurestic Leaks AI Assistant hu! Main aapki PAK/LUA files watch aur process karne ke liye ready hu. Folder me file daalein ya koi query poochhein! 🚀\n")
+                    low_um = user_msg.lower()
+                    
+                    # Direct Command Execution: Scan and Process existing files in workspace!
+                    handled_command = False
+                    
+                    if any(kw in low_um for kw in ['unpack', 'pak', 'obb']):
+                        found_paks = []
+                        for wf in watch_folders:
+                            if wf.exists():
+                                for f in wf.glob("*"):
+                                    if f.is_file() and f.suffix.lower() in ['.pak', '.obb']:
+                                        found_paks.append(f)
+                        if found_paks:
+                            pf = found_paks[0]
+                            console.print(f"[bold cyan]⚡ AI Unpacking found PAK file: {pf.name}...[/bold cyan]")
+                            try:
+                                pak = TencentPakFile(pf)
+                                out_u = data_path / "UNPACK" / pf.stem
+                                pak.dump(out_u)
+                                console.print(f"[bold green]✅ AI Report: Unpacked {pf.name} successfully to {out_u}![/bold green]\n")
+                            except Exception as ex:
+                                console.print(f"[bold red]❌ Unpack Error: {ex}[/bold red]\n")
+                            handled_command = True
+                        else:
+                            console.print("\n[bold bright_cyan]🤖 AI Assistant:[/bold bright_cyan] 📦 PAK Unpack karne ke liye:\n1. File `1_PAK_INPUT` folder me daalein (AI auto-detect kar lega)\n2. Ya Main Menu -> Option [1] PAK/OBB Tool select karein!\n")
+                            handled_command = True
+                            
+                    elif any(kw in low_um for kw in ['compile', 'luac']):
+                        found_luas = []
+                        for wf in watch_folders:
+                            if wf.exists():
+                                for f in wf.glob("*"):
+                                    if f.is_file() and f.suffix.lower() in ['.lua', '.txt']:
+                                        found_luas.append(f)
+                        if found_luas:
+                            lf = found_luas[0]
+                            console.print(f"[bold cyan]⚡ AI Compiling found Lua script: {lf.name}...[/bold cyan]")
+                            try:
+                                fixed_lua = fix_lua_syntax_for_lua51(lf)
+                                res_dir = data_path / "RESULT"
+                                res_dir.mkdir(parents=True, exist_ok=True)
+                                out_luac = res_dir / f"{lf.stem}.luac"
+                                compiler = "luac5.1" if shutil.which("luac5.1") else ("luac" if shutil.which("luac") else None)
+                                if compiler:
+                                    proc = subprocess.run([compiler, "-o", str(out_luac), str(fixed_lua)], capture_output=True, text=True)
+                                    if proc.returncode == 0:
+                                        console.print(f"[bold green]✅ AI Report: Compiled successfully to {out_luac.name}![/bold green]\n")
+                                    else:
+                                        console.print(f"[bold yellow]⚠️ Syntax Warning: {proc.stderr.strip()}[/bold yellow]\n")
+                            except Exception as ex:
+                                console.print(f"[bold red]❌ Compile Error: {ex}[/bold red]\n")
+                            handled_command = True
+                        else:
+                            console.print("\n[bold bright_cyan]🤖 AI Assistant:[/bold bright_cyan] 📜 Lua Compile karne ke liye:\n1. Script `1_LUA_INPUT` folder me daalein (AI auto-compile karega)\n2. Ya Main Menu -> Option [2] Lua Compiler select karein!\n")
+                            handled_command = True
+
+                    elif any(kw in low_um for kw in ['fix', 'repair', 'syntax']):
+                        found_luas = []
+                        for wf in watch_folders:
+                            if wf.exists():
+                                for f in wf.glob("*"):
+                                    if f.is_file() and f.suffix.lower() in ['.lua', '.txt']:
+                                        found_luas.append(f)
+                        if found_luas:
+                            lf = found_luas[0]
+                            console.print(f"[bold cyan]🤖 AI repairing Lua syntax for: {lf.name}...[/bold cyan]")
+                            try:
+                                code = lf.read_text(errors='ignore')
+                                fixed_code = ai_fix_lua_code(code)
+                                if fixed_code:
+                                    lf.write_text(fixed_code, encoding='utf-8')
+                                    console.print(f"[bold green]✅ AI Report: {lf.name} syntax repaired successfully![/bold green]\n")
+                            except Exception as ex:
+                                console.print(f"[bold red]❌ Fix Error: {ex}[/bold red]\n")
+                            handled_command = True
+                        else:
+                            console.print("\n[bold bright_cyan]🤖 AI Assistant:[/bold bright_cyan] 🛠️ Lua Syntax Fix karne ke liye:\n1. Broken script `1_LUA_INPUT` folder me daalein\n2. Ya Main Menu -> Option [3] AI Tools -> Option [3] AI Lua Repair use karein!\n")
+                            handled_command = True
+
+                    elif any(kw in low_um for kw in ['scan', 'check', 'status', 'folder']):
+                        display_workspace_summary(data_path)
+                        handled_command = True
+
+                    if not handled_command:
+                        console.print("[dim cyan]🤖 AI Assistant is thinking...[/dim cyan]")
+                        resp = call_ai_api(f"You are Featurestic Leaks AI Assistant in Watch Mode. User typed: '{user_msg}'. Respond in friendly Hinglish with emojis.")
+                        if resp:
+                            console.print(f"\n[bold bright_cyan]🤖 AI Assistant:[/bold bright_cyan]\n{resp.strip()}\n")
+                        else:
+                            console.print("\n[bold bright_cyan]🤖 AI Assistant:[/bold bright_cyan] Main ready hu! Input folder me `.pak` ya `.lua` file daalein, main usko instantly process kar dunga! 🚀\n")
                     continue
                 else:
                     time.sleep(1)
