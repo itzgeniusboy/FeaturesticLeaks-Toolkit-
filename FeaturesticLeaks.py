@@ -7633,8 +7633,22 @@ def run_ai_watch_assistant(data_path: Path):
                         except Exception:
                             pass
 
-            else:
-                time.sleep(2)
+            if not new_file:
+                user_msg = safe_input("\n💬 You (Type chat query or press Enter to scan files): ").strip()
+                if user_msg.lower() in ['exit', 'quit', 'back', 'cancel', '0']:
+                    console.print("[bold cyan]🤖 AI Assistant: Watch mode stopped. Main menu me wapas aa gaye![/bold cyan]")
+                    break
+                
+                if user_msg:
+                    console.print("[dim cyan]🤖 AI Assistant is thinking...[/dim cyan]")
+                    resp = call_ai_api(f"You are Featurestic Leaks AI Assistant in Watch Mode. User typed: '{user_msg}'. Respond in friendly Hinglish with emojis.")
+                    if resp:
+                        console.print(f"\n[bold bright_cyan]🤖 AI Assistant:[/bold bright_cyan]\n{resp.strip()}\n")
+                    else:
+                        console.print("\n[bold bright_cyan]🤖 AI Assistant:[/bold bright_cyan] Hello! Main Featurestic Leaks AI Assistant hu! Main aapki PAK/LUA files watch aur process karne ke liye ready hu. Folder me file daalein ya koi query poochhein! 🚀\n")
+                    continue
+                else:
+                    time.sleep(1)
 
         except KeyboardInterrupt:
             console.print("\n[bold yellow]⏹️ AI Watch Assistant Stopped.[/bold yellow]")
