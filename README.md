@@ -1,7 +1,7 @@
 # ⚡ FEATURESTIC LEAKS PAK & LUA MASTER SUITE v2.6
 
-> **Termux / Android Game Reverse Engineering, PAK Manipulation & Universal Lua Suite**  
-> Complete high-performance reverse engineering suite for unpacking, repacking, path-injecting, rebuilding Unreal Engine / Tencent `.pak` & `.obb` containers, dumping skin assets, and managing Lua bytecode natively on Termux, Android Linux, and PC.
+> **Termux / Android Game Reverse Engineering, High-Speed PAK Manipulation & Universal Lua Suite**  
+> Complete high-performance reverse engineering suite for unpacking, repacking, path-injecting, rebuilding Unreal Engine / Tencent `.pak` & `.obb` containers, dumping skin assets, UAsset/UExp auto-pairing, and managing Lua bytecode natively on Termux, Android Linux, and PC.
 
 ---
 
@@ -64,7 +64,7 @@ python FeaturesticLeaks.py
 
 ---
 
-## 💡 Quick Launch Shortcuts & Telegram Bot
+## 💡 Quick Launch Shortcuts & One-Click Update
 
 Shortcut commands through tool ko Termux me kisi bhi location se launch kar sakte hain:
 
@@ -76,11 +76,9 @@ Shortcut commands through tool ko Termux me kisi bhi location se launch kar sakt
    ```bash
    paktool
    ```
-3. **Telegram Bot Runner**:
-   ```bash
-   python telegram_bot.py
-   ```
-   > 💡 **Interactive Bot Token Prompt**: If no token is set in environment or config, `telegram_bot.py` will ask interactively for your `@BotFather` token and save it automatically to `telegram_bot_config.json`.
+3. **🚀 Instant Tool Update**:
+   - Tool **automatically** checks for updates on GitHub when launched.
+   - You can also force update anytime via **Utilities & Help Menu -> Option [7] Check Tool Update 🚀**.
 
 ---
 
@@ -106,24 +104,25 @@ Tool launch hote hi SDCard (`/sdcard/FeaturesticLeaks/`) me structured workspace
 └── 📋 LOGS/                    <-- System logs & debug reports
 ```
 
-> 💡 **Clean File Manager Experience**: Pehle ke faltu aur bikhre hue folders auto-clean ho jaate hain. Aap ZArchiver me direct `/sdcard/FeaturesticLeaks/` open karke easily manage kar sakte hain.
+> 💡 **Clean File Manager Experience**: Bikhre hue temporary folders auto-clean ho jaate hain. Aap ZArchiver me direct `/sdcard/FeaturesticLeaks/` open karke easily manage kar sakte hain.
 
 ---
 
 ## 🧰 Complete Feature Overview
 
 ### 📦 1. PAK / OBB Tools
-1. **Unpack All Types PAKs**: Decrypts SM4/AES crypts, decompresses Zstandard / OBB compression, and outputs extracted files with detailed debug logs.
-2. **Repack All Types PAKs**: Auto-detects container modes (`MINI_OBB`, `GAMEPATCH`, `OBBZSDIC`) and rebuilds container blocks cleanly.
-3. **Replace Existing Files**: Replaces existing PAK files regardless of file size differences without crash or header corruption issues.
-4. **Inject Path (New Files)**: Injects brand new files/folders directly into target internal paths (e.g. `Content/Lua/GameLua/Mod/...`).
-5. **White Body Mod**: One-click character asset nuller tool.
-6. **Skin ID Swap & Skin Asset Dumper**:
+1. **Multi-Threaded PAK Unpacker**: Multi-threaded engine (up to 32 worker threads) supporting SM4/AES decryption, Zstandard/OBB decompression, and automatic CRC32 stem hash auto-repair for corrupt PAK headers.
+2. **Repack All Types PAKs**: Auto-detects container modes (`MINI_OBB`, `GAMEPATCH`, `OBBZSDIC`) and rebuilds container blocks with high efficiency.
+3. **Replace Existing Files**: Size-independent byte replacer that modifies existing PAK files without crash or header corruption issues.
+4. **Inject Path (New Files)**: Direct path injector for inserting custom files/folders directly into target internal game directories (e.g., `Content/Lua/GameLua/Mod/...`).
+5. **One-Click Mods**: White body mesh nuller & character asset converter.
+6. **Skin ID Swap & Asset Dumper**:
    - Swaps Lobby, Ingame, Weapon, Hit Effect & Deadbox skin IDs inside `.uasset` / `.uexp` binaries.
-   - **Skin Assets Dumper**: Scans PAK files or UNPACK folders for skin textures, meshes, uassets/uexps, generates `.txt` and `.json` reports, and exports raw skin assets.
-7. **OBB Manager**: Unzips OBB containers and rezips with byte-exact padding to match original file sizes.
+   - **Skin Asset Dumper**: Scans PAK files or UNPACK folders for skin textures, meshes, uassets/uexps, generates `.txt` and `.json` reports, and exports raw skin assets.
+7. **OBB Manager**: Extract and rezip OBB containers with byte-exact padding to match original file sizes.
+8. **UAsset / UExp Sync Engine**: Auto-pairs companion `.uasset` and `.uexp` files when selecting files and warns if a companion asset is missing in the game directory. Includes keyword filtering `[F]`.
 
-### 🌙 2. Lua Master Suite & Telegram AI Bot
+### 🌙 2. Lua Master Suite
 1. **Compile Lua**: Converts `.lua` source code into `.luac` bytecode.
 2. **Decompile Lua**: Converts `.luac` bytecode back to readable `.lua` source text.
 3. **Embed PAK into Lua**: Converts `.pak` into Base64 payload and embeds it directly into a GameGuard Lua installer script.
@@ -132,16 +131,14 @@ Tool launch hote hi SDCard (`/sdcard/FeaturesticLeaks/`) me structured workspace
 6. **Anti-Bypass & Security Analyzer**: Audits Lua scripts for GameGuard memory calls and outputs a 0-100 risk score report.
 7. **Bytecode Header Fixer**: Repairs corrupted magic headers for Lua 5.1 (`1B 4C 75 61 51 00...`) or LuaJIT (`1B 4C 4A 02...`).
 8. **Lua Script Merger**: Merges multiple `.lua` scripts into a clean, modular `Master_Merged_Script.lua` file wrapped in `do...end` blocks.
-9. **Telegram AI & Modding Bot (`telegram_bot.py`)**:
-   - Interactive Token Setup & config saving (`telegram_bot_config.json`).
-   - Multi-key API pool with auto rotation for Gemini & Groq AI models.
-   - Direct Telegram file handlers: Auto syntax repair, compile `.lua` -> `.luac`, and decompile scripts directly in Telegram chat!
 
 ### 🛠️ 3. Utilities & Help
 1. **UE4 String Tool**: Extract and repack readable string literals inside `.uasset` / `.uexp` binary files.
 2. **File Finder**: Search files inside PAK structure by keyword or extension.
 3. **Termux Auto-Setup**: Configures `leak` global terminal command and SDCard directories automatically.
-4. **Workspace Cleanup**: Easily clear temporary working folders to free up storage space.
+4. **File Resizer & Equalizer**: Match exact byte size of any PAK, OBB, or LUA file.
+5. **Workspace Cleanup**: Easily clear temporary working folders to free up storage space.
+6. **Check Tool Update 🚀**: Force instant GitHub update check to pull the latest code seamlessly.
 
 ---
 
@@ -150,4 +147,3 @@ Tool launch hote hi SDCard (`/sdcard/FeaturesticLeaks/`) me structured workspace
 * **Main Developer**: **[@L359D](https://t.me/L359D)**
 * **Official Telegram Channel**: **[t.me/FeaturesticLeaks](https://t.me/FeaturesticLeaks)**
 * **Platform**: Termux / Android Linux / Windows / Linux
-

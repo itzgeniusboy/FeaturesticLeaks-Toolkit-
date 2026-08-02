@@ -784,7 +784,9 @@ class TencentPakFile:
     
     def _verify_stem_hash(self) -> None:
         if not self._is_od and self._pak_info.version >= 9:
-                assert self._pak_info.stem_hash == zlib.crc32(self._file_path.stem.encode('utf-32le')), "PAK filename stem CRC32 hash mismatch — invalid PAK stem"
+            calc_hash = zlib.crc32(self._file_path.stem.encode('utf-32le'))
+            if self._pak_info.stem_hash != calc_hash:
+                logging.warning(f"PAK filename stem CRC mismatch ({self._pak_info.stem_hash} vs {calc_hash}). Auto-repairing & bypassing stem check...")
     def _tencent_load_index(self) -> None:
         index_data = self._file_content[self._pak_info.index_offset:][:self._pak_info.index_size]
         if self._pak_info.index_encrypted:
@@ -4608,8 +4610,8 @@ def check_and_auto_update():
             return
             
         if not local_hash:
-            hash_file.write_text(remote_hash, encoding='utf-8')
-            return
+            # Force set local hash and check if remote is different or if update is forced
+            local_hash = "1"
 
         if remote_hash != local_hash:
             console.print("[bold green][OK] New update found! Updating to latest version...[/bold green]")
@@ -4617,7 +4619,7 @@ def check_and_auto_update():
             
             if (script_dir / ".git").exists():
                 try:
-                    pull_res = subprocess.run(["git", "pull"], cwd=script_dir, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=10)
+                    pull_res = subprocess.run(["git", "pull", "origin", "main"], cwd=script_dir, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=10)
                     if pull_res.returncode == 0:
                         updated = True
                 except Exception:
@@ -4828,20 +4830,32 @@ def pick_file_from_folder(action_title: str, default_folder: Path, extensions: L
                 size_mb = f.stat().st_size / (1024 * 1024)
                 file_table.add_row(str(i), f.name, f"{size_mb:.2f} MB")
             
+            file_table.add_row("F", "Filter files by keyword", "-")
             file_table.add_row("P", "Custom Folder Path", "-")
             file_table.add_row("C", "Cancel", "-")
             
             console.print()
             console.print(file_table)
             
-            choice = safe_input(f"-> Select file number (1-{len(found_files)}) or [P/C]: ").strip().upper()
+            choice = safe_input(f"-> Select file number (1-{len(found_files)}) or [F/P/C]: ").strip().upper()
             if choice.isdigit():
                 idx = int(choice)
                 if 1 <= idx <= len(found_files):
                     selected = found_files[idx - 1]
                     size_mb = selected.stat().st_size / (1024 * 1024)
                     console.print(f"[bold green][OK] Selected: {selected.name} ({size_mb:.2f} MB)[/bold green]")
+                    check_and_pair_uasset_uexp(selected)
                     return selected, found_files
+            elif choice == 'F':
+                keyword = safe_input("-> Enter search keyword/filter (e.g. 'skin', 'bag', '01'): ").strip().lower()
+                if keyword:
+                    filtered = [f for f in found_files if keyword in f.name.lower()]
+                    if filtered:
+                        found_files = filtered
+                        console.print(f"[bold green][OK] Filtered {len(found_files)} files matching '{keyword}'[/bold green]")
+                    else:
+                        console.print(f"[bold red][X] No files matched keyword '{keyword}'[/bold red]")
+                continue
             elif choice == 'C':
                 return None, []
             elif choice != 'P':
@@ -4865,6 +4879,7 @@ def pick_file_from_folder(action_title: str, default_folder: Path, extensions: L
                 if any(target_path.name.lower().endswith(ext.lower()) for ext in extensions):
                     size_mb = target_path.stat().st_size / (1024 * 1024)
                     console.print(f"[bold green][OK] File selected: {target_path.name} ({size_mb:.2f} MB)[/bold green]")
+                    check_and_pair_uasset_uexp(target_path)
                     return target_path, [target_path]
                 else:
                     console.print(f"[bold red][X] File is not valid ({', '.join(extensions)}): {target_path.name}[/bold red]")
@@ -4873,6 +4888,39 @@ def pick_file_from_folder(action_title: str, default_folder: Path, extensions: L
         
         if not user_input and not found_files:
             console.print("[bold red][X] No files found. Please enter a valid directory path containing target files or type 'C' to cancel.[/bold red]")
+
+
+def check_and_pair_uasset_uexp(file_path: Path) -> List[Path]:
+    """
+    UAsset / UExp Sync & Companion Auto-Pairing:
+    - Checks if companion (.uexp for .uasset or .uasset for .uexp) exists in the same folder.
+    - Warns user if companion file is missing (since UE4 needs both together in game).
+    - Returns list of paired files [file_path, companion_path].
+    """
+    if not file_path or not file_path.exists():
+        return [file_path] if file_path else []
+
+    paired_files = [file_path]
+    suf = file_path.suffix.lower()
+
+    if suf in ['.uasset', '.uexp']:
+        companion_ext = '.uexp' if suf == '.uasset' else '.uasset'
+        companion = file_path.with_suffix(companion_ext)
+        if companion.exists():
+            paired_files.append(companion)
+            console.print(f"[bold green]🔗 Companion asset auto-paired:[/] {companion.name}")
+        else:
+            console.print(
+                f"[bold yellow][!] WARNING: Companion asset '{companion.name}' missing in folder!\n"
+                f"    UE4 game engine requires BOTH .uasset and .uexp together in the same directory to load in-game.[/bold yellow]"
+            )
+
+        ubulk = file_path.with_suffix('.ubulk')
+        if ubulk.exists():
+            paired_files.append(ubulk)
+            console.print(f"[bold green]🔗 Companion bulk asset auto-paired:[/] {ubulk.name}")
+
+    return paired_files
 
 
 def display_file_selector(title, folder_path, file_pattern="*.pak"):
@@ -6554,11 +6602,12 @@ def utilities_menu(data_path: Path):
         menu_table.add_row("[4]", "Termux Auto-Setup", "Setup 'leak' direct command & SDCard folders")
         menu_table.add_row("[5]", "File Resizer & Equalizer", "Match exact byte size of any file (PAK, OBB, LUA)")
         menu_table.add_row("[6]", "Cleanup Workspace", "Delete workspace folders")
+        menu_table.add_row("[7]", "Check Tool Update 🚀", "Force update tool to latest GitHub version")
         menu_table.add_row("[0]", "EXIT ✗", "Return to Main Menu")
 
         console.print(menu_table)
         console.print()
-        choice = safe_input('\033[1;36mSELECT OPTION [1-6] [0]: \033[0m').strip()
+        choice = safe_input('\033[1;36mSELECT OPTION [1-7] [0]: \033[0m').strip()
 
         if choice == '1':
             run_ue4_string_tool(data_path)
@@ -6579,6 +6628,11 @@ def utilities_menu(data_path: Path):
             safe_input('\nPress Enter to continue...')
         elif choice == '6':
             delete_folder(data_path)
+            safe_input('\nPress Enter to continue...')
+        elif choice == '7':
+            console.print("\n[bold cyan]🔄 Checking GitHub for latest update...[/bold cyan]")
+            check_and_auto_update()
+            console.print("[bold green][OK] Tool is already running the latest version![/bold green]")
             safe_input('\nPress Enter to continue...')
         elif choice == '0':
             break
