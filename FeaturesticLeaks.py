@@ -127,6 +127,14 @@ _ensure_package("pytz")
 _ensure_package("gmalg")
 _ensure_package("pycryptodome", "Crypto")
 _ensure_package("zstandard")
+_ensure_package("watchdog")
+
+try:
+    from watchdog.observers import Observer
+    from watchdog.events import FileSystemEventHandler
+    HAS_WATCHDOG = True
+except Exception:
+    HAS_WATCHDOG = False
 
 from rich.console import Console
 from rich.panel import Panel
@@ -6862,6 +6870,116 @@ def lua_tools_menu(data_path: Path):
             time.sleep(1)
 
 
+# ==================== WATCH MODE ENGINE ====================
+
+if HAS_WATCHDOG:
+    class AutoHandler(FileSystemEventHandler):
+        def __init__(self, data_path: Path):
+            super().__init__()
+            self.data_path = data_path
+            self.processed = set()
+
+        def on_created(self, event):
+            if not event.is_directory:
+                filepath = Path(event.src_path)
+                if filepath in self.processed:
+                    return
+                self.processed.add(filepath)
+
+                console.print(f"\n[bold bright_yellow]📁 New File Detected:[/bold bright_yellow] [bold cyan]{filepath}[/bold cyan]")
+
+                if filepath.suffix.lower() in ['.pak', '.obb']:
+                    console.print(f"[bold bright_green]📦 Auto-unpacking PAK file: {filepath.name}...[/bold bright_green]")
+                    try:
+                        pak = TencentPakFile(filepath)
+                        unpack_path = self.data_path / "UNPACK" / filepath.stem
+                        pak.dump(unpack_path)
+                        console.print(f"[bold green]✅ Auto-unpacked {filepath.name} to {unpack_path}![/bold green]")
+
+                        sd_unpack = Path("/sdcard/FeaturesticLeaks/UNPACK") / filepath.stem
+                        if sd_unpack.parent.exists() and sd_unpack != unpack_path:
+                            try:
+                                pak.dump(sd_unpack)
+                                console.print(f"[bold green][+] Also extracted to SDCard: {sd_unpack}[/bold green]")
+                            except Exception:
+                                pass
+                    except Exception as e:
+                        console.print(f"[bold red][X] Unpack error for {filepath.name}: {e}[/bold red]")
+
+                elif filepath.suffix.lower() in ['.lua', '.txt']:
+                    console.print(f"[bold bright_cyan]🌙 Auto-compiling Lua script: {filepath.name}...[/bold bright_cyan]")
+                    try:
+                        fixed_lua = fix_lua_syntax_for_lua51(filepath)
+                        res_dir = self.data_path / "RESULT"
+                        res_dir.mkdir(parents=True, exist_ok=True)
+                        out_luac = res_dir / f"{filepath.stem}.luac"
+
+                        compiler = "luac5.1" if shutil.which("luac5.1") else ("luac" if shutil.which("luac") else None)
+                        if compiler:
+                            proc = subprocess.run([compiler, "-o", str(out_luac), str(fixed_lua)], capture_output=True, text=True)
+                            if proc.returncode == 0:
+                                console.print(f"[bold green]✅ Auto-compiled {filepath.name} -> {out_luac.name} ({out_luac.stat().st_size:,} bytes)[/bold green]")
+                                sd_res = Path("/sdcard/FeaturesticLeaks/RESULT")
+                                if sd_res.exists():
+                                    try:
+                                        shutil.copy2(out_luac, sd_res / out_luac.name)
+                                        console.print(f"[bold green][+] Saved to SDCard: {sd_res / out_luac.name}[/bold green]")
+                                    except Exception:
+                                        pass
+                            else:
+                                console.print(f"[bold yellow][!] Compilation warning: {proc.stderr.strip()}[/bold yellow]")
+                        else:
+                            console.print("[bold yellow][!] No Lua compiler found in system PATH.[/bold yellow]")
+                    except Exception as e:
+                        console.print(f"[bold red][X] Auto-compile error for {filepath.name}: {e}[/bold red]")
+
+def run_watch_mode(data_path: Path):
+    print_banner()
+    console.print(Panel(Align.center("[bold bright_cyan]👁️ AUTOMATIC WATCH MODE 👁️[/bold bright_cyan]\n[dim white]Monitors PAK_INPUT and LUA_INPUT folders in real-time and auto-processes incoming files![/dim white]"), border_style="cyan", box=ROUNDED))
+
+    if not HAS_WATCHDOG:
+        console.print("[bold red][X] 'watchdog' module is not installed. Please run: pip install watchdog[/bold red]")
+        return
+
+    paths_to_watch = [
+        data_path / "PAK",
+        data_path / "LUA",
+        Path("/sdcard/FeaturesticLeaks/PAK_WORKSPACE/1_PAK_INPUT"),
+        Path("/sdcard/FeaturesticLeaks/LUA_WORKSPACE/1_LUA_INPUT")
+    ]
+
+    observer = Observer()
+    handler = AutoHandler(data_path)
+    scheduled_count = 0
+
+    for p in paths_to_watch:
+        try:
+            p.mkdir(parents=True, exist_ok=True)
+            observer.schedule(handler, path=str(p), recursive=False)
+            scheduled_count += 1
+            console.print(f"[bold green][+] Watching directory:[/bold green] [bold white]{p}[/bold white]")
+        except Exception as e:
+            console.print(f"[dim yellow][!] Skip watching {p}: {e}[/dim yellow]")
+
+    if scheduled_count == 0:
+        console.print("[bold red][X] No valid directories to watch.[/bold red]")
+        return
+
+    console.print("\n[bold bright_yellow]👁️ Watch Mode Active... Drop any .pak, .obb, or .lua file into the input folders to process![/bold bright_yellow]")
+    console.print("[bold dim white]Press Ctrl+C to stop watching and return to menu.[/bold dim white]\n")
+
+    observer.start()
+    try:
+        while True:
+            time.sleep(1)
+    except KeyboardInterrupt:
+        observer.stop()
+        console.print("\n[bold yellow]⏹️ Watch Mode Stopped.[/bold yellow]")
+    except Exception as e:
+        observer.stop()
+        console.print(f"\n[bold red][X] Watcher error: {e}[/bold red]")
+    observer.join()
+
 
 def utilities_menu(data_path: Path):
     while True:
@@ -6880,16 +6998,18 @@ def utilities_menu(data_path: Path):
 
         menu_table.add_row("[1]", "UE4 String Tool", "Extract & repack .uasset/.uexp strings")
         menu_table.add_row("[2]", "File Finder", "Search .uasset/.uexp/.ubulk by pattern")
-        menu_table.add_row("[3]", "Workspace Summary", "Folder guide & live file count summary")
-        menu_table.add_row("[4]", "Termux Auto-Setup", "Setup 'leak' direct command & SDCard folders")
-        menu_table.add_row("[5]", "File Resizer & Equalizer", "Match exact byte size of any file (PAK, OBB, LUA)")
-        menu_table.add_row("[6]", "Cleanup Workspace", "Delete workspace folders")
-        menu_table.add_row("[7]", "Check Tool Update 🚀", "Force update tool to latest GitHub version")
+        menu_table.add_row("[3]", "URL & LIB Patcher 🔗", "Find & replace encrypted URLs in .so / binaries")
+        menu_table.add_row("[4]", "File Resizer & Equalizer", "Match exact byte size of any file (PAK, OBB, LUA)")
+        menu_table.add_row("[5]", "Termux Auto-Setup", "Setup 'leak' direct command & SDCard folders")
+        menu_table.add_row("[6]", "Workspace Summary", "Folder guide & live file count summary")
+        menu_table.add_row("[7]", "Beginner Guide & FAQ 🔰", "Beginner Quick Start & Modding Help")
+        menu_table.add_row("[8]", "Cleanup Workspace", "Delete workspace folders")
+        menu_table.add_row("[9]", "Check Tool Update 🚀", "Force update tool to latest GitHub version")
         menu_table.add_row("[0]", "EXIT ✗", "Return to Main Menu")
 
         console.print(menu_table)
         console.print()
-        choice = safe_input('\033[1;36mSELECT OPTION [1-7] [0]: \033[0m').strip()
+        choice = safe_input('\033[1;36mSELECT OPTION [1-9] [0]: \033[0m').strip()
 
         if choice == '1':
             run_ue4_string_tool(data_path)
@@ -6898,23 +7018,112 @@ def utilities_menu(data_path: Path):
             run_file_finder_tool(data_path)
             safe_input('\nPress Enter to continue...')
         elif choice == '3':
+            run_url_lib_patcher_tool(data_path)
+            safe_input('\nPress Enter to continue...')
+        elif choice == '4':
+            run_file_resizer_tool(data_path)
+            safe_input('\nPress Enter to continue...')
+        elif choice == '5':
+            install_termux_shortcut_and_sdcard(data_path)
+            safe_input('\nPress Enter to continue...')
+        elif choice == '6':
             print_banner()
             display_workspace_summary(data_path)
             show_workflow_guide()
             safe_input('\nPress Enter to continue...')
-        elif choice == '4':
-            install_termux_shortcut_and_sdcard(data_path)
-            safe_input('\nPress Enter to continue...')
-        elif choice == '5':
-            run_file_resizer_tool(data_path)
-            safe_input('\nPress Enter to continue...')
-        elif choice == '6':
+        elif choice == '7':
+            run_beginner_guide(data_path)
+        elif choice == '8':
             delete_folder(data_path)
             safe_input('\nPress Enter to continue...')
-        elif choice == '7':
+        elif choice == '9':
             console.print("\n[bold cyan]🔄 Checking GitHub for latest update...[/bold cyan]")
             check_and_auto_update()
             console.print("[bold green][OK] Tool is already running the latest version![/bold green]")
+            safe_input('\nPress Enter to continue...')
+        elif choice == '0':
+            break
+        else:
+            console.print('[bold red][X] Invalid choice.[/bold red]')
+            time.sleep(1)
+
+
+def watch_mode_menu(data_path: Path):
+    while True:
+        print_banner()
+        menu_table = Table(
+            title="[bold bright_cyan]👁️ WATCH MODE ENGINE 👁️[/bold bright_cyan]",
+            show_header=True,
+            header_style="bold bright_cyan",
+            box=ROUNDED,
+            border_style="bright_cyan",
+            expand=True
+        )
+        menu_table.add_column("OPT", justify="center", width=8, style="bold bright_yellow")
+        menu_table.add_column("COMMAND", justify="left", width=22, style="bold bright_white")
+        menu_table.add_column("DESCRIPTION", justify="left", style="bright_cyan")
+
+        menu_table.add_row("[1]", "Start Watch Mode 👁️", "Real-time auto-unpack .pak/.obb & auto-compile .lua")
+        menu_table.add_row("[2]", "Watch Mode Status", "Check monitored input folders & watchdog installation")
+        menu_table.add_row("[0]", "EXIT ✗", "Return to Main Menu")
+
+        console.print(menu_table)
+        console.print()
+        choice = safe_input('\033[1;36mSELECT OPTION [1-2] [0]: \033[0m').strip()
+
+        if choice == '1':
+            run_watch_mode(data_path)
+            safe_input('\nPress Enter to continue...')
+        elif choice == '2':
+            print_banner()
+            console.print(Panel(
+                f"[bold cyan]👁️ WATCH MODE STATUS & CONFIGURATION[/bold cyan]\n\n"
+                f"[bold white]Watchdog Library Installed:[/bold white] {'[bold green]YES[/bold green]' if HAS_WATCHDOG else '[bold red]NO (run pip install watchdog)[/bold red]'}\n\n"
+                f"[bold yellow]Monitored Folders:[/bold yellow]\n"
+                f" • {data_path / 'PAK'}\n"
+                f" • {data_path / 'LUA'}\n"
+                f" • /sdcard/FeaturesticLeaks/PAK_WORKSPACE/1_PAK_INPUT\n"
+                f" • /sdcard/FeaturesticLeaks/LUA_WORKSPACE/1_LUA_INPUT\n\n"
+                f"[dim white]When active, dropping any .pak/.obb file will automatically extract it, and any .lua file will be compiled automatically![/dim white]",
+                border_style="cyan",
+                box=ROUNDED
+            ))
+            safe_input('\nPress Enter to continue...')
+        elif choice == '0':
+            break
+        else:
+            console.print('[bold red][X] Invalid choice.[/bold red]')
+            time.sleep(1)
+
+
+def ai_tools_menu(data_path: Path):
+    while True:
+        print_banner()
+        menu_table = Table(
+            title="[bold bright_cyan]🤖 AI TOOLS & MULTI-API MANAGER 🤖[/bold bright_cyan]",
+            show_header=True,
+            header_style="bold bright_cyan",
+            box=ROUNDED,
+            border_style="bright_cyan",
+            expand=True
+        )
+        menu_table.add_column("OPT", justify="center", width=8, style="bold bright_yellow")
+        menu_table.add_column("COMMAND", justify="left", width=24, style="bold bright_white")
+        menu_table.add_column("DESCRIPTION", justify="left", style="bright_cyan")
+
+        menu_table.add_row("[1]", "AI-Assisted Lua Repair 🤖", "Fix broken Lua syntax, missing ends & GG errors")
+        menu_table.add_row("[2]", "Manage AI API Keys", "Setup Google Gemini, Groq & OpenRouter keys & fallback")
+        menu_table.add_row("[0]", "EXIT ✗", "Return to Main Menu")
+
+        console.print(menu_table)
+        console.print()
+        choice = safe_input('\033[1;36mSELECT OPTION [1-2] [0]: \033[0m').strip()
+
+        if choice == '1':
+            run_ai_assisted_lua_repair(data_path)
+            safe_input('\nPress Enter to continue...')
+        elif choice == '2':
+            manage_ai_api_keys()
             safe_input('\nPress Enter to continue...')
         elif choice == '0':
             break
@@ -7117,7 +7326,7 @@ def run_beginner_guide(data_path: Path):
     )
     guide_table.add_row(
         "🔗 URL & LIB Patcher",
-        "Option [4] (URL & LIB Patcher) se `.so` libraries me encrypted links scan karke new panel URLs inject karein!"
+        "Option [5] (Utilities) -> Option [3] (URL & LIB Patcher) se `.so` libraries me encrypted links scan karke new panel URLs inject karein!"
     )
     
     console.print(guide_table)
@@ -7141,11 +7350,30 @@ def main_menu():
         pass
     check_and_auto_update()
 
+    # Direct Termux CLI Shortcuts: leak pak | leak lua | leak watch | leak ai | leak utils
+    if len(sys.argv) > 1:
+        cmd = sys.argv[1].lower().strip()
+        if cmd in ['pak', 'p', 'paktools']:
+            pak_obb_tools_menu(data_path)
+            sys.exit(0)
+        elif cmd in ['lua', 'l', 'luatools']:
+            lua_tools_menu(data_path)
+            sys.exit(0)
+        elif cmd in ['watch', 'w', 'watchmode']:
+            watch_mode_menu(data_path)
+            sys.exit(0)
+        elif cmd in ['ai', 'a', 'aitools']:
+            ai_tools_menu(data_path)
+            sys.exit(0)
+        elif cmd in ['utils', 'utility', 'u', 'util', 'utilities']:
+            utilities_menu(data_path)
+            sys.exit(0)
+
     while True:
         print_banner()
-        console.print("[bold bright_cyan]📂 SDCard Workspace:[bold bright_white] /sdcard/FeaturesticLeaks/[/bold bright_white] [dim white](Opt [3] me workspace summary dekhein)[/dim white]\n")
+        console.print("[bold bright_cyan]📂 Termux Shortcuts:[bold bright_white] leak pak | leak lua | leak watch | leak ai | leak utils[/bold bright_white]\n")
         menu_table = Table(
-            title="[bold bright_cyan]⚡ MAIN MENU ⚡[/bold bright_cyan]",
+            title="[bold bright_cyan]⚡ MAIN CATEGORY MENU ⚡[/bold bright_cyan]",
             show_header=True,
             header_style="bold bright_cyan",
             box=ROUNDED,
@@ -7153,14 +7381,14 @@ def main_menu():
             expand=True
         )
         menu_table.add_column("OPT", justify="center", width=8, style="bold bright_yellow")
-        menu_table.add_column("COMMAND", justify="left", width=22, style="bold bright_white")
+        menu_table.add_column("CATEGORY", justify="left", width=22, style="bold bright_white")
         menu_table.add_column("DESCRIPTION", justify="left", style="bright_cyan")
 
-        menu_table.add_row("[1]", "PAK TOOL ✓", "Extract, Repack, Replace & Inject PAK/OBB")
-        menu_table.add_row("[2]", "LUA TOOL ✓", "Compile, Decompile & PAK/Lua Embedder")
-        menu_table.add_row("[3]", "UTILITIES ✓", "UE4 String Tool, File Finder & Setup")
-        menu_table.add_row("[4]", "URL & LIB PATCHER 🔗", "Find & replace encrypted URLs in .so / binaries")
-        menu_table.add_row("[5]", "GUIDE & FAQ 🔰", "Beginner Quick Start & Modding Help")
+        menu_table.add_row("[1]", "PAK Tools 📦", "Extract, Repack, Replace & Inject PAK/OBB/Skins")
+        menu_table.add_row("[2]", "LUA Tools 🌙", "Compile, Decompile, Script Merger & Obfuscator")
+        menu_table.add_row("[3]", "Watch Mode 👁️", "Real-time auto-unpack & auto-compile watcher")
+        menu_table.add_row("[4]", "AI Tools 🤖", "AI Lua Repair & Multi-API Key Manager (Gemini/Groq)")
+        menu_table.add_row("[5]", "Utilities 🛠️", "UE4 String Tool, Lib Patcher, Finder & FAQ Guide")
         menu_table.add_row("[0]", "EXIT ✗", "Close application")
 
         console.print(menu_table)
@@ -7172,11 +7400,11 @@ def main_menu():
         elif choice == '2':
             lua_tools_menu(data_path)
         elif choice == '3':
-            utilities_menu(data_path)
+            watch_mode_menu(data_path)
         elif choice == '4':
-            run_url_lib_patcher_tool(data_path)
+            ai_tools_menu(data_path)
         elif choice == '5':
-            run_beginner_guide(data_path)
+            utilities_menu(data_path)
         elif choice == '0':
             console.print("[dim white]Exiting Featurestic Leaks. Goodbye![/dim white]")
             time.sleep(1)

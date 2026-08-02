@@ -48,22 +48,30 @@ python FeaturesticLeaks.py
 
 ## 💡 3. Quick Launch Shortcuts & Tool Auto-Update
 
-Tool ko baar-baar poora path likhe bina launch aur update karne ke liye:
+Tool ko baar-baar poora path likhe bina launch aur update karne ke liye Termux shortcuts:
 
-1. **`leak` Shortcut**:
-   Main menu me **Utilities & Help -> Option 4 (Termux Auto-Setup)** select karein. Iske baad Termux me kahin se bhi sirf yeh type karein:
+1. **`leak` Shortcut** (Main Category Menu):
    ```bash
    leak
    ```
 
-2. **`paktool` Shortcut**:
+2. **Category Direct Termux Shortcuts**:
+   ```bash
+   leak pak     # Direct PAK & OBB Tools Sub-Menu
+   leak lua     # Direct LUA Master Suite Sub-Menu
+   leak watch   # Direct Watch Mode Engine
+   leak ai      # Direct AI Tools & API Key Manager
+   leak utils   # Direct Utilities & Setup Sub-Menu
+   ```
+
+3. **`paktool` Shortcut**:
    ```bash
    paktool
    ```
 
-3. **🚀 Instant Update System**:
+4. **🚀 Instant Update System**:
    - Tool start hote hi automatically GitHub repository check karta hai. Agar koi naya commit/update aaya ho, toh bina user ka data khoye instant auto-update kar deta hai!
-   - Aap **Utilities & Help Menu -> Option [7] Check Tool Update 🚀** par click karke kabhi bhi manual force update check kar sakte hain.
+   - Aap **Utilities Menu -> Option [9] Check Tool Update 🚀** par click karke kabhi bhi manual force update check kar sakte hain.
 
 ---
 
@@ -181,6 +189,7 @@ Option `2` chunte hi aapko 3 Modes milenge:
 #### **[4] File Resizer & Equalizer**: Kisi bhi PAK, OBB, ya LUA file ka exact byte size match karta hai.
 #### **[5] Cleanup Workspace**: Extra temporary working folders ko delete karke storage space clear karta hai.
 #### **[6] Check Tool Update 🚀**: GitHub se instant latest update pull karta hai.
+#### **[8] Watch Mode 👁️**: Input folders ko real-time monitor karta hai. Jaise hi koi naye `.pak` ya `.lua` files drop ki jati hain, yeh unhe automatically unpack ya compile kar deta hai.
 
 ---
 

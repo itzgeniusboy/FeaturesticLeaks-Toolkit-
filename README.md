@@ -68,17 +68,40 @@ python FeaturesticLeaks.py
 
 Shortcut commands through tool ko Termux me kisi bhi location se launch kar sakte hain:
 
-1. **`leak` Command** (Global Termux Terminal Shortcut):
+1. **`leak` Command** (Main Category Menu):
    ```bash
    leak
    ```
-2. **`paktool` Command**:
+2. **Category Direct Shortcuts**:
+   ```bash
+   leak pak     # Launch PAK & OBB Tools Menu directly
+   leak lua     # Launch LUA Master Suite directly
+   leak watch   # Launch Watch Mode Engine directly
+   leak ai      # Launch AI Tools & Multi-API Key Manager
+   leak utils   # Launch Utilities & Setup Menu
+   ```
+3. **`paktool` Command**:
    ```bash
    paktool
    ```
-3. **🚀 Instant Tool Update**:
+4. **🚀 Instant Tool Update**:
    - Tool **automatically** checks for updates on GitHub when launched.
-   - You can also force update anytime via **Utilities & Help Menu -> Option [7] Check Tool Update 🚀**.
+   - You can also force update anytime via **Utilities Menu -> Option [9] Check Tool Update 🚀**.
+
+---
+
+## 📂 Category-Wise Modular Menu Architecture
+
+Tool visual layout is restructured into 5 dedicated, clean category menus for a fast, clutter-free Termux experience:
+
+```text
+⚡ MAIN CATEGORY MENU
+├── [1] 📦 PAK Tools       --> Unpack, Repack, Replace, Inject, Skin Swapper, OBB Manager
+├── [2] 🌙 LUA Tools       --> Compile, Decompile, Script Merger, Obfuscator, Universal Packer
+├── [3] 👁️ Watch Mode      --> Real-time auto-unpack (.pak) & auto-compile (.lua) folder watcher
+├── [4] 🤖 AI Tools        --> AI Lua Repair Engine & Multi-API Key Manager (Gemini / Groq)
+└── [5] 🛠️ Utilities       --> UE4 String Tool, Lib URL Patcher, Finder, Resizer, Auto-Setup & FAQ
+```
 
 ---
 
@@ -142,6 +165,7 @@ Tool launch hote hi SDCard (`/sdcard/FeaturesticLeaks/`) me structured workspace
 4. **File Resizer & Equalizer**: Match exact byte size of any PAK, OBB, or LUA file.
 5. **Workspace Cleanup**: Easily clear temporary working folders to free up storage space.
 6. **Check Tool Update 🚀**: Force instant GitHub update check to pull the latest code seamlessly.
+7. **Watch Mode 👁️**: Monitors PAK and LUA input folders in real-time and automatically unpacks `.pak` files or compiles `.lua` scripts as soon as they are dropped.
 
 ---
 
