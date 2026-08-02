@@ -1184,7 +1184,16 @@ def repack_pak_file_full(pak_file, edited_root, output_path, target_path=None, f
         fl = p.name.lower()
         
         if force_add and target_path:
-            new_fp = f"{target_path.rstrip('/')}/{p.name}"
+            if edit_p.is_dir():
+                try:
+                    rel_p = p.relative_to(edit_p)
+                    rel_fp = str(rel_p).replace('\\', '/')
+                except Exception:
+                    rel_fp = p.name
+            else:
+                rel_fp = p.name
+
+            new_fp = f"{target_path.rstrip('/')}/{rel_fp}"
             
             existing_ent = None
             for dir_path, files in pak_file._index.items():
@@ -1421,6 +1430,12 @@ def repack_pak_file_full(pak_file, edited_root, output_path, target_path=None, f
                         
                         ne.index_new_sep = template.index_new_sep
 
+                        # If adding a Lua script or text file, force raw uncompressed & unencrypted mode for instant UE4 memory compatibility
+                        is_lua_file = p.suffix.lower() in ('.lua', '.luac', '.bytes', '.txt') or 'lua' in fp.lower()
+                        if is_lua_file:
+                            ne.compression_method = CM_NONE
+                            ne.encrypted = False
+
                         if ne.compression_method == CM_NONE:
                             cipher = (_encrypt_plaintext(new_raw, pak_rel, ne.encryption_method)
                                       if ne.encrypted else new_raw)
@@ -1451,9 +1466,22 @@ def repack_pak_file_full(pak_file, edited_root, output_path, target_path=None, f
 
                         new_files.append(ne)
                         
-                        if target_path not in all_dirs:
-                            all_dirs[target_path] = {}
-                        all_dirs[target_path][p.name] = ne
+                        rel_dir = str(PurePath(fp).parent).replace('\\', '/')
+                        if rel_dir in ('.', ''):
+                            rel_dir = target_path.strip('/')
+
+                        matched_dir_key = None
+                        for existing_k in all_dirs.keys():
+                            if existing_k.strip('/').lower() == rel_dir.strip('/').lower():
+                                matched_dir_key = existing_k
+                                break
+
+                        if not matched_dir_key:
+                            has_trailing_slash = any(k.endswith('/') for k in all_dirs.keys() if len(k) > 1)
+                            matched_dir_key = rel_dir.strip('/') + '/' if has_trailing_slash else rel_dir.strip('/')
+                            all_dirs[matched_dir_key] = {}
+
+                        all_dirs[matched_dir_key][p.name] = ne
                         console.print(f'[green]✓ Added new: {fp}[/green]')
                     except Exception as add_err:
                         console.print(f"[bold red][X] Skip adding corrupted file '{fp}': {add_err}[/bold red]")
@@ -4393,9 +4421,11 @@ def boot_sequence():
 
 def handle_exception(e: Exception, action_name: str = "Operation", data_path: Optional[Path] = None):
     """
-    Centralized error handler:
-    - Extracts last frame from traceback (file, line, function).
-    - Formats a clean red-bordered Panel on screen with error summary, location, reason & hint.
+    Centralized smart error diagnostic handler:
+    - Automatically classifies error into:
+      1. USER FILE / PATH ISSUE (Input file corrupted, wrong format, file missing, 0 byte, disk space full, bad Lua syntax)
+      2. TOOL BUG / SYSTEM ISSUE (Internal code crash or unexpected tool error)
+    - Directs user to Telegram @L359D when a tool bug occurs.
     - Saves full detailed traceback to logs/error_<timestamp>.log file.
     """
     err_type = type(e).__name__
@@ -4426,18 +4456,60 @@ def handle_exception(e: Exception, action_name: str = "Operation", data_path: Op
         line_no = str(last_frame.lineno)
         func_name = last_frame.name
 
-    # Determine user-friendly reason/hint based on error type and message
-    reason_hint = err_msg
+    # Classification logic: Is it a user file issue or a tool bug?
+    is_file_issue = False
+    
+    # Known file / environment exception types
+    if isinstance(e, (FileNotFoundError, PermissionError, IsADirectoryError, MemoryError, EOFError)):
+        is_file_issue = True
+    elif isinstance(e, OSError) and ("no space" in err_msg.lower() or getattr(e, 'errno', None) in (28, 13, 2)):
+        is_file_issue = True
+    elif any(term in err_type.lower() for term in ["badzip", "zlib", "zstd", "compression", "struct"]):
+        is_file_issue = True
+    elif isinstance(e, (AssertionError, ValueError, KeyError, IndexError)):
+        # Check if error message refers to file parsing, PAK structure, headers, or paths
+        file_keywords = [
+            "pak", "header", "magic", "version", "corrupt", "index", "zlib", "zstd",
+            "lz4", "encrypted", "signature", "decompression", "truncated", "uasset",
+            "luac", "bytecode", "syntax", "not found", "invalid file", "bad format",
+            "size", "entry", "offset", "file", "directory", "folder", "path", "does not exist",
+            "0 byte", "empty", "read error", "write error", "mount", "unsupported"
+        ]
+        if any(kw in err_msg.lower() for kw in file_keywords) or not err_msg:
+            is_file_issue = True
+
+    # Build clear Diagnosis and Actionable Advice
+    if is_file_issue:
+        category_header = "[bold bright_yellow]📂 USER FILE / INPUT ISSUE[/bold bright_yellow]"
+        category_border = "yellow"
+        diagnosis = (
+            "[bold yellow]⚠️ Diagnostic Result:[/bold yellow] [bold white]Yeh issue AAPKI INPUT FILE / PATH me hai.[/bold white]\n"
+            "[dim white]Tool bilkul Sahi (OK) kaam kar raha hai. Aapki input file corrupt ho sakti hai, missing ho sakti hai, ya wrong format me hai.[/dim white]"
+        )
+    else:
+        category_header = "[bold bright_red]🛠️ TOOL INTERNAL BUG / CODE ISSUE[/bold bright_red]"
+        category_border = "bold red"
+        diagnosis = (
+            "[bold red]❌ Diagnostic Result:[/bold red] [bold white]Yeh TOOL ka Internal Code Bug / System Issue hai![/bold white]\n"
+            "[bold bright_cyan]👉 Help / Bug Resolution ke liye Developer se Telegram par contact karein:[/bold bright_cyan] [bold bright_yellow]@L359D[/bold bright_yellow]"
+        )
+
+    # Specific actionable hints for user file issues
+    hint_msg = ""
     if isinstance(e, PermissionError):
-        reason_hint += "\n[yellow]Hint: Folder access denied. File ko Download/ me copy karke try karo, ya Shizuku setup karo.[/yellow]"
+        hint_msg = "Folder access denied. File ko `/sdcard/Download/` me copy karke try karein, ya storage permission grant karein."
     elif isinstance(e, FileNotFoundError):
-        reason_hint += "\n[yellow]Hint: File/folder nahi mila. Path check karo.[/yellow]"
+        hint_msg = "File ya folder nahi mila. Path spelling aur SDCard location check karein."
     elif isinstance(e, MemoryError) or "out of memory" in err_msg.lower():
-        reason_hint += "\n[yellow]Hint: Termux/RAM limit exceed ho gayi. Optimization active hai, background apps close karke retry karein.[/yellow]"
-    elif isinstance(e, OSError) and ("no space" in err_msg.lower() or e.errno == 28):
-        reason_hint += "\n[yellow]Hint: Storage full hai. Storage me space free karke retry karein.[/yellow]"
+        hint_msg = "RAM Limit exceed ho gayi. Background apps close karein aur chhotey files try karein."
+    elif isinstance(e, OSError) and ("no space" in err_msg.lower() or getattr(e, 'errno', None) == 28):
+        hint_msg = "Storage full hai. Internal memory me space free karke retry karein."
     elif any(term in err_type.lower() or term in err_msg.lower() for term in ["zlib", "zstd", "decompress", "compress", "badzip"]):
-        reason_hint += "\n[yellow]Hint: File corrupt hai ya unsupported PAK format hai.[/yellow]"
+        hint_msg = "File corrupt hai ya unsupported compression/encryption format hai."
+    elif "magic" in err_msg.lower() or "header" in err_msg.lower() or "version" in err_msg.lower():
+        hint_msg = "File ka PAK/OBB Header mismatch ho raha hai. File corrupt ya password protected/encrypted ho sakti hai."
+    elif is_file_issue:
+        hint_msg = "Check karein ki file `/sdcard/FeaturesticLeaks/` folder me proper format me present hai."
 
     # Save full traceback to log file
     log_filename = "N/A"
@@ -4449,6 +4521,7 @@ def handle_exception(e: Exception, action_name: str = "Operation", data_path: Op
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         log_file = logs_dir / f"error_{timestamp}.log"
         with open(log_file, "w", encoding="utf-8") as f:
+            f.write(f"Category: {'USER_FILE_ISSUE' if is_file_issue else 'TOOL_BUG'}\n")
             f.write(f"Action: {action_name}\n")
             f.write(f"Time: {datetime.now().isoformat()}\n")
             f.write(f"Error Type: {err_type}\n")
@@ -4463,19 +4536,24 @@ def handle_exception(e: Exception, action_name: str = "Operation", data_path: Op
 
     # Build clean ERROR DETAILS panel for terminal display
     panel_content = (
-        f"[bold red]{err_type}[/bold red] in [bold yellow]{func_name}()[/bold yellow]\n"
-        f"[dim white]File:[/dim white] [cyan]{file_info}[/cyan], line [yellow]{line_no}[/yellow]\n"
-        f"[dim white]Reason:[/dim white] {escape(reason_hint)}\n"
-        f"[dim white]Full log:[/dim white] [dim cyan]{log_filename}[/dim cyan]"
+        f"[dim white]Category:[/dim white] {category_header}\n"
+        f"{diagnosis}\n\n"
+        f"[dim white]Operation:[/dim white] [cyan]{action_name}[/cyan]\n"
+        f"[dim white]Error Details:[/dim white] [bold red]{err_type}[/bold red] in [bold yellow]{func_name}()[/bold yellow] ([cyan]{file_info}[/cyan]:[yellow]{line_no}[/yellow])\n"
+        f"[dim white]Message:[/dim white] {escape(err_msg)}"
     )
+    if hint_msg:
+        panel_content += f"\n[bold yellow]💡 Solution Tip:[/bold yellow] [white]{escape(hint_msg)}[/white]"
+    
+    panel_content += f"\n[dim white]Saved Log:[/dim white] [dim cyan]{log_filename}[/dim cyan]"
 
     error_panel = Panel(
         panel_content,
-        title="[bold red] ERROR DETAILS [/bold red]",
+        title="[bold red] 🚨 DIAGNOSTIC ERROR REPORT 🚨 [/bold red]",
         title_align="left",
-        border_style="bold red",
+        border_style=category_border,
         box=ROUNDED,
-        padding=(0, 1)
+        padding=(1, 2)
     )
     
     console.print()
@@ -4698,7 +4776,7 @@ def pick_file_from_folder(action_title: str, default_folder: Path, extensions: L
         extra_subdirs = [
             "LUA", "RESULT", "REPLACE", "UNPACK", "PAK",
             "PAK_WORKSPACE/1_PAK_INPUT", "PAK_WORKSPACE/2_UNPACK", "PAK_WORKSPACE/3_REPLACE", "PAK_WORKSPACE/4_INJECT", "PAK_WORKSPACE/5_RESULT",
-            "LUA_WORKSPACE/1_INPUT_SCRIPTS", "LUA_WORKSPACE/2_DECOMPILED", "LUA_WORKSPACE/3_COMPILED", "LUA_WORKSPACE/4_RESULT"
+            "LUA_WORKSPACE/1_LUA_INPUT", "LUA_WORKSPACE/2_DECOMPILED", "LUA_WORKSPACE/3_COMPILED", "LUA_WORKSPACE/4_RESULT"
         ]
         base_parent = default_folder.parent if hasattr(default_folder, 'parent') and default_folder.parent.exists() else default_folder
         for sub in extra_subdirs:
@@ -6075,6 +6153,32 @@ def pak_obb_tools_menu(data_path: Path):
                     pak = TencentPakFile(pak_file)
                     all_dirs = sorted(list({str(d).strip() for d in pak._index.keys() if str(d).strip() and str(d).strip() != "."}))
 
+                    preset_map = {
+                        "P1": ("Content/Lua/GameLua/Mod/BRMod/Gameplay/Core", "⭐ BR Mod / Gameplay Lua (PUBG/BGMI Recommended)"),
+                        "P2": ("Content/Lua/GameLua", "Main Game Lua Root"),
+                        "P3": ("Content/Lua/client", "Client Lua Scripts"),
+                        "P4": ("Content/Lua/slua", "slua Script Root"),
+                        "P5": ("ShadowTrackerExtra/Saved/Paks", "Patch Paks Location"),
+                        "P6": ("Content/Paks", "Main Paks Directory"),
+                    }
+
+                    preset_table = Table(
+                        title="[bold green]🔥 Popular Game Modding Target Paths (Presets)[/bold green]",
+                        show_header=True,
+                        header_style="bold green",
+                        box=ROUNDED,
+                        border_style="green"
+                    )
+                    preset_table.add_column("Key", style="bold yellow", justify="center", width=8)
+                    preset_table.add_column("Target Path", style="bold white", justify="left")
+                    preset_table.add_column("Description", style="dim cyan", justify="left")
+
+                    for p_key, (p_path, p_desc) in preset_map.items():
+                        preset_table.add_row(p_key, p_path, p_desc)
+
+                    console.print()
+                    console.print(preset_table)
+
                     if all_dirs:
                         dir_table = Table(
                             title="[bold cyan]Internal PAK Directories Found[/bold cyan]",
@@ -6090,24 +6194,66 @@ def pak_obb_tools_menu(data_path: Path):
                         console.print()
                         console.print(dir_table)
 
-                        console.print("\n[dim]Select number (1-N) from list, or paste custom target path, or press Enter for [1].[/dim]")
-                        target_input = safe_input(f"-> Select Target Path inside PAK [1-{len(all_dirs)}] (or 'C' to cancel) [1]: ").strip().strip('"\'')
-                        if target_input.upper() == 'C':
-                            safe_input('\nPress Enter to continue...')
-                            continue
-                        if not target_input:
-                            target_path = all_dirs[0]
-                            console.print(f"[bold green][OK] Selected Default Path: {target_path}[/bold green]")
-                        elif target_input.isdigit() and 1 <= int(target_input) <= len(all_dirs):
-                            target_path = all_dirs[int(target_input) - 1]
-                            console.print(f"[bold green][OK] Selected Path: {target_path}[/bold green]")
-                        else:
-                            target_path = target_input
+                    console.print("\n[dim]Choose Preset [P1-P6], or PAK Dir [1-N], or paste custom path [Default P1].[/dim]")
+                    target_input = safe_input("-> Select Target Path inside PAK (P1-P6 / 1-N / custom) [P1]: ").strip().strip('"\'')
+
+                    if target_input.upper() == 'C':
+                        safe_input('\nPress Enter to continue...')
+                        continue
+
+                    if not target_input or target_input.upper() == 'P1':
+                        target_path = preset_map["P1"][0]
+                        console.print(f"[bold green][OK] Selected Preset P1: {target_path}[/bold green]")
+                    elif target_input.upper() in preset_map:
+                        target_path = preset_map[target_input.upper()][0]
+                        console.print(f"[bold green][OK] Selected Preset {target_input.upper()}: {target_path}[/bold green]")
+                    elif target_input.isdigit() and all_dirs and 1 <= int(target_input) <= len(all_dirs):
+                        target_path = all_dirs[int(target_input) - 1]
+                        console.print(f"[bold green][OK] Selected PAK Internal Dir: {target_path}[/bold green]")
                     else:
-                        target_path = safe_input('\n-> Enter Target Path inside PAK (or "C" to cancel): ').strip().strip('"\'')
-                        if not target_path or target_path.upper() == 'C':
-                            safe_input('\nPress Enter to continue...')
-                            continue
+                        target_path = target_input
+
+                    # Clean and normalize target path (No leading/trailing slashes, forward slashes only)
+                    target_path = target_path.strip().strip('"\'').strip('/\\').replace('\\', '/')
+                    console.print(f"[bold cyan][+] Normalized Target Path: {target_path}[/bold cyan]")
+
+                    # Interactive Lua Pre-Injection Assistant
+                    lua_files = [p for p in actual_edit_path.rglob('*') if p.is_file() and p.suffix.lower() == '.lua']
+                    if lua_files:
+                        console.print(f"\n[bold yellow]📜 Found {len(lua_files)} .lua script(s) in INJECT folder.[/bold yellow]")
+                        console.print("[dim]Choose Lua Injection Preparation:[/dim]")
+                        console.print("  [1] Auto-Fix Syntax & Inject Source (.lua) [Default - Recommended]")
+                        console.print("  [2] Auto-Compile to Bytecode & Inject (.luac) [Fastest & Anti-Cheat Safe]")
+                        console.print("  [3] Inject As-Is (No pre-processing)")
+                        lua_prep = safe_input("-> Select Option [1-3] [1]: ").strip() or '1'
+                        if lua_prep == '1':
+                            for lf in lua_files:
+                                fix_lua_syntax_for_lua51(lf)
+                            console.print("[bold green]✓ Lua syntax auto-fixed for Lua 5.1 / UE4![/bold green]")
+                        elif lua_prep == '2':
+                            compiled_cnt = 0
+                            for lf in lua_files:
+                                fix_lua_syntax_for_lua51(lf)
+                                out_luac = lf.with_suffix('.luac')
+                                ok = False
+                                try:
+                                    res = subprocess.run(["luac5.1", "-o", str(out_luac), str(lf)], capture_output=True, text=True)
+                                    if res.returncode == 0 and out_luac.exists():
+                                        ok = True
+                                except Exception:
+                                    pass
+                                if not ok:
+                                    try:
+                                        res = subprocess.run(["luajit", "-b", str(lf), str(out_luac)], capture_output=True, text=True)
+                                        if res.returncode == 0 and out_luac.exists():
+                                            ok = True
+                                    except Exception:
+                                        pass
+                                if ok:
+                                    lf.unlink(missing_ok=True)
+                                    compiled_cnt += 1
+                            if compiled_cnt > 0:
+                                console.print(f"[bold green]✓ Successfully compiled {compiled_cnt} Lua script(s) to bytecode (.luac)![/bold green]")
 
                     result_dir = data_path / "RESULT"
                     result_dir.mkdir(parents=True, exist_ok=True)
@@ -7014,6 +7160,43 @@ def auto_start_telegram_bot_background(data_path: Path):
 
 _BOOTED = False
 
+def run_beginner_guide(data_path: Path):
+    print_banner()
+    guide_table = Table(
+        title="[bold bright_green]🔰 BEGINNER QUICK START & FAQ GUIDE 🔰[/bold bright_green]",
+        show_header=True,
+        header_style="bold green",
+        box=ROUNDED,
+        border_style="green",
+        expand=True
+    )
+    guide_table.add_column("TOPIC", style="bold yellow", width=22)
+    guide_table.add_column("EASY STEPS & TIPS", style="bold white")
+
+    guide_table.add_row(
+        "📦 PAK/OBB Unpack",
+        "1. PAK/OBB file ko `/sdcard/FeaturesticLeaks/PAK/` me daalo.\n2. Option [1] -> Option [1] (Unpack Package). Output `/sdcard/FeaturesticLeaks/UNPACK/` me milega."
+    )
+    guide_table.add_row(
+        "🛠️ Lua Inject into PAK",
+        "1. Lua file ko `/sdcard/FeaturesticLeaks/INJECT/` me daalo.\n2. Option [1] -> Option [2] -> Option [3] (Inject Path).\n3. Target Path me `P1` (Content/Lua/GameLua/Mod/BRMod/Gameplay/Core) select karein!\n4. Auto-Fix / Auto-Compile prompt me [1] ya [2] press karein!"
+    )
+    guide_table.add_row(
+        "⚡ Why Lua Fails?",
+        "• Plain text .lua vs Bytecode .luac: Game bytecode chahti hai. Option [2] se Auto-Compile karein.\n• Wrong Target Path: Hamesha `P1` select karein PUBG/BGMI Gameplay Lua mods ke liye!"
+    )
+    guide_table.add_row(
+        "🚀 1-Click Auto Lua",
+        "Option [2] (Lua Tool) -> Option [8] (1-Click Auto Workflow) chalayein! Ye syntax error fix karta hai, compile karta hai aur output sync karta hai!"
+    )
+    guide_table.add_row(
+        "🤖 Telegram Bot AI",
+        "Bot launch karne ke liye: `python telegram_bot.py`. Bot ko screenshot bhej kar full guidance paayein!"
+    )
+
+    console.print(guide_table)
+    safe_input('\nPress Enter to return to main menu...')
+
 def main_menu():
     global _BOOTED
     if not _BOOTED:
@@ -7053,11 +7236,12 @@ def main_menu():
         menu_table.add_row("[1]", "PAK TOOL ✓", "Extract, Repack, Replace & Inject PAK/OBB")
         menu_table.add_row("[2]", "LUA TOOL ✓", "Compile, Decompile & PAK/Lua Embedder")
         menu_table.add_row("[3]", "UTILITIES ✓", "UE4 String Tool, File Finder & Setup")
+        menu_table.add_row("[4]", "GUIDE & FAQ 🔰", "Beginner Quick Start & Modding Help")
         menu_table.add_row("[0]", "EXIT ✗", "Close application")
 
         console.print(menu_table)
         console.print()
-        choice = safe_input('\033[1;36mSELECT OPTION [1-3] [0]: \033[0m').strip()
+        choice = safe_input('\033[1;36mSELECT OPTION [0-4]: \033[0m').strip()
 
         if choice == '1':
             pak_obb_tools_menu(data_path)
@@ -7065,6 +7249,8 @@ def main_menu():
             lua_tools_menu(data_path)
         elif choice == '3':
             utilities_menu(data_path)
+        elif choice == '4':
+            run_beginner_guide(data_path)
         elif choice == '0':
             console.print("[dim white]Exiting Featurestic Leaks. Goodbye![/dim white]")
             time.sleep(1)
