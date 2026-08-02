@@ -844,47 +844,48 @@ class TencentPakFile:
                 else:
                     self._index.update({PurePath(dir_path): e})
     
-    def _write_to_disk(self, file_path: Path, entry: TencentPakEntry) -> None:
+    def _write_to_disk(self, file_path: Path, entry: TencentPakEntry, silent: bool = False) -> None:
         """
         [BEFORE]: Uncompressed files loaded full content into RAM before writing to disk.
         [AFTER]: Streaming chunked writes (64MB chunks) for uncompressed data and per-block stream writes to minimize memory footprint.
         """
-        encryption_method = entry.encryption_method
-        compression_method = entry.compression_method
+        if not silent:
+            encryption_method = entry.encryption_method
+            compression_method = entry.compression_method
 
-        enc_str = self._get_method_str(encryption_method, True)
-        comp_str = self._get_method_str(compression_method, False)
-        console.print(f"[bold cyan]->[/] Unpack: [bold green]{file_path.name}[/] [[bold yellow]{comp_str}[/]/[bold magenta]{enc_str}[/]]")
+            enc_str = self._get_method_str(encryption_method, True)
+            comp_str = self._get_method_str(compression_method, False)
+            console.print(f"[bold cyan]->[/] Unpack: [bold green]{file_path.name}[/] [[bold yellow]{comp_str}[/]/[bold magenta]{enc_str}[/]]")
 
         with open(file_path, 'wb') as file:
-            if compression_method == CM_NONE:
+            if entry.compression_method == CM_NONE:
                 offset = entry.offset
-                total_size = PakCrypto.align_encrypted_content_size(entry.size, encryption_method)
+                total_size = PakCrypto.align_encrypted_content_size(entry.size, entry.encryption_method)
                 chunk_size = 64 * 1024 * 1024  # 64MB streaming chunk buffer
                 written = 0
                 while written < total_size:
                     to_read = min(chunk_size, total_size - written)
                     data = self._file_content[offset + written:][:to_read]
                     if entry.encrypted:
-                        data = PakCrypto.decrypt_block(data, file_path, encryption_method)
+                        data = PakCrypto.decrypt_block(data, file_path, entry.encryption_method)
                     file.write(data)
                     written += to_read
                 file.truncate(entry.size)
                 return
             else:
                 if len(entry.compressed_blocks) == 0:
-                    data = self._peek_content(entry.offset, entry.size, encryption_method)
+                    data = self._peek_content(entry.offset, entry.size, entry.encryption_method)
                     if entry.encrypted:
-                        data = PakCrypto.decrypt_block(data, file_path, encryption_method)
-                    data = PakCompression.decompress_block(data, self._zstd_dict, compression_method)
+                        data = PakCrypto.decrypt_block(data, file_path, entry.encryption_method)
+                    data = PakCompression.decompress_block(data, self._zstd_dict, entry.compression_method)
                     file.write(data)
                 else:
                     block_size = entry.compression_block_size if entry.compression_block_size > 0 else 65536
-                    for x in PakCrypto.generate_block_indices(len(entry.compressed_blocks), encryption_method):
-                        data = self._peek_block_content(entry.compressed_blocks[x], encryption_method)
+                    for x in PakCrypto.generate_block_indices(len(entry.compressed_blocks), entry.encryption_method):
+                        data = self._peek_block_content(entry.compressed_blocks[x], entry.encryption_method)
                         if entry.encrypted:
-                            data = PakCrypto.decrypt_block(data, file_path, encryption_method)
-                        data = PakCompression.decompress_block(data, self._zstd_dict, compression_method)
+                            data = PakCrypto.decrypt_block(data, file_path, entry.encryption_method)
+                        data = PakCompression.decompress_block(data, self._zstd_dict, entry.compression_method)
                         file.seek(x * block_size)
                         file.write(data)
                 file.truncate(entry.uncompressed_size)
@@ -892,7 +893,7 @@ class TencentPakFile:
     def dump(self, out_path: Path) -> None:
         """
         [BEFORE]: Unpacked sequentially without disk space check, resume checkpoints, error isolation, or garbage collection.
-        [AFTER]: Added pre-unpack disk space check, .progress.json checkpointing for resume support, per-entry corruption exception isolation, and periodic gc.collect().
+        [AFTER]: Multi-threaded ThreadPoolExecutor parallel unpacking with silent output mode and fast progress bar.
         """
         out_path = out_path / self._mount_point
         out_path.mkdir(parents=True, exist_ok=True)
@@ -907,7 +908,27 @@ class TencentPakFile:
         checkpoint_file = out_path.parent / ".unpack_progress.json"
         completed = load_checkpoint(checkpoint_file)
 
+        items_to_unpack = []
+        for dir_path, dir_content in self._index.items():
+            current_out_path = out_path / dir_path
+            current_out_path.mkdir(parents=True, exist_ok=True)
+            for file_name, entry in dir_content.items():
+                rel_file_key = str(PurePath(dir_path) / file_name).replace('\\', '/')
+                if rel_file_key not in completed:
+                    target_file = current_out_path / file_name
+                    items_to_unpack.append((target_file, entry, rel_file_key))
+
+        silent_mode = len(items_to_unpack) > 10
         processed_count = 0
+
+        def _unpack_item(item):
+            t_file, ent, key = item
+            try:
+                self._write_to_disk(t_file, ent, silent=silent_mode)
+                return True, key, None
+            except Exception as e:
+                return False, key, e
+
         with Progress(
             SpinnerColumn(),
             TextColumn("[bold cyan][UNPACK][/] {task.description}"),
@@ -916,25 +937,21 @@ class TencentPakFile:
             TimeElapsedColumn(),
             console=console
         ) as progress:
-            task = progress.add_task("Extracting files...", total=total_files)
-            for dir_path, dir_content in self._index.items():
-                current_out_path = out_path / dir_path
-                current_out_path.mkdir(parents=True, exist_ok=True)
-                for file_name, entry in dir_content.items():
-                    rel_file_key = str(PurePath(dir_path) / file_name).replace('\\', '/')
-                    if rel_file_key in completed:
-                        progress.update(task, advance=1)
-                        continue
+            task = progress.add_task("Extracting files in parallel...", total=total_files)
+            progress.update(task, advance=len(completed))
 
-                    target_file = current_out_path / file_name
-                    try:
-                        self._write_to_disk(target_file, entry)
-                        completed.add(rel_file_key)
-                    except Exception as entry_err:
-                        console.print(f"[bold red][X] Skip corrupted entry '{rel_file_key}': {entry_err}[/bold red]")
+            max_workers = min(16, (os.cpu_count() or 4) * 2)
+            with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
+                futures = {executor.submit(_unpack_item, item): item for item in items_to_unpack}
+                for future in concurrent.futures.as_completed(futures):
+                    success, key, err = future.result()
+                    if success:
+                        completed.add(key)
+                    else:
+                        console.print(f"[bold red][X] Skip corrupted entry '{key}': {err}[/bold red]")
 
                     processed_count += 1
-                    if processed_count % 50 == 0:
+                    if processed_count % 100 == 0:
                         save_checkpoint(checkpoint_file, completed)
                         gc.collect()
 
@@ -1978,7 +1995,8 @@ def display_workspace_summary(data_path: Path):
         for p in paths:
             if p.exists():
                 try:
-                    cnt += len([f for f in p.rglob("*") if f.is_file()])
+                    for root, dirs, files in os.walk(p):
+                        cnt += len(files)
                 except Exception:
                     pass
         return cnt
