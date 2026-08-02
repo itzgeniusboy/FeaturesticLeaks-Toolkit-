@@ -6528,7 +6528,16 @@ def manage_ai_api_keys():
     cfg = get_ai_config()
     while True:
         print_banner()
-        console.print(Panel("[bold bright_cyan]🤖 AI API KEYS & PROVIDER MANAGEMENT 🤖[/bold bright_cyan]\n[dim white]Manage API keys for Google Gemini, Groq, and OpenRouter with multi-key rotation fallback.[/dim white]", border_style="cyan", box=ROUNDED))
+        console.print(Panel(
+            "[bold bright_cyan]🤖 AI API KEYS & MULTI-PROVIDER MANAGER 🤖[/bold bright_cyan]\n\n"
+            "[bold white]🌐 Direct Links to Get Free Instant API Keys:[/bold white]\n"
+            " • [bold bright_yellow]Google Gemini:[bold /yellow]   [bold underline bright_blue]https://aistudio.google.com/app/apikey[/bold underline bright_blue]\n"
+            " • [bold bright_yellow]Groq Cloud:[bold /yellow]      [bold underline bright_blue]https://console.groq.com/keys[/bold underline bright_blue]\n"
+            " • [bold bright_yellow]OpenRouter:[bold /yellow]      [bold underline bright_blue]https://openrouter.ai/keys[/bold underline bright_blue]\n\n"
+            "[dim white]Click or copy any URL above in your browser to generate a free API key![/dim white]",
+            border_style="cyan",
+            box=ROUNDED
+        ))
         
         active_prov = cfg.get("active_provider", "google")
         console.print(f"[bold white]Active Provider:[/bold white] [bold bright_green]{active_prov.upper()}[/bold bright_green]\n")
@@ -6549,14 +6558,14 @@ def manage_ai_api_keys():
         console.print("  [1] Add API Key (Google / Groq / OpenRouter)")
         console.print("  [2] Set Active Provider")
         console.print("  [3] Delete / Clear Keys")
-        console.print("  [0] Back to Lua Menu")
+        console.print("  [0] Back to Menu")
         
         choice = safe_input("\n-> Select Option [0-3]: ").strip()
         if choice == '1':
-            console.print("\n[bold cyan]Select Provider to Add Key:[/bold cyan]")
-            console.print("  [1] Google Gemini (Get free key from https://aistudio.google.com)")
-            console.print("  [2] Groq (Get free fast key from https://console.groq.com)")
-            console.print("  [3] OpenRouter (Get free key from https://openrouter.ai)")
+            console.print("\n[bold cyan]Select Provider to Get/Add API Key:[/bold cyan]")
+            console.print("  [1] Google Gemini  👉 [bright_blue]https://aistudio.google.com/app/apikey[/bright_blue]")
+            console.print("  [2] Groq Cloud     👉 [bright_blue]https://console.groq.com/keys[/bright_blue]")
+            console.print("  [3] OpenRouter     👉 [bright_blue]https://openrouter.ai/keys[/bright_blue]")
             p_choice = safe_input("-> Select Provider [1-3]: ").strip()
             prov_map = {"1": "google", "2": "groq", "3": "openrouter"}
             prov = prov_map.get(p_choice)
@@ -6565,6 +6574,7 @@ def manage_ai_api_keys():
                 time.sleep(1)
                 continue
             
+            console.print(f"\n[bold white]Generating key for {prov.capitalize()}? Copy key from link above and paste below:[/bold white]")
             key_val = safe_input(f"-> Paste your {prov.capitalize()} API key: ").strip().strip('"\'')
             if key_val:
                 if prov not in cfg["keys"]:
@@ -6621,8 +6631,16 @@ def query_ai_for_lua_fix(lua_code: str, error_msg: str) -> Optional[str]:
         if env_key:
             keys = [env_key]
         else:
-            console.print(f"[bold red][X] No API keys saved for provider '{provider}'.[/bold red]")
-            console.print("[bold yellow]Please configure API keys in Lua Menu -> AI-Assisted Repair -> Option [2] Manage API Keys.[/bold yellow]")
+            console.print(Panel(
+                f"[bold red][X] No API keys saved for provider '{provider.upper()}'.[/bold red]\n\n"
+                f"[bold white]Get a free API key directly from these sites:[/bold white]\n"
+                f" • [bold yellow]Google Gemini:[bold /yellow]   [bold underline bright_blue]https://aistudio.google.com/app/apikey[/bold underline bright_blue]\n"
+                f" • [bold yellow]Groq Cloud:[bold /yellow]      [bold underline bright_blue]https://console.groq.com/keys[/bold underline bright_blue]\n"
+                f" • [bold yellow]OpenRouter:[bold /yellow]      [bold underline bright_blue]https://openrouter.ai/keys[/bold underline bright_blue]\n\n"
+                f"[dim white]Add keys in AI Tools -> Option [2] Manage API Keys.[/dim white]",
+                border_style="red",
+                box=ROUNDED
+            ))
             return None
 
     prompt = f"""You are an expert Lua 5.1 and GameGuard script engineer.
@@ -6665,7 +6683,7 @@ ORIGINAL LUA SCRIPT:
                     "Content-Type": "application/json"
                 }
                 payload = {
-                    "model": "llama-3.1-70b-versatile",
+                    "model": "llama-3.3-70b-versatile",
                     "messages": [{"role": "user", "content": prompt}],
                     "temperature": 0.2
                 }
