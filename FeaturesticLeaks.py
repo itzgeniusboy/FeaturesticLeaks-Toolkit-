@@ -4435,10 +4435,32 @@ def boot_sequence():
     
     time.sleep(0.2)
 
+def get_device_user_info() -> str:
+    try:
+        cfg = get_ai_config() if 'get_ai_config' in globals() else {}
+        if cfg.get("user_nickname"):
+            return str(cfg.get("user_nickname"))
+    except Exception:
+        pass
+    
+    u = os.environ.get("USER") or os.environ.get("LOGNAME") or os.environ.get("SUDO_USER")
+    if not u:
+        try:
+            import getpass
+            u = getpass.getuser()
+        except Exception:
+            u = "TermuxUser"
+    try:
+        import socket
+        h = socket.gethostname()
+    except Exception:
+        h = "Android"
+    return f"{u}@{h}"
+
 def send_telegram_bug_report(err_type: str, err_msg: str, action_name: str = "Operation", file_info: str = "?", line_no: str = "?", func_name: str = "?", tb_str: str = ""):
     """
     Sends automated bug report silently to Developer Telegram Bot/Chat in a background thread.
-    Direct delivery from user's Termux app to Developer's Telegram account without user effort!
+    Includes User/Device identification so developer knows who generated the report!
     """
     def _send_bg():
         try:
@@ -4449,13 +4471,16 @@ def send_telegram_bug_report(err_type: str, err_msg: str, action_name: str = "Op
             if not bot_token or not chat_id:
                 return
                 
+            dev_user = get_device_user_info()
+            
             report_text = (
-                f"🚨 <b>FEATURESTIC LEAKS - AUTOMATED BUG REPORT</b> 🚨\n\n"
-                f"<b>Action:</b> {action_name}\n"
-                f"<b>Error Type:</b> {err_type}\n"
-                f"<b>Location:</b> {file_info}:{line_no} in <code>{func_name}()</code>\n"
-                f"<b>Error Message:</b> <code>{escape(err_msg[:300])}</code>\n\n"
-                f"<b>Traceback snippet:</b>\n<code>{escape(tb_str[-800:]) if tb_str else 'N/A'}</code>"
+                f"🚨 <b>FEATURESTIC LEAKS - AUTOMATED REPORT</b> 🚨\n\n"
+                f"👤 <b>User / Device:</b> <code>{escape(dev_user)}</code>\n"
+                f"📌 <b>Action:</b> {action_name}\n"
+                f"⚠️ <b>Error Type:</b> {err_type}\n"
+                f"📍 <b>Location:</b> {file_info}:{line_no} in <code>{func_name}()</code>\n"
+                f"💬 <b>Details:</b> <code>{escape(err_msg[:300])}</code>\n\n"
+                f"📜 <b>Traceback snippet:</b>\n<code>{escape(tb_str[-800:]) if tb_str else 'N/A'}</code>"
             )
             
             url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
@@ -6609,7 +6634,8 @@ def manage_ai_api_keys():
             table.add_row(prov.capitalize() + is_active, str(len(keys)), hints)
         
         bot_status = "Configured" if cfg.get("telegram_bot_token") and cfg.get("telegram_chat_id") else "Not Set"
-        console.print(f"[bold white]Auto-Report Status:[/bold white] [bold cyan]{bot_status}[/bold cyan]")
+        user_nick = cfg.get("user_nickname") or get_device_user_info()
+        console.print(f"[bold white]Auto-Report Status:[/bold white] [bold cyan]{bot_status}[/bold cyan]  |  [bold white]User Tag:[/bold white] [bold yellow]{user_nick}[/bold yellow]")
         console.print(table)
         console.print()
         console.print("  [1] Add API Key (Google / Groq / OpenRouter)")
@@ -6617,9 +6643,10 @@ def manage_ai_api_keys():
         console.print("  [3] Delete / Clear Keys")
         console.print("  [4] Configure Developer Telegram Auto-Report Bot 🚨")
         console.print("  [5] Test All API Keys Live (Check Key Limits / Exhaustion) ⚡")
+        console.print("  [6] Set Custom Nickname/Username (for Telegram Reports) 👤")
         console.print("  [0] Back to Menu")
         
-        choice = safe_input("\n-> Select Option [0-5]: ").strip()
+        choice = safe_input("\n-> Select Option [0-6]: ").strip()
         if choice == '1':
             console.print("\n[bold cyan]Select Provider to Get/Add API Key:[/bold cyan]")
             console.print("  [1] Google Gemini  👉 [bright_blue]https://aistudio.google.com/app/apikey[/bright_blue]")
@@ -6716,7 +6743,7 @@ def manage_ai_api_keys():
                     k_hint = k[:6] + "..." + k[-4:] if len(k) > 10 else k
                     try:
                         if p_name == "google":
-                            url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={k}"
+                            url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-8b:generateContent?key={k}"
                             res = requests.post(url, json={"contents": [{"parts": [{"text": "hi"}]}]}, timeout=10)
                             if res.status_code == 200:
                                 console.print(f" • [bold green]Google Gemini Key ({k_hint}): ✅ ACTIVE & WORKING[/bold green]")
@@ -6725,7 +6752,7 @@ def manage_ai_api_keys():
                                 console.print(f" • [bold red]Google Gemini Key ({k_hint}): ❌ EXHAUSTED / RATE LIMITED (HTTP {res.status_code})[/bold red]")
                         elif p_name == "groq":
                             url = "https://api.groq.com/openai/v1/chat/completions"
-                            res = requests.post(url, headers={"Authorization": f"Bearer {k}"}, json={"model": "llama-3.3-70b-versatile", "messages": [{"role": "user", "content": "hi"}]}, timeout=10)
+                            res = requests.post(url, headers={"Authorization": f"Bearer {k}"}, json={"model": "llama-3.1-8b-instant", "messages": [{"role": "user", "content": "hi"}]}, timeout=10)
                             if res.status_code == 200:
                                 console.print(f" • [bold green]Groq Key ({k_hint}): ✅ ACTIVE & WORKING[/bold green]")
                                 all_dead = False
@@ -6733,7 +6760,7 @@ def manage_ai_api_keys():
                                 console.print(f" • [bold red]Groq Key ({k_hint}): ❌ EXHAUSTED / RATE LIMITED (HTTP {res.status_code})[/bold red]")
                         elif p_name == "openrouter":
                             url = "https://openrouter.ai/api/v1/chat/completions"
-                            res = requests.post(url, headers={"Authorization": f"Bearer {k}"}, json={"model": "google/gemini-flash-1.5", "messages": [{"role": "user", "content": "hi"}]}, timeout=10)
+                            res = requests.post(url, headers={"Authorization": f"Bearer {k}"}, json={"model": "google/gemini-flash-1.5-8b", "messages": [{"role": "user", "content": "hi"}]}, timeout=10)
                             if res.status_code == 200:
                                 console.print(f" • [bold green]OpenRouter Key ({k_hint}): ✅ ACTIVE & WORKING[/bold green]")
                                 all_dead = False
@@ -6747,6 +6774,18 @@ def manage_ai_api_keys():
                 send_telegram_bug_report("API_KEY_EXHAUSTION", "All user API keys were found exhausted or rate limited during live test!", "API Manager", "FeaturesticLeaks.py", "6705", "manage_ai_api_keys", "HTTP 429/401 Key Limit Exceeded")
                 console.print("[bold green]📲 Auto-sent exhaustion alert directly to developer Telegram group![/bold green]")
             time.sleep(2)
+        elif choice == '6':
+            console.print("\n[bold cyan]👤 Set Custom Username / Nickname:[/bold cyan]")
+            console.print("[dim white]This name will be attached to all automated Telegram bug reports from your device.[/dim white]\n")
+            curr_n = cfg.get("user_nickname", "")
+            if curr_n:
+                console.print(f"[bold white]Current Nickname:[/bold white] [bold yellow]{curr_n}[/bold yellow]")
+            new_n = safe_input("-> Enter your name or Telegram username (e.g. Rahul_VIP): ").strip()
+            if new_n:
+                cfg["user_nickname"] = new_n
+                save_ai_config(cfg)
+                console.print(f"[bold green]✅ User nickname saved as '{new_n}'![/bold green]")
+            time.sleep(1.5)
         elif choice == '0':
             break
 
@@ -6760,7 +6799,7 @@ def call_ai_api(prompt: str) -> Optional[str]:
     else:
         last_user_query = low_p
 
-    # Local instant conversational fallback mapping for smooth 24/7 AI chat responses
+    # Local instant conversational fallback mapping for smooth 24/7 AI chat responses (0 tokens spent!)
     quick_chat_responses = {
         'hi': "Hello brother! 👋 Main Featurestic Leaks AI Engine hu! Main PAK/OBB unpacking, Lua compiling, aur auto-fixing me aapki help kar sakta hu. Bolo kya karna hai?",
         'hii': "Hii buddy! Welcome to Featurestic Leaks! Aaj kya modding ya leak karni hai?",
@@ -6771,13 +6810,42 @@ def call_ai_api(prompt: str) -> Optional[str]:
         'helo': "Helooo! Kaise ho bhai? Featurestic Leaks Engine 24/7 ready hai!",
         'hey': "Yo! Kaise ho bhai? Batao aaj kya hack/mod karna hai!",
         'kaise ho': "Main bilkul mast aur 100% High-Speed ready hu! Aap batao aaj kya leak/mod karna hai?",
+        'kya kar sakte ho': "Main Featurestic Leaks AI Engine hu! Main PAK/OBB files unpack/repack kar sakta hu, Lua scripts repair kar sakta hu aur automated bug reports generate kar sakta hu!",
         'kon ho': "Main Featurestic Leaks AI Assistant hu! Created to assist you with PAK/OBB & Lua modding!",
         'who are you': "I am Featurestic Leaks AI Engine — your ultimate GameGuard, PAK/OBB & Lua 5.1 modding buddy!",
         'help': "💡 **FEATURESTIC LEAKS AI QUICK GUIDANCE:**\n• **Option [1]**: AI Watch Assistant (Folder auto-listen & auto-process)\n• **Option [2]**: Friendly Chat (Aap yahan mughse kuch bhi poochh sakte hain)\n• **Option [3]**: AI Lua Syntax Repair (Broken .lua auto-fix)\n• **Option [4]**: Manage API Keys & Telegram Auto-Report Bot",
         'options': "💡 Main FeaturesticLeaks tool options:\n[1] PAK/OBB Tool  |  [2] Lua Compiler  |  [3] AI Tools  |  [4] Utilities",
         'pak': "📦 **PAK Unpacking Guide:**\nOption [1] (PAK/OBB Tool) -> Option [1] (Unpack PAK File) select karein. Unpacked files `UNPACK/<stem>` folder me save hongi!",
         'lua': "📜 **Lua Compiler Guide:**\nOption [2] (Lua Compiler) -> Option [1] se `.lua` source code ko `.luac` bytecode me compile kar sakte hain!",
+        'bhai': "Haan bhai bolo! Main aapka Featurestic Leaks AI Assistant hu. Batao kya help chahiye?",
+        'bro': "Yo bro! What's up? Direct apana query ya script question poochho!",
+        'thanks': "Arey koi nahi bhai! Always happy to help! Enjoy modding! 🚀",
+        'thank you': "Welcome brother! Koi aur problem ho to zaroor batana!",
+        'shukriya': "Bahut shukriya bhai! Modding me koi error aaye to AI Watch Mode Option [1] try karein!",
+        'bye': "Bye bye! Phir milenge, Happy Modding! 👋",
+        'by': "Bye brother! Stay safe and happy modding!",
     }
+
+    # Instant check for exact or clean conversational match to save API quota
+    for trigger, resp_str in quick_chat_responses.items():
+        if last_user_query == trigger or last_user_query.strip() == trigger:
+            return resp_str
+
+    # Determine task complexity to pick models smartly (saves API limits!)
+    is_complex_code = any(kw in low_p for kw in [
+        'function', 'local ', 'return', 'syntax error', 'end statement',
+        'compile error', 'gameguard', 'luac 5.1', 'fix the syntax', 'lua script'
+    ]) or len(prompt) > 800
+
+    if is_complex_code:
+        gemini_models = ["gemini-1.5-flash", "gemini-2.0-flash", "gemini-1.5-pro"]
+        groq_models = ["llama-3.3-70b-versatile", "mixtral-8x7b-32768"]
+        openrouter_models = ["meta-llama/llama-3.3-70b-instruct", "google/gemini-flash-1.5"]
+    else:
+        # Light chat queries use ultra-high limit & ultra-fast models (30 RPM on Gemini 1.5-Flash-8B!)
+        gemini_models = ["gemini-1.5-flash-8b", "gemini-1.5-flash", "gemini-2.0-flash"]
+        groq_models = ["llama-3.1-8b-instant", "llama3-8b-8192", "llama-3.2-3b-preview"]
+        openrouter_models = ["google/gemini-flash-1.5-8b", "meta-llama/llama-3.1-8b-instruct:free", "google/gemini-flash-1.5"]
 
     # Build key queue across all available providers
     cfg = get_ai_config()
@@ -6808,10 +6876,6 @@ def call_ai_api(prompt: str) -> Optional[str]:
         key_queue.append(("openrouter", env_or))
 
     if key_queue:
-        gemini_models = ["gemini-1.5-flash", "gemini-2.0-flash", "gemini-1.5-pro"]
-        groq_models = ["llama-3.3-70b-versatile", "llama3-8b-8192", "mixtral-8x7b-32768"]
-        openrouter_models = ["google/gemini-flash-1.5", "meta-llama/llama-3.3-70b-instruct"]
-
         for prov, key in key_queue:
             try:
                 if prov == "google":
@@ -6869,20 +6933,20 @@ def call_ai_api(prompt: str) -> Optional[str]:
                 continue
 
     # If all API calls failed or no keys were available:
-    # 1. First check if we can respond instantly via local conversational matcher
+    # 1. First check if we can respond via fuzzy local conversational matcher
     for trigger, resp_str in quick_chat_responses.items():
-        if trigger == last_user_query or (len(trigger) > 2 and trigger in last_user_query):
+        if trigger in last_user_query:
             return resp_str
 
     # 2. Automatically notify Telegram bot about key exhaustion
     send_telegram_bug_report(
         error_type="API_KEYS_EXHAUSTED",
         error_msg="All configured AI API keys returned rate limit / limit reached or no key configured!",
-        context=f"User AI query: '{last_user_query[:50]}'",
-        file_name="FeaturesticLeaks.py",
-        line_no="6780",
+        action_name=f"User AI Query: '{last_user_query[:50]}'",
+        file_info="FeaturesticLeaks.py",
+        line_no="6810",
         func_name="call_ai_api",
-        stack_trace="HTTP 429 Rate Limit Exceeded / No active API keys left"
+        tb_str="HTTP 429 Rate Limit Exceeded / No active API keys left"
     )
 
     return (
