@@ -6062,8 +6062,14 @@ def pak_obb_tools_menu(data_path: Path):
                 cand_dirs = [
                     Path("/sdcard/FeaturesticLeaks/REPLACE"),
                     data_path / "REPLACE",
-                    Path("/sdcard/FeaturesticLeaks/PAK TOOL/EDIT"),
-                    data_path / "PAK TOOL" / "EDIT"
+                    Path("/sdcard/FeaturesticLeaks/PAK_WORKSPACE/3_REPLACE"),
+                    data_path / "PAK_WORKSPACE" / "3_REPLACE",
+                    Path("/sdcard/FeaturesticLeaks/INJECT"),
+                    data_path / "INJECT",
+                    Path("/sdcard/FeaturesticLeaks/PAK_WORKSPACE/4_INJECT"),
+                    data_path / "PAK_WORKSPACE" / "4_INJECT",
+                    Path("/sdcard/FeaturesticLeaks/LUA"),
+                    data_path / "LUA"
                 ]
                 actual_edit_path = None
                 ignored_names = {'.gitkeep', '.ds_store', 'desktop.ini', 'thumbs.db'}
@@ -6124,8 +6130,14 @@ def pak_obb_tools_menu(data_path: Path):
                 cand_dirs = [
                     Path("/sdcard/FeaturesticLeaks/INJECT"),
                     data_path / "INJECT",
+                    Path("/sdcard/FeaturesticLeaks/PAK_WORKSPACE/4_INJECT"),
+                    data_path / "PAK_WORKSPACE" / "4_INJECT",
+                    Path("/sdcard/FeaturesticLeaks/LUA"),
+                    data_path / "LUA",
                     Path("/sdcard/FeaturesticLeaks/REPLACE"),
-                    data_path / "REPLACE"
+                    data_path / "REPLACE",
+                    Path("/sdcard/FeaturesticLeaks/PAK_WORKSPACE/3_REPLACE"),
+                    data_path / "PAK_WORKSPACE" / "3_REPLACE"
                 ]
                 actual_edit_path = None
                 ignored_names = {'.gitkeep', '.ds_store', 'desktop.ini', 'thumbs.db'}
@@ -6138,6 +6150,8 @@ def pak_obb_tools_menu(data_path: Path):
 
                 if not actual_edit_path:
                     console.print('[yellow][!] INJECT source folder me koi file nahi mili![/yellow]')
+                    console.print('[cyan]👉 Advice: Apni .lua ya mod file ko `/sdcard/FeaturesticLeaks/INJECT/` ya `/sdcard/FeaturesticLeaks/PAK_WORKSPACE/4_INJECT/` me daalo.[/cyan]')
+                    console.print('[dim white]Agar aapne kisi aur folder me file rakhi hai, toh niche exact full folder path paste karein (ya Enter dabayein cancel ke liye):[/dim white]')
                     custom_edit = safe_input('-> Enter custom source folder path (or press Enter to cancel): ').strip().strip('"\'')
                     if not custom_edit:
                         safe_input('\nPress Enter to continue...')
