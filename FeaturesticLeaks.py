@@ -7160,6 +7160,167 @@ def auto_start_telegram_bot_background(data_path: Path):
 
 _BOOTED = False
 
+def run_url_lib_patcher_tool(data_path: Path):
+    """
+    URL & LIB PATCHER TOOL
+    Allows searching, inspecting, and replacing encrypted URLs in .so, .exe, .bin, .bytes files using XOR keys.
+    """
+    print_banner()
+    console.print(Panel(
+        "[bold cyan]🔗 URL & LIB PATCHER TOOL (SO / BINARY URL MODDER)[/bold cyan]\n"
+        "[dim white]Search, list, and replace encrypted http:// & https:// URLs inside .so game libraries, binaries & scripts![/dim white]",
+        border_style="cyan",
+        box=ROUNDED
+    ))
+
+    so_dir = data_path / "REPLACE"
+    so_dir.mkdir(parents=True, exist_ok=True)
+
+    target_file, _ = pick_file_from_folder("Select Library / Binary File", so_dir, extensions=[".so", ".bin", ".exe", ".bytes", ".dat", ".txt"])
+    if not target_file or not target_file.exists():
+        console.print("[bold red][X] No file selected.[/bold red]")
+        return
+
+    current_key = 0x2E
+
+    def xor_crypt(data: bytes, key: int) -> bytes:
+        return bytes([b ^ (key & 0xFF) for b in data])
+
+    def find_urls(data: bytes) -> List[Tuple[int, str]]:
+        url_pattern = re.compile(rb"https?://[A-Za-z0-9\./\_\-?=&%:#]+")
+        return [(m.start(), m.group().decode(errors="ignore")) for m in url_pattern.finditer(data)]
+
+    while True:
+        print_banner()
+        patch_table = Table(
+            title=f"[bold bright_green]⚙️ LIB URL PATCHER - [{target_file.name}][/bold bright_green]",
+            show_header=True,
+            header_style="bold green",
+            box=ROUNDED,
+            border_style="green",
+            expand=True
+        )
+        patch_table.add_column("OPT", style="bold yellow", justify="center", width=8)
+        patch_table.add_column("ACTION", style="bold white", justify="left", width=22)
+        patch_table.add_column("INFO", style="dim cyan", justify="left")
+
+        patch_table.add_row("[1]", "List Found URLs", "Scan & list all http/https URLs inside file")
+        patch_table.add_row("[2]", "Set XOR Key", f"Current Key: [bold yellow]0x{current_key:02X}[/bold yellow] ({current_key})")
+        patch_table.add_row("[3]", "Replace URL(s)", "Patch URLs with new domain/panel link (Saves patched file)")
+        patch_table.add_row("[4]", "Select Different File", f"Current: {target_file.name}")
+        patch_table.add_row("[0]", "Back to Main Menu", "Return to main menu")
+
+        console.print(patch_table)
+        console.print()
+        choice = safe_input("\033[1;36mSELECT OPTION [0-4]: \033[0m").strip()
+
+        if choice == '1':
+            try:
+                raw_data = target_file.read_bytes()
+                dec_data = xor_crypt(raw_data, current_key)
+                urls = find_urls(dec_data)
+                if not urls:
+                    console.print(f"[bold red][X] No URLs found with XOR Key 0x{current_key:02X}. Try changing key (Opt 2).[/bold red]")
+                else:
+                    url_table = Table(title=f"URLs Found in {target_file.name} ({len(urls)} total)", box=ROUNDED, border_style="cyan")
+                    url_table.add_column("#", style="yellow", justify="center")
+                    url_table.add_column("Offset", style="dim white")
+                    url_table.add_column("Len", style="magenta")
+                    url_table.add_column("URL", style="bold white")
+                    for idx, (offset, url_str) in enumerate(urls, 1):
+                        url_table.add_row(str(idx), hex(offset), str(len(url_str)), url_str)
+                    console.print(url_table)
+            except Exception as e:
+                handle_exception(e, "List URLs", data_path)
+            safe_input('\nPress Enter to continue...')
+
+        elif choice == '2':
+            key_inp = safe_input("-> Enter XOR Key (e.g. 0x2E or 46 or 0x00) [0x2E]: ").strip()
+            if key_inp:
+                try:
+                    if key_inp.startswith(('0x', '0X')):
+                        current_key = int(key_inp, 16) & 0xFF
+                    else:
+                        current_key = int(key_inp) & 0xFF
+                    console.print(f"[bold green]✓ XOR Key updated to 0x{current_key:02X} ({current_key})[/bold green]")
+                except ValueError:
+                    console.print("[bold red][X] Invalid key format![/bold red]")
+            safe_input('\nPress Enter to continue...')
+
+        elif choice == '3':
+            try:
+                raw_data = target_file.read_bytes()
+                dec_data = xor_crypt(raw_data, current_key)
+                urls = find_urls(dec_data)
+                if not urls:
+                    console.print(f"[bold red][X] No URLs found to replace with Key 0x{current_key:02X}.[/bold red]")
+                    safe_input('\nPress Enter to continue...')
+                    continue
+
+                url_table = Table(title=f"Select URL to Replace", box=ROUNDED, border_style="cyan")
+                url_table.add_column("#", style="yellow", justify="center")
+                url_table.add_column("Len", style="magenta")
+                url_table.add_column("URL", style="bold white")
+                for idx, (offset, url_str) in enumerate(urls, 1):
+                    url_table.add_row(str(idx), str(len(url_str)), url_str)
+                console.print(url_table)
+
+                sel_str = safe_input("-> Enter URL number to replace (1-N) or 'C' to cancel: ").strip()
+                if sel_str.upper() == 'C' or not sel_str.isdigit():
+                    continue
+
+                idx_num = int(sel_str) - 1
+                if not (0 <= idx_num < len(urls)):
+                    console.print("[bold red][X] Invalid selection number.[/bold red]")
+                    safe_input('\nPress Enter to continue...')
+                    continue
+
+                old_offset, old_url = urls[idx_num]
+                console.print(f"\n[bold cyan]Original URL:[/bold cyan] {old_url} (Len: {len(old_url)})")
+                new_url = safe_input("-> Enter NEW URL (e.g., https://my-panel.com/api): ").strip()
+                if not new_url:
+                    console.print("[yellow][!] Operation cancelled (empty URL).[/yellow]")
+                    safe_input('\nPress Enter to continue...')
+                    continue
+
+                patched = bytearray(dec_data)
+                old_bytes = old_url.encode('utf-8')
+                new_bytes = new_url.encode('utf-8')
+
+                if len(new_bytes) > len(old_bytes):
+                    extra = len(new_bytes) - len(old_bytes)
+                    patched = bytearray(patched[:old_offset] + new_bytes + patched[old_offset + len(old_bytes):])
+                else:
+                    patched[old_offset:old_offset + len(new_bytes)] = new_bytes
+                    pad_len = len(old_bytes) - len(new_bytes)
+                    if pad_len > 0:
+                        patched[old_offset + len(new_bytes):old_offset + len(old_bytes)] = b'\x00' * pad_len
+
+                enc_patched = xor_crypt(bytes(patched), current_key)
+
+                result_dir = data_path / "RESULT"
+                result_dir.mkdir(parents=True, exist_ok=True)
+                out_name = f"{target_file.stem}_patched{target_file.suffix}"
+                out_file = result_dir / out_name
+                out_file.write_bytes(enc_patched)
+
+                console.print(f"\n[bold green]✅ URL Patched Successfully![/bold green]")
+                console.print(f"[bold white]Old URL:[/bold white] {old_url}")
+                console.print(f"[bold bright_green]New URL:[/bold bright_green] {new_url}")
+                console.print(f"[bold cyan]Saved to:[/bold cyan] {out_file}")
+
+            except Exception as e:
+                handle_exception(e, "URL Replacement", data_path)
+            safe_input('\nPress Enter to continue...')
+
+        elif choice == '4':
+            new_f, _ = pick_file_from_folder("Select Library / Binary File", so_dir, extensions=[".so", ".bin", ".exe", ".bytes", ".dat", ".txt"])
+            if new_f and new_f.exists():
+                target_file = new_f
+
+        elif choice == '0':
+            break
+
 def run_beginner_guide(data_path: Path):
     print_banner()
     guide_table = Table(
@@ -7188,6 +7349,10 @@ def run_beginner_guide(data_path: Path):
     guide_table.add_row(
         "🚀 1-Click Auto Lua",
         "Option [2] (Lua Tool) -> Option [8] (1-Click Auto Workflow) chalayein! Ye syntax error fix karta hai, compile karta hai aur output sync karta hai!"
+    )
+    guide_table.add_row(
+        "🔗 URL & LIB Patcher",
+        "Option [4] (URL & LIB Patcher) se `.so` libraries me encrypted links scan karke new panel URLs inject karein!"
     )
     guide_table.add_row(
         "🤖 Telegram Bot AI",
@@ -7236,12 +7401,13 @@ def main_menu():
         menu_table.add_row("[1]", "PAK TOOL ✓", "Extract, Repack, Replace & Inject PAK/OBB")
         menu_table.add_row("[2]", "LUA TOOL ✓", "Compile, Decompile & PAK/Lua Embedder")
         menu_table.add_row("[3]", "UTILITIES ✓", "UE4 String Tool, File Finder & Setup")
-        menu_table.add_row("[4]", "GUIDE & FAQ 🔰", "Beginner Quick Start & Modding Help")
+        menu_table.add_row("[4]", "URL & LIB PATCHER 🔗", "Find & replace encrypted URLs in .so / binaries")
+        menu_table.add_row("[5]", "GUIDE & FAQ 🔰", "Beginner Quick Start & Modding Help")
         menu_table.add_row("[0]", "EXIT ✗", "Close application")
 
         console.print(menu_table)
         console.print()
-        choice = safe_input('\033[1;36mSELECT OPTION [0-4]: \033[0m').strip()
+        choice = safe_input('\033[1;36mSELECT OPTION [0-5]: \033[0m').strip()
 
         if choice == '1':
             pak_obb_tools_menu(data_path)
@@ -7250,6 +7416,8 @@ def main_menu():
         elif choice == '3':
             utilities_menu(data_path)
         elif choice == '4':
+            run_url_lib_patcher_tool(data_path)
+        elif choice == '5':
             run_beginner_guide(data_path)
         elif choice == '0':
             console.print("[dim white]Exiting Featurestic Leaks. Goodbye![/dim white]")
