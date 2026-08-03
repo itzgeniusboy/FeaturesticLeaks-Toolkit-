@@ -51,11 +51,11 @@ export default function App() {
       let reply = "Ha bhai! Kya krna h? PAK bnana h, unpack krna h, lua compile krna h ya fix krna h? OpenCode custom AI active h! Batao kya krna h!";
       const lower = userText.toLowerCase();
       if (lower.includes('unpack') || lower.includes('unpak')) {
-        reply = "🤖 OpenCode AI: Unpack request detect hua! Scan kar raha hu... Bhai 1_PAK_INPUT (ya INPUT) folder me pehle PAK file daalo tabhi to unpack karunga! Abhi isme kuch nahi hai. Pehle file daalo fir batao! 📦";
+        reply = "🤖 OpenCode AI: Unpack request detect hua! Scan kar raha hu... Bhai PAK folder me pehle PAK file daalo tabhi to unpack karunga! Abhi isme kuch nahi hai. Pehle file daalo fir RESULT folder me result mil jayega! 📦";
       } else if (lower.includes('compile') || lower.includes('lua pack')) {
-        reply = "🤖 OpenCode AI: Lua Compile request detect hua! Scan kar raha hu... Bhai 1_LUA_INPUT (ya INPUT) folder me pehle Lua file daalo tabhi compile karunga! Abhi isme koi script nahi hai. Pehle file daalo fir main compile kar dunga! 📜";
+        reply = "🤖 OpenCode AI: Lua Compile request detect hua! Scan kar raha hu... Bhai LUA folder me pehle Lua file daalo tabhi compile karunga! Abhi isme koi script nahi hai. Pehle file daalo fir RESULT folder me compiled script mil jayegi! 📜";
       } else if (lower.includes('fix') || lower.includes('repair')) {
-        reply = "🤖 OpenCode AI: Lua Repair request detect hua! Scan kar raha hu... Bhai 1_LUA_INPUT (ya INPUT) folder me pehle broken Lua file daalo tabhi repair karunga! Abhi isme script nahi hai. Pehle file daalo fir batao! 🛠️";
+        reply = "🤖 OpenCode AI: Lua Repair request detect hua! Scan kar raha hu... Bhai LUA folder me pehle broken Lua file daalo tabhi repair karunga! Abhi isme script nahi hai. Pehle file daalo fir batao! 🛠️";
       } else if (lower.includes('opencode') || lower.includes('termux') || lower.includes('api') || lower.includes('unlimited')) {
         reply = "🤖 OpenCode Custom Integration: Ha bhai! OpenCode custom model integration enabled hai. Isme unlimited API endpoint, custom model name aur local/remote server connect ho jate hai. Agar tool me koi bug ya error aaya, toh automatic Developer Telegram Group (@L359D) par report send ho jayegi! 🚀";
       } else if (lower.includes('hi') || lower.includes('hello') || lower.includes('hlw') || lower.includes('bhai')) {
@@ -310,7 +310,7 @@ export default function App() {
                     <Package className="w-5 h-5" />
                     <span>Unpack PAK / OBB</span>
                   </div>
-                  <p className="text-xs text-slate-400">Extracts contents into <code className="text-cyan-300">/sdcard/FeaturesticLeaks/UNPACK</code></p>
+                  <p className="text-xs text-slate-400">Extracts contents into <code className="text-cyan-300">/sdcard/FeaturesticLeaks/RESULT</code></p>
                   
                   <div className="space-y-2">
                     <label className="text-xs font-medium text-slate-300">Select Input File</label>

@@ -1927,26 +1927,23 @@ def repack_gamepatch(pak, repack_dir, output_pak):
     repack_pak_file_with_block_display(pak_file=pak, edited_root=repack_dir, output_path=output_pak)
 
 def ensure_directories(base_dir: Path):
-    # Clean, Simple 4 Main Folders Workspace
-    (base_dir / "INPUT").mkdir(parents=True, exist_ok=True)
-    (base_dir / "OUTPUT").mkdir(parents=True, exist_ok=True)
-    (base_dir / "REPLACE").mkdir(parents=True, exist_ok=True)
-    (base_dir / "INJECT").mkdir(parents=True, exist_ok=True)
-    (base_dir / "LOGS").mkdir(parents=True, exist_ok=True)
+    # Ultra-Simple 3 Main Folders Workspace (PAK, LUA, RESULT)
+    (base_dir / "PAK").mkdir(parents=True, exist_ok=True)
+    (base_dir / "LUA").mkdir(parents=True, exist_ok=True)
+    (base_dir / "RESULT").mkdir(parents=True, exist_ok=True)
 
     sdcard_path = Path("/sdcard/FeaturesticLeaks")
     try:
         if sdcard_path.parent.exists():
             sdcard_path.mkdir(parents=True, exist_ok=True)
-            (sdcard_path / "INPUT").mkdir(parents=True, exist_ok=True)
-            (sdcard_path / "OUTPUT").mkdir(parents=True, exist_ok=True)
-            (sdcard_path / "REPLACE").mkdir(parents=True, exist_ok=True)
-            (sdcard_path / "INJECT").mkdir(parents=True, exist_ok=True)
-            (sdcard_path / "LOGS").mkdir(parents=True, exist_ok=True)
+            (sdcard_path / "PAK").mkdir(parents=True, exist_ok=True)
+            (sdcard_path / "LUA").mkdir(parents=True, exist_ok=True)
+            (sdcard_path / "RESULT").mkdir(parents=True, exist_ok=True)
 
             # Auto-cleanup empty legacy folders from SDCard & workspace so File Manager is kept ultra-clean
             legacy_dirs = [
-                "PAK_WORKSPACE", "LUA_WORKSPACE", "PAK", "LUA", "UNPACK", "REPACK", "RESULT",
+                "INPUT", "OUTPUT", "REPLACE", "INJECT", "LOGS",
+                "PAK_WORKSPACE", "LUA_WORKSPACE", "UNPACK", "REPACK",
                 "PAK TOOL", "ERROR_REPORTS", "1_PAK_INPUT", "2_UNPACK", "3_REPLACE", "4_INJECT", "5_RESULT",
                 "1_LUA_INPUT", "2_DECOMPILED", "3_COMPILED", "4_RESULT"
             ]
@@ -1997,13 +1994,12 @@ def display_workspace_summary(data_path: Path):
                         pass
         return cnt
 
-    input_cnt = get_cnt(["INPUT", "PAK", "LUA", "PAK_WORKSPACE/1_PAK_INPUT", "LUA_WORKSPACE/1_LUA_INPUT"])
-    output_cnt = get_cnt(["OUTPUT", "UNPACK", "RESULT", "REPACK", "PAK_WORKSPACE/2_UNPACK", "PAK_WORKSPACE/5_RESULT", "LUA_WORKSPACE/2_DECOMPILED", "LUA_WORKSPACE/3_COMPILED", "LUA_WORKSPACE/4_RESULT"])
-    replace_cnt = get_cnt(["REPLACE", "PAK_WORKSPACE/3_REPLACE"])
-    inject_cnt = get_cnt(["INJECT", "PAK_WORKSPACE/4_INJECT"])
+    pak_cnt = get_cnt(["PAK", "INPUT", "PAK_WORKSPACE/1_PAK_INPUT"])
+    lua_cnt = get_cnt(["LUA", "LUA_WORKSPACE/1_LUA_INPUT"])
+    result_cnt = get_cnt(["RESULT", "OUTPUT", "UNPACK", "REPACK", "PAK_WORKSPACE/2_UNPACK", "PAK_WORKSPACE/5_RESULT", "LUA_WORKSPACE/2_DECOMPILED", "LUA_WORKSPACE/3_COMPILED", "LUA_WORKSPACE/4_RESULT"])
 
     table = Table(
-        title="[bold bright_cyan]📂 SIMPLE & ORGANIZED WORKSPACE 📂[/bold bright_cyan]",
+        title="[bold bright_cyan]📂 ULTRA-SIMPLE 3-FOLDER WORKSPACE 📂[/bold bright_cyan]",
         border_style="bright_cyan",
         box=ROUNDED,
         show_header=True,
@@ -2014,13 +2010,12 @@ def display_workspace_summary(data_path: Path):
     table.add_column("Purpose & Simple Description", justify="left", style="bold bright_white")
     table.add_column("Files", justify="center", style="bold bright_yellow", width=10)
 
-    table.add_row("📥 INPUT/", "Put original .pak, .obb, or .lua scripts here", f"[bold bright_yellow]{input_cnt}[/bold bright_yellow]")
-    table.add_row("🚀 OUTPUT/", "Unpacked folders, repacked files & compiled scripts saved here", f"[bold bright_yellow]{output_cnt}[/bold bright_yellow]")
-    table.add_row("✏️ REPLACE/", "Put edited files here to replace files inside PAK", f"[bold bright_yellow]{replace_cnt}[/bold bright_yellow]")
-    table.add_row("💉 INJECT/", "Put custom files here for Inject Path mode", f"[bold bright_yellow]{inject_cnt}[/bold bright_yellow]")
+    table.add_row("📦 PAK/", "Put original .pak / .obb files here to unpack or repack", f"[bold bright_yellow]{pak_cnt}[/bold bright_yellow]")
+    table.add_row("📜 LUA/", "Put .lua scripts here to compile, decompile, or repair", f"[bold bright_yellow]{lua_cnt}[/bold bright_yellow]")
+    table.add_row("🚀 RESULT/", "All unpacked folders, compiled scripts & repacked files saved here", f"[bold bright_yellow]{result_cnt}[/bold bright_yellow]")
 
     console.print(table)
-    console.print("[bold bright_cyan]💡 Workspace Location: [bold bright_white]/sdcard/FeaturesticLeaks/[/bold bright_white] (Super clean & easy)[/bold bright_cyan]\n")
+    console.print("[bold bright_cyan]💡 Workspace Location: [bold bright_white]/sdcard/FeaturesticLeaks/[/bold bright_white] (Only 3 Main Folders: PAK, LUA, RESULT!)[/bold bright_cyan]\n")
 
 # ============================================================================
 # LUA ENGINE & PSEUDO-DECOMPILER (Pure Python + External Tools Fallback)
@@ -6664,7 +6659,7 @@ AI_CONFIG_FILE = Path.home() / ".featurestic_ai_config.json"
 
 def get_ai_config() -> Dict[str, Any]:
     default_cfg = {
-        "active_provider": "google",
+        "active_provider": "opencode",
         "keys": {
             "google": [],
             "groq": [],
@@ -6708,117 +6703,92 @@ def manage_ai_api_keys():
     while True:
         print_banner()
         console.print(Panel(
-            "[bold bright_cyan]🤖 AI API KEYS & OPENCODE CUSTOM MODEL MANAGER 🤖[/bold bright_cyan]\n\n"
-            "[bold white]🌐 Supported AI Engines & Custom Endpoints:[/bold white]\n"
-            " • [bold bright_yellow]Google Gemini:[bold /yellow]   [bold underline bright_blue]https://aistudio.google.com/app/apikey[/bold underline bright_blue]\n"
-            " • [bold bright_yellow]Groq Cloud:[bold /yellow]      [bold underline bright_blue]https://console.groq.com/keys[/bold underline bright_blue]\n"
-            " • [bold bright_yellow]OpenRouter:[bold /yellow]      [bold underline bright_blue]https://openrouter.ai/keys[/bold underline bright_blue]\n"
-            " • [bold bright_yellow]OpenCode Custom:[bold /yellow]  [bold bright_green]Unlimited Custom Endpoint / Local Model Server[/bold bright_green]\n\n"
-            "[dim white]Click or copy any URL above in your browser to generate a free API key or setup OpenCode![/dim white]",
+            "[bold bright_cyan]🤖 OPENCODE UNLIMITED AI MODEL & API MANAGER 🤖[/bold bright_cyan]\n\n"
+            "[bold white]🚀 Primary OpenCode Custom Engine (No API Exhaustion / Rate Limits):[/bold white]\n"
+            " • [bold bright_yellow]OpenCode Endpoint:[bold /yellow]  [bold underline bright_green]https://api.opencode.ai/v1[/bold underline bright_green]\n"
+            " • [bold bright_yellow]Custom Model Name:[bold /yellow]  [bold bright_white]opencode-modding-v1 / qwen2.5-coder / custom[/bold bright_white]\n"
+            " • [bold bright_yellow]API Key / Token:[bold /yellow]    [bold bright_green]Unlimited Custom Tokens / OpenCode Key[/bold bright_green]\n\n"
+            "[dim white]OpenCode AI runs smoothly across all device modding tasks & auto-reports errors to Telegram![/dim white]",
             border_style="cyan",
             box=ROUNDED
         ))
         
-        active_prov = cfg.get("active_provider", "google")
-        console.print(f"[bold white]Active Provider:[/bold white] [bold bright_green]{active_prov.upper()}[/bold bright_green]\n")
+        active_prov = cfg.get("active_provider", "opencode")
+        console.print(f"[bold white]Active Provider Engine:[/bold white] [bold bright_green]{active_prov.upper()}[/bold bright_green]\n")
         
-        table = Table(title="[bold cyan]Saved API Keys & AI Providers[/bold cyan]", box=ROUNDED)
-        table.add_column("Provider / Endpoint", style="bold yellow")
-        table.add_column("Status / Total Keys", style="bold white", justify="center")
-        table.add_column("Details / Model / Hints", style="dim white")
-        
-        for prov in ["google", "groq", "openrouter"]:
-            keys = cfg.get("keys", {}).get(prov, [])
-            hints = ", ".join([k[:6] + "..." + k[-4:] if len(k) > 10 else "Saved" for k in keys]) if keys else "[dim red]No keys saved[/dim red]"
-            is_active = " (Active)" if prov == active_prov else ""
-            table.add_row(prov.capitalize() + is_active, str(len(keys)), hints)
+        table = Table(title="[bold cyan]AI Provider Status & Endpoint Details[/bold cyan]", box=ROUNDED)
+        table.add_column("Provider Engine", style="bold yellow")
+        table.add_column("Status", style="bold white", justify="center")
+        table.add_column("Endpoint / Model Details", style="dim white")
         
         oc_ep = cfg.get("opencode_endpoint", "https://api.opencode.ai/v1")
         oc_mod = cfg.get("opencode_model", "opencode-modding-v1")
-        is_oc_active = " (Active)" if active_prov == "opencode" else ""
-        table.add_row("OpenCode Custom" + is_oc_active, "Connected", f"Endpoint: {oc_ep} | Model: {oc_mod}")
+        is_oc_active = " (Active Default)" if active_prov == "opencode" else ""
+        table.add_row("OpenCode Custom AI" + is_oc_active, "✅ ACTIVE", f"Endpoint: {oc_ep} | Model: {oc_mod}")
+
+        for prov in ["google", "groq", "openrouter"]:
+            keys = cfg.get("keys", {}).get(prov, [])
+            hints = f"Keys saved: {len(keys)}" if keys else "Backup Engine"
+            is_active = " (Active)" if prov == active_prov else ""
+            table.add_row(prov.capitalize() + is_active, "Standby", hints)
 
         bot_status = "Configured" if cfg.get("telegram_bot_token") and cfg.get("telegram_chat_id") else "Not Set"
         user_nick = cfg.get("telegram_username") or cfg.get("user_nickname") or get_device_user_info()
-        console.print(f"[bold white]Auto-Report Status:[/bold white] [bold cyan]{bot_status}[/bold cyan]  |  [bold white]Telegram User Tag:[/bold white] [bold yellow]{user_nick}[/bold yellow]")
+        console.print(f"[bold white]Telegram Auto-Report:[/bold white] [bold cyan]{bot_status}[/bold cyan]  |  [bold white]Developer Tag:[/bold white] [bold yellow]{user_nick}[/bold yellow]")
         console.print(table)
         console.print()
-        console.print("  [1] Add API Key (Google / Groq / OpenRouter / OpenCode)")
-        console.print("  [2] Set Active Provider (Gemini / Groq / OpenRouter / OpenCode)")
-        console.print("  [3] Delete / Clear Keys")
-        console.print("  [4] Configure Developer Telegram Auto-Report Bot 🚨")
-        console.print("  [5] Test All API Keys Live (Check Key Limits / Exhaustion) ⚡")
-        console.print("  [6] Set Your Telegram Username (for Telegram Error Reports) 💬")
-        console.print("  [7] Configure OpenCode Custom Model Endpoint (URL, Model, Key) 🚀")
-        console.print("  [0] Back to Menu")
+        console.print("  [1] Configure OpenCode Endpoint, Model & API Key 🚀")
+        console.print("  [2] Live Test OpenCode Connection ⚡")
+        console.print("  [3] Configure Developer Telegram Auto-Report Bot 🚨")
+        console.print("  [4] Set Your Telegram Username (for Bug Reports) 💬")
+        console.print("  [5] Switch Active Provider (OpenCode / Gemini / Groq / OpenRouter)")
+        console.print("  [0] Back to Main Menu")
         
-        choice = safe_input("\n-> Select Option [0-7]: ").strip()
+        choice = safe_input("\n-> Select Option [0-5]: ").strip()
         if choice == '1':
-            console.print("\n[bold cyan]Select Provider to Get/Add API Key:[/bold cyan]")
-            console.print("  [1] Google Gemini  👉 [bright_blue]https://aistudio.google.com/app/apikey[/bright_blue]")
-            console.print("  [2] Groq Cloud     👉 [bright_blue]https://console.groq.com/keys[/bright_blue]")
-            console.print("  [3] OpenRouter     👉 [bright_blue]https://openrouter.ai/keys[/bright_blue]")
-            console.print("  [4] OpenCode Key   👉 [bright_green]Custom OpenCode Key / Token[/bright_green]")
-            p_choice = safe_input("-> Select Provider [1-4]: ").strip()
-            prov_map = {"1": "google", "2": "groq", "3": "openrouter", "4": "opencode"}
-            prov = prov_map.get(p_choice)
-            if not prov:
-                console.print("[bold red][X] Invalid provider.[/bold red]")
-                time.sleep(1)
-                continue
+            console.print("\n[bold cyan]🚀 Configure OpenCode Custom AI Model Endpoint:[/bold cyan]")
+            console.print("[dim white]Connect custom OpenCode endpoint, local server, or OpenAI-compatible proxy.[/dim white]\n")
+            curr_ep = cfg.get("opencode_endpoint", "https://api.opencode.ai/v1")
+            curr_mod = cfg.get("opencode_model", "opencode-modding-v1")
+            curr_key = cfg.get("opencode_api_key", "")
+            console.print(f"[bold white]Current Endpoint URL:[/bold white] [bright_yellow]{curr_ep}[/bright_yellow]")
+            console.print(f"[bold white]Current Model Name:[/bold white] [bright_yellow]{curr_mod}[/bright_yellow]")
             
-            if prov == "opencode":
-                k_val = safe_input("-> Enter OpenCode API Key / Token (leave empty for none): ").strip()
-                cfg["opencode_api_key"] = k_val
-                save_ai_config(cfg)
-                console.print("[bold green]✅ OpenCode API Key updated![/bold green]")
-            else:
-                console.print(f"\n[bold white]Generating key for {prov.capitalize()}? Copy key from link above and paste below:[/bold white]")
-                key_val = safe_input(f"-> Paste your {prov.capitalize()} API key: ").strip().strip('"\'')
-                if key_val:
-                    if prov not in cfg["keys"]:
-                        cfg["keys"][prov] = []
-                    if key_val not in cfg["keys"][prov]:
-                        cfg["keys"][prov].append(key_val)
-                        save_ai_config(cfg)
-                        console.print(f"[bold green]✅ Added API key for {prov.capitalize()}![/bold green]")
-                    else:
-                        console.print("[bold yellow][!] Key already exists.[/bold yellow]")
-            time.sleep(1)
+            ep_in = safe_input("-> Enter OpenCode Base URL (press Enter to keep current): ").strip()
+            mod_in = safe_input("-> Enter Model Name (e.g. opencode-modding-v1, qwen2.5-coder): ").strip()
+            key_in = safe_input("-> Enter OpenCode API Key / Token (optional, press Enter to keep current): ").strip()
+            
+            if ep_in:
+                cfg["opencode_endpoint"] = ep_in
+            if mod_in:
+                cfg["opencode_model"] = mod_in
+            if key_in:
+                cfg["opencode_api_key"] = key_in
+            
+            cfg["active_provider"] = "opencode"
+            save_ai_config(cfg)
+            console.print(f"[bold green]✅ OpenCode Custom Model configured and set as Active Provider![/bold green]")
+            time.sleep(1.5)
         elif choice == '2':
-            console.print("\n[bold cyan]Select Active Provider:[/bold cyan]")
-            console.print("  [1] Google Gemini")
-            console.print("  [2] Groq")
-            console.print("  [3] OpenRouter")
-            console.print("  [4] OpenCode Custom AI Model")
-            p_choice = safe_input("-> Select Active Provider [1-4]: ").strip()
-            prov_map = {"1": "google", "2": "groq", "3": "openrouter", "4": "opencode"}
-            prov = prov_map.get(p_choice)
-            if prov:
-                cfg["active_provider"] = prov
-                save_ai_config(cfg)
-                console.print(f"[bold green]✅ Active provider set to {prov.upper()}![/bold green]")
-            time.sleep(1)
+            console.print("\n[bold cyan]⚡ Live Testing OpenCode AI Endpoint...[/bold cyan]")
+            oc_ep = cfg.get("opencode_endpoint", "https://api.opencode.ai/v1").rstrip('/')
+            if not oc_ep.endswith("/chat/completions"):
+                oc_ep += "/chat/completions"
+            oc_m = cfg.get("opencode_model", "opencode-modding-v1")
+            oc_k = cfg.get("opencode_api_key", "")
+            try:
+                headers = {"Content-Type": "application/json"}
+                if oc_k:
+                    headers["Authorization"] = f"Bearer {oc_k}"
+                res = requests.post(oc_ep, json={"model": oc_m, "messages": [{"role": "user", "content": "hi"}]}, headers=headers, timeout=8)
+                if res.status_code == 200:
+                    console.print(f" • [bold green]OpenCode Custom Endpoint ({oc_m}): ✅ ACTIVE & WORKING UNLIMITED![/bold green]")
+                else:
+                    console.print(f" • [bold yellow]OpenCode Custom Endpoint ({oc_m}): HTTP {res.status_code} response[/bold yellow]")
+            except Exception as ex_oc:
+                console.print(f" • [bold dim yellow]OpenCode Custom Endpoint note: {ex_oc}[/bold dim yellow]")
+            time.sleep(2)
         elif choice == '3':
-            console.print("\n[bold cyan]Clear Keys for Provider:[/bold cyan]")
-            console.print("  [1] Google Gemini")
-            console.print("  [2] Groq")
-            console.print("  [3] OpenRouter")
-            console.print("  [4] Clear ALL Keys")
-            p_choice = safe_input("-> Select Option [1-4]: ").strip()
-            prov_map = {"1": "google", "2": "groq", "3": "openrouter"}
-            if p_choice in prov_map:
-                prov = prov_map[p_choice]
-                cfg["keys"][prov] = []
-                save_ai_config(cfg)
-                console.print(f"[bold green]✅ Cleared keys for {prov.capitalize()}![/bold green]")
-            elif p_choice == '4':
-                cfg["keys"] = {"google": [], "groq": [], "openrouter": []}
-                cfg["opencode_api_key"] = ""
-                save_ai_config(cfg)
-                console.print("[bold green]✅ Cleared all saved API keys![/bold green]")
-            time.sleep(1)
-        elif choice == '4':
             console.print("\n[bold cyan]🚨 Configure Telegram Auto-Report Bot for Direct Error Delivery:[/bold cyan]")
             console.print("[dim white]Create a bot on Telegram via @BotFather to get your Bot Token & Chat ID.[/dim white]\n")
             
@@ -6843,110 +6813,34 @@ def manage_ai_api_keys():
             send_telegram_bug_report("TEST_PING", "Telegram Bot Connection Verified Successfully!", "Telegram Bot Config Test", "FeaturesticLeaks.py", "6699", "manage_ai_api_keys", "No errors! Bot is connected and working.")
             console.print("[dim white]All unhandled errors anywhere on user devices will now instantly land on your Telegram![/dim white]")
             time.sleep(1.5)
-        elif choice == '5':
-            console.print("\n[bold cyan]⚡ Live Testing All Saved API Keys & OpenCode Endpoint...[/bold cyan]")
-            all_dead = True
-            all_keys_list = []
-            for p_name in ["google", "groq", "openrouter"]:
-                for k in cfg.get("keys", {}).get(p_name, []):
-                    all_keys_list.append((p_name, k))
-            
-            # Test OpenCode Custom Endpoint
-            oc_ep = cfg.get("opencode_endpoint", "https://api.opencode.ai/v1").rstrip('/')
-            if not oc_ep.endswith("/chat/completions"):
-                oc_ep += "/chat/completions"
-            oc_m = cfg.get("opencode_model", "opencode-modding-v1")
-            oc_k = cfg.get("opencode_api_key", "")
-            try:
-                headers = {"Content-Type": "application/json"}
-                if oc_k:
-                    headers["Authorization"] = f"Bearer {oc_k}"
-                res = requests.post(oc_ep, json={"model": oc_m, "messages": [{"role": "user", "content": "hi"}]}, headers=headers, timeout=8)
-                if res.status_code == 200:
-                    console.print(f" • [bold green]OpenCode Custom Endpoint ({oc_m}): ✅ ACTIVE & WORKING[/bold green]")
-                    all_dead = False
-                else:
-                    console.print(f" • [bold yellow]OpenCode Custom Endpoint ({oc_m}): HTTP {res.status_code} response[/bold yellow]")
-            except Exception as ex_oc:
-                console.print(f" • [bold dim yellow]OpenCode Custom Endpoint note: {ex_oc}[/bold dim yellow]")
-
-            if not all_keys_list and all_dead:
-                console.print("[bold yellow]⚠️ No external API keys saved yet! Option [1] se Google Gemini key paste karein ya OpenCode use karein.[/bold yellow]")
-            else:
-                for p_name, k in all_keys_list:
-                    k_hint = k[:6] + "..." + k[-4:] if len(k) > 10 else k
-                    try:
-                        if p_name == "google":
-                            url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-8b:generateContent?key={k}"
-                            res = requests.post(url, json={"contents": [{"parts": [{"text": "hi"}]}]}, timeout=10)
-                            if res.status_code == 200:
-                                console.print(f" • [bold green]Google Gemini Key ({k_hint}): ✅ ACTIVE & WORKING[/bold green]")
-                                all_dead = False
-                            else:
-                                console.print(f" • [bold red]Google Gemini Key ({k_hint}): ❌ EXHAUSTED / RATE LIMITED (HTTP {res.status_code})[/bold red]")
-                        elif p_name == "groq":
-                            url = "https://api.groq.com/openai/v1/chat/completions"
-                            res = requests.post(url, headers={"Authorization": f"Bearer {k}"}, json={"model": "llama-3.1-8b-instant", "messages": [{"role": "user", "content": "hi"}]}, timeout=10)
-                            if res.status_code == 200:
-                                console.print(f" • [bold green]Groq Key ({k_hint}): ✅ ACTIVE & WORKING[/bold green]")
-                                all_dead = False
-                            else:
-                                console.print(f" • [bold red]Groq Key ({k_hint}): ❌ EXHAUSTED / RATE LIMITED (HTTP {res.status_code})[/bold red]")
-                        elif p_name == "openrouter":
-                            url = "https://openrouter.ai/api/v1/chat/completions"
-                            res = requests.post(url, headers={"Authorization": f"Bearer {k}"}, json={"model": "google/gemini-flash-1.5-8b", "messages": [{"role": "user", "content": "hi"}]}, timeout=10)
-                            if res.status_code == 200:
-                                console.print(f" • [bold green]OpenRouter Key ({k_hint}): ✅ ACTIVE & WORKING[/bold green]")
-                                all_dead = False
-                            else:
-                                console.print(f" • [bold red]OpenRouter Key ({k_hint}): ❌ EXHAUSTED / RATE LIMITED (HTTP {res.status_code})[/bold red]")
-                    except Exception as e_k:
-                        console.print(f" • [bold red]{p_name.capitalize()} Key ({k_hint}): ❌ Error: {e_k}[/bold red]")
-
-            if all_dead and all_keys_list:
-                console.print("\n[bold red]🚨 ALERT: SAARE API KEYS EXHAUSTED YA RATE LIMITED HO GAYE HAIN![/bold red]")
-                console.print("[dim white]OpenCode Custom Model [7] select karein ya naye free API key add karein.[/dim white]")
-            time.sleep(2)
-        elif choice == '6':
+        elif choice == '4':
             console.print("\n[bold cyan]👤 Set Your Telegram Username:[/bold cyan]")
             console.print("[dim white]Enter your Telegram Handle (e.g. @itzraviking). This will be attached to all automated Telegram bug reports from your device so the developer can contact you directly.[/dim white]\n")
             curr_tg = cfg.get("telegram_username") or cfg.get("user_nickname", "")
-            if curr_tg:
-                console.print(f"[bold white]Current Telegram Username:[/bold white] [bold yellow]{curr_tg}[/bold yellow]")
+            console.print(f"[bold white]Current Telegram Username:[/bold white] [bold yellow]{curr_tg}[/bold yellow]")
             new_tg = safe_input("-> Enter your Telegram Username (e.g. @itzraviking): ").strip()
             if new_tg:
-                if not new_tg.startswith("@") and " " not in new_tg and not new_tg.startswith("http"):
-                    new_tg = f"@{new_tg}"
+                if not new_tg.startswith("@"):
+                    new_tg = "@" + new_tg
                 cfg["telegram_username"] = new_tg
-                cfg["user_nickname"] = new_tg
                 save_ai_config(cfg)
                 console.print(f"[bold green]✅ Telegram Username saved as '{new_tg}'![/bold green]")
                 console.print("[dim white]Developer will now see this tag in all error reports from your app![/dim white]")
             time.sleep(1.5)
-        elif choice == '7':
-            console.print("\n[bold cyan]🚀 Configure OpenCode Custom AI Model Endpoint:[/bold cyan]")
-            console.print("[dim white]Connect custom OpenAI-compatible server, OpenCode endpoint, Ollama or custom proxy.[/dim white]\n")
-            curr_ep = cfg.get("opencode_endpoint", "https://api.opencode.ai/v1")
-            curr_mod = cfg.get("opencode_model", "opencode-modding-v1")
-            curr_key = cfg.get("opencode_api_key", "")
-            console.print(f"[bold white]Current Endpoint URL:[/bold white] [bright_yellow]{curr_ep}[/bright_yellow]")
-            console.print(f"[bold white]Current Model Name:[/bold white] [bright_yellow]{curr_mod}[/bright_yellow]")
-            
-            ep_in = safe_input("-> Enter OpenCode Base URL (press Enter to keep current): ").strip()
-            mod_in = safe_input("-> Enter Model Name (e.g. opencode-modding-v1, qwen2.5-coder): ").strip()
-            key_in = safe_input("-> Enter API Key / Token (optional, press Enter to keep current): ").strip()
-            
-            if ep_in:
-                cfg["opencode_endpoint"] = ep_in
-            if mod_in:
-                cfg["opencode_model"] = mod_in
-            if key_in:
-                cfg["opencode_api_key"] = key_in
-            
-            cfg["active_provider"] = "opencode"
-            save_ai_config(cfg)
-            console.print(f"[bold green]✅ OpenCode Custom Model configured and set as Active Provider![/bold green]")
-            time.sleep(1.5)
+        elif choice == '5':
+            console.print("\n[bold cyan]Select Active Provider Engine:[/bold cyan]")
+            console.print("  [1] OpenCode Custom AI (Recommended)")
+            console.print("  [2] Google Gemini")
+            console.print("  [3] Groq Cloud")
+            console.print("  [4] OpenRouter")
+            p_choice = safe_input("-> Select Active Provider [1-4]: ").strip()
+            prov_map = {"1": "opencode", "2": "google", "3": "groq", "4": "openrouter"}
+            prov = prov_map.get(p_choice)
+            if prov:
+                cfg["active_provider"] = prov
+                save_ai_config(cfg)
+                console.print(f"[bold green]✅ Active provider set to {prov.upper()}![/bold green]")
+            time.sleep(1)
         elif choice == '0':
             break
 
