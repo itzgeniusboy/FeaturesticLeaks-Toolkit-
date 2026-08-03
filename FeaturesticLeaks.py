@@ -6788,6 +6788,7 @@ def manage_ai_api_keys():
             "[bold bright_cyan]🤖 OPENCODE UNLIMITED AI MODEL & API MANAGER 🤖[/bold bright_cyan]\n\n"
             "[bold white]🚀 Primary OpenCode Custom Engine (No API Exhaustion / Rate Limits):[/bold white]\n"
             " • [bold bright_yellow]OpenCode Endpoint:[bold /yellow]  [bold underline bright_green]https://api.opencode.ai/v1[/bold underline bright_green]\n"
+            " • [bold bright_yellow]🔑 OpenCode Auth Link:[bold /yellow] [bold underline bright_cyan]https://opencode.ai/auth[/bold underline bright_cyan]\n"
             " • [bold bright_yellow]Custom Model Name:[bold /yellow]  [bold bright_white]opencode-modding-v1 / qwen2.5-coder / custom[/bold bright_white]\n"
             " • [bold bright_yellow]API Key / Token:[bold /yellow]    [bold bright_green]Unlimited Custom Tokens / OpenCode Key[/bold bright_green]\n\n"
             "[dim white]OpenCode AI runs smoothly across all device modding tasks & auto-reports errors to Telegram![/dim white]",
@@ -6829,7 +6830,8 @@ def manage_ai_api_keys():
         choice = safe_input("\n-> Select Option [0-5]: ").strip()
         if choice == '1':
             console.print("\n[bold cyan]🚀 Configure OpenCode Custom AI Model Endpoint:[/bold cyan]")
-            console.print("[dim white]Connect custom OpenCode endpoint, local server, or OpenAI-compatible proxy.[/dim white]\n")
+            console.print("[dim white]Connect custom OpenCode endpoint, local server, or OpenAI-compatible proxy.[/dim white]")
+            console.print("[bold yellow]🔑 Get OpenCode API Key Direct Link:[bold /yellow] [bold underline bright_cyan]https://opencode.ai/auth[/bold underline bright_cyan]\n")
             curr_ep = cfg.get("opencode_endpoint", "https://api.opencode.ai/v1")
             curr_mod = cfg.get("opencode_model", "opencode-modding-v1")
             curr_key = cfg.get("opencode_api_key", "")
@@ -8087,39 +8089,7 @@ def run_ai_chat_mode(data_path: Path):
 
 
 def ai_tools_menu(data_path: Path):
-    while True:
-        print_banner()
-        menu_table = Table(
-            title="[bold bright_cyan]🤖 AI TOOLS & MULTI-API MANAGER 🤖[/bold bright_cyan]",
-            show_header=True,
-            header_style="bold bright_cyan",
-            box=ROUNDED,
-            border_style="bright_cyan",
-            expand=True
-        )
-        menu_table.add_column("OPT", justify="center", width=8, style="bold bright_yellow")
-        menu_table.add_column("COMMAND", justify="left", width=26, style="bold bright_white")
-        menu_table.add_column("DESCRIPTION", justify="left", style="bright_cyan")
-
-        menu_table.add_row("[1]", "AI Modding Assistant & Chat 🤖", "Real-time AI watcher, Chat companion, PAK/Lua auto-fix & Lua repair")
-        menu_table.add_row("[2]", "Manage AI API Keys & Telegram 🔑", "Setup Gemini/Groq keys & Telegram Auto-Report Bot")
-        menu_table.add_row("[0]", "EXIT ✗", "Return to Main Menu")
-
-        console.print(menu_table)
-        console.print()
-        choice = safe_input('\033[1;36mSELECT OPTION [1-2] [0]: \033[0m').strip()
-
-        if choice == '1':
-            run_ai_watch_assistant(data_path)
-            safe_input('\nPress Enter to continue...')
-        elif choice == '2':
-            manage_ai_api_keys()
-            safe_input('\nPress Enter to continue...')
-        elif choice == '0':
-            break
-        else:
-            console.print('[bold red][X] Invalid choice.[/bold red]')
-            time.sleep(1)
+    manage_ai_api_keys()
 
 
 _BOOTED = False
@@ -8281,7 +8251,7 @@ def main_menu():
         elif choice == '3':
             lua_tools_menu(data_path)
         elif choice == '4':
-            ai_tools_menu(data_path)
+            manage_ai_api_keys()
         elif choice.lower() in ['u', 'update', 'autoupdate', 'auto-update']:
             check_and_auto_update(interactive=True)
             safe_input('\nPress Enter to continue...')
