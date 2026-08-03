@@ -2673,7 +2673,7 @@ def _pseudo_decompile_lua(proto, depth: int = 0, func_name: str = "main") -> str
     lines.append(f"{indent}end")
     return "\n".join(lines)
 
-def fix_lua_syntax_for_lua51(lua_file: Path) -> Path:
+def fix_lua_syntax_for_lua51(lua_file: Path, in_place: bool = True) -> Path:
     """Preprocesses .lua file to fix standard Lua 5.1 incompatible syntax like 'continue', bitwise operators, and excessive 'local' declarations (>200 limits)."""
     try:
         text = lua_file.read_text(encoding="utf-8", errors="ignore")
@@ -2728,9 +2728,20 @@ def fix_lua_syntax_for_lua51(lua_file: Path) -> Path:
         for i in range(len(tokens) - 1, -1, -1):
             masked_text = masked_text.replace(f"__LUA_TOK_{i}__", tokens[i])
 
-        out_file = lua_file.parent / f"{lua_file.stem}_fixed51.lua"
-        out_file.write_text(masked_text, encoding="utf-8")
-        return out_file
+        if in_place:
+            lua_file.write_text(masked_text, encoding="utf-8")
+            # Clean up any leftover _fixed51 file if it exists
+            old_fixed = lua_file.parent / f"{lua_file.stem}_fixed51.lua"
+            if old_fixed.exists() and old_fixed != lua_file:
+                try:
+                    old_fixed.unlink()
+                except Exception:
+                    pass
+            return lua_file
+        else:
+            out_file = lua_file.parent / f"{lua_file.stem}_fixed51.lua"
+            out_file.write_text(masked_text, encoding="utf-8")
+            return out_file
     except Exception:
         return lua_file
 
@@ -6296,22 +6307,33 @@ def pak_obb_tools_menu(data_path: Path):
                     safe_input('\nPress Enter to continue...')
                     continue
 
+                sd_rep = Path("/sdcard/FeaturesticLeaks/REPLACE")
+                dp_rep = data_path / "REPLACE"
+                if sd_rep.exists() and dp_rep.exists():
+                    sd_names = {p.name for p in sd_rep.rglob('*') if p.is_file()}
+                    for dp_f in list(dp_rep.rglob('*')):
+                        if dp_f.is_file() and dp_f.name not in sd_names:
+                            try:
+                                dp_f.unlink()
+                            except Exception:
+                                pass
+
                 cand_dirs = [
                     Path("/sdcard/FeaturesticLeaks/REPLACE"),
                     data_path / "REPLACE",
                     Path("/sdcard/FeaturesticLeaks/PAK_WORKSPACE/3_REPLACE"),
-                    data_path / "PAK_WORKSPACE" / "3_REPLACE",
-                    Path("/sdcard/FeaturesticLeaks/INJECT"),
-                    data_path / "INJECT",
-                    Path("/sdcard/FeaturesticLeaks/PAK_WORKSPACE/4_INJECT"),
-                    data_path / "PAK_WORKSPACE" / "4_INJECT",
-                    Path("/sdcard/FeaturesticLeaks/LUA"),
-                    data_path / "LUA"
+                    data_path / "PAK_WORKSPACE" / "3_REPLACE"
                 ]
                 actual_edit_path = None
                 ignored_names = {'.gitkeep', '.ds_store', 'desktop.ini', 'thumbs.db'}
                 for cd in cand_dirs:
                     if cd.exists():
+                        for tmp_f in list(cd.rglob('*')):
+                            if tmp_f.is_file() and (tmp_f.name.endswith('_fixed51.lua') or tmp_f.name.endswith('.tmp_luac') or tmp_f.name.endswith('.tmp')):
+                                try:
+                                    tmp_f.unlink()
+                                except Exception:
+                                    pass
                         valid_files = [p for p in cd.rglob('*') if p.is_file() and p.name.lower() not in ignored_names and not p.name.startswith('.')]
                         if valid_files:
                             actual_edit_path = cd
@@ -6375,22 +6397,33 @@ def pak_obb_tools_menu(data_path: Path):
                     safe_input('\nPress Enter to continue...')
                     continue
 
+                sd_inj = Path("/sdcard/FeaturesticLeaks/INJECT")
+                dp_inj = data_path / "INJECT"
+                if sd_inj.exists() and dp_inj.exists():
+                    sd_names = {p.name for p in sd_inj.rglob('*') if p.is_file()}
+                    for dp_f in list(dp_inj.rglob('*')):
+                        if dp_f.is_file() and dp_f.name not in sd_names:
+                            try:
+                                dp_f.unlink()
+                            except Exception:
+                                pass
+
                 cand_dirs = [
                     Path("/sdcard/FeaturesticLeaks/INJECT"),
                     data_path / "INJECT",
                     Path("/sdcard/FeaturesticLeaks/PAK_WORKSPACE/4_INJECT"),
-                    data_path / "PAK_WORKSPACE" / "4_INJECT",
-                    Path("/sdcard/FeaturesticLeaks/LUA"),
-                    data_path / "LUA",
-                    Path("/sdcard/FeaturesticLeaks/REPLACE"),
-                    data_path / "REPLACE",
-                    Path("/sdcard/FeaturesticLeaks/PAK_WORKSPACE/3_REPLACE"),
-                    data_path / "PAK_WORKSPACE" / "3_REPLACE"
+                    data_path / "PAK_WORKSPACE" / "4_INJECT"
                 ]
                 actual_edit_path = None
                 ignored_names = {'.gitkeep', '.ds_store', 'desktop.ini', 'thumbs.db'}
                 for cd in cand_dirs:
                     if cd.exists():
+                        for tmp_f in list(cd.rglob('*')):
+                            if tmp_f.is_file() and (tmp_f.name.endswith('_fixed51.lua') or tmp_f.name.endswith('.tmp_luac') or tmp_f.name.endswith('.tmp')):
+                                try:
+                                    tmp_f.unlink()
+                                except Exception:
+                                    pass
                         valid_files = [p for p in cd.rglob('*') if p.is_file() and p.name.lower() not in ignored_names and not p.name.startswith('.')]
                         if valid_files:
                             actual_edit_path = cd

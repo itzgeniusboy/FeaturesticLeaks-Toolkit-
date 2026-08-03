@@ -139,7 +139,7 @@ Tool launch hote hi SDCard (`/sdcard/FeaturesticLeaks/`) me structured workspace
 1. **Multi-Threaded PAK Unpacker**: Multi-threaded engine (up to 32 worker threads) supporting SM4/AES decryption, Zstandard/OBB decompression, and automatic CRC32 stem hash auto-repair for corrupt PAK headers.
 2. **Repack All Types PAKs**: Auto-detects container modes (`MINI_OBB`, `GAMEPATCH`, `OBBZSDIC`) and rebuilds container blocks with high efficiency.
 3. **Replace Existing Files**: Size-independent byte replacer that modifies existing PAK files without crash or header corruption issues.
-4. **Inject Path (New Files)**: Direct path injector for inserting custom files/folders directly into target internal game directories (e.g., `Content/Lua/GameLua/Mod/...`).
+4. **Inject Path (New Files)**: Direct path injector for inserting custom files/folders directly into target internal game directories (e.g., `Content/Lua/GameLua/Mod/...`). Features auto-in-place Lua 5.1 syntax repair, temporary file auto-cleanup, and strict workspace sync so deleted files never get re-injected.
 5. **One-Click Mods**: White body mesh nuller & character asset converter.
 6. **Skin ID Swap & Asset Dumper**:
    - Swaps Lobby, Ingame, Weapon, Hit Effect & Deadbox skin IDs inside `.uasset` / `.uexp` binaries.

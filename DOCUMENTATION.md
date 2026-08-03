@@ -200,7 +200,13 @@ Option `2` chunte hi aapko 3 Modes milenge:
 ### **Q1: Tool ko update kaise karein?**
 * **Answer**: Main Menu me **`U`** type karein ya **Utilities & Help -> Option [9] Check Tool Update 🚀** select karein. Tool automatically GitHub se verified update pull karke auto-restart ho jayega.
 
-### **Q2: File Manager me folders clean kaise rahte hain?**
+### **Q2: User dwara file delete karne ke baad bhi same file kyon inject ho rahi thi aur ab kaise fixed hai?**
+* **Answer**: Pehle Lua pre-processing option `_fixed51.lua` aur temporary `.tmp_luac` files create karta tha, aur secondary fallback search paths (`INJECT`, `REPLACE`, `LUA`) ke karan agar kisi ek internal folder me purani file bachi hoti thi toh tool usko detect kar leta tha. Ab tool me:
+  1. Strict folder isolation apply kar di gayi hai (`REPLACE` sirf replace folders dekhega aur `INJECT` sirf inject folders).
+  2. `/sdcard/FeaturesticLeaks/` SDCard folder aur internal workspace folders me automatic deletion synchronization lagayi gayi hai (jab user SDCard se file delete karega toh internal directory se bhi purani file auto-delete ho jayegi).
+  3. All temporary `_fixed51.lua` aur `.tmp_luac` files directly in-place update honge aur temporary leftovers script process hotes hi auto-cleanup honge.
+
+### **Q3: File Manager me folders clean kaise rahte hain?**
 * **Answer**: Purane bikhre hue folders auto-clean ho chuke hain! Ab sirf do organized main folders **`PAK_WORKSPACE`** aur **`LUA_WORKSPACE`** rahenge, jiske andar numeric sub-folders (`1_PAK_INPUT`, `2_UNPACK`, `3_REPLACE`, `4_INJECT`, `5_RESULT`) honge.
 
 ### **Q3: Bug report developer ko kaise jata hai?**
