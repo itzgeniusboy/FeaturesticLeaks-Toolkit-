@@ -8262,21 +8262,25 @@ def main_menu():
         menu_table.add_column("CATEGORY", justify="left", width=22, style="bold bright_white")
         menu_table.add_column("DESCRIPTION", justify="left", style="bright_cyan")
 
-        menu_table.add_row("[1]", "PAK Tools 📦", "Unpack, Repack, Replace & Inject PAK/OBB")
-        menu_table.add_row("[2]", "LUA Tools 🌙", "Compile, Decompile & Auto 1-Click Lua Workflow")
-        menu_table.add_row("[3]", "AI Tools & Companion 🤖", "AI Modding Watcher, Chat AI Companion & Multi-API Keys")
+        menu_table.add_row("[1]", "AI Assistant & Modder 🤖", "1-Click AI Companion for Auto Unpack, Repack, Lua Inject & Modding")
+        menu_table.add_row("[2]", "PAK Tools 📦", "Unpack, Repack, Replace & Inject PAK/OBB")
+        menu_table.add_row("[3]", "LUA Tools 🌙", "Compile, Decompile & Auto 1-Click Lua Workflow")
+        menu_table.add_row("[4]", "AI API & Settings 🔑", "Manage Gemini/Groq keys, Telegram Bot & AI Settings")
         menu_table.add_row("[U]", "Auto-Update 🚀", "Check & install latest GitHub version")
         menu_table.add_row("[0]", "EXIT ✗", "Close application")
 
         console.print(menu_table)
         console.print()
-        choice = safe_input('\033[1;36mSELECT OPTION [1-3 / U] [0]: \033[0m').strip()
+        choice = safe_input('\033[1;36mSELECT OPTION [1-4 / U] [0]: \033[0m').strip()
 
         if choice == '1':
-            pak_obb_tools_menu(data_path)
+            run_ai_watch_assistant(data_path)
+            safe_input('\nPress Enter to return to main menu...')
         elif choice == '2':
-            lua_tools_menu(data_path)
+            pak_obb_tools_menu(data_path)
         elif choice == '3':
+            lua_tools_menu(data_path)
+        elif choice == '4':
             ai_tools_menu(data_path)
         elif choice.lower() in ['u', 'update', 'autoupdate', 'auto-update']:
             check_and_auto_update(interactive=True)
