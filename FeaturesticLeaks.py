@@ -6175,15 +6175,14 @@ def pak_obb_tools_menu(data_path: Path):
 
         menu_table.add_row("[1]", "Unpack Package", "Extract PAK / OBB package contents to workspace")
         menu_table.add_row("[2]", "Repack & Inject", "Repack workspace, replace edited files, or inject custom path")
-        menu_table.add_row("[3]", "One-Click Game Mods", "White Body / Item Nuller & Skin ID Swapper")
-        menu_table.add_row("[4]", "OBB Manager", "Unzip & Rezip OBB with size padding")
-        menu_table.add_row("[5]", "PAK Compare & Dump", "Compare 2 PAKs or dump index / offsets / hashes")
-        menu_table.add_row("[6]", "File Resizer & Equalizer", "Match exact byte size of any file (PAK, OBB, LUA)")
+        menu_table.add_row("[3]", "OBB Manager", "Unzip & Rezip OBB with size padding")
+        menu_table.add_row("[4]", "PAK Compare & Dump", "Compare 2 PAKs or dump index / offsets / hashes")
+        menu_table.add_row("[5]", "File Resizer & Equalizer", "Match exact byte size of any file (PAK, OBB, LUA)")
         menu_table.add_row("[0]", "EXIT ✗", "Return to Main Menu")
 
         console.print(menu_table)
         console.print()
-        choice = safe_input('\033[1;36mSELECT OPTION [1-6] [0]: \033[0m').strip()
+        choice = safe_input('\033[1;36mSELECT OPTION [1-5] [0]: \033[0m').strip()
 
         if choice == '1':
             pak_dir = data_path / "PAK"
@@ -6570,25 +6569,14 @@ def pak_obb_tools_menu(data_path: Path):
                 safe_input('\nPress Enter to continue...')
 
         elif choice == '3':
-            console.print("\n[bold cyan]🎨 ONE-CLICK GAME MODS:[/bold cyan]")
-            console.print("  [1] White Body & Gear Asset Nuller Mod")
-            console.print("  [2] Skin ID Swapper (Lobby / Ingame / Weapon)")
-            sub_c = safe_input("\n-> Select Mod [1-2] [1]: ").strip() or '1'
-            if sub_c == '1':
-                run_white_body_mod(data_path)
-            else:
-                run_skin_id_modder(data_path)
-            safe_input('\nPress Enter to continue...')
-
-        elif choice == '4':
             run_obb_manager(data_path)
             safe_input('\nPress Enter to continue...')
 
-        elif choice == '5':
+        elif choice == '4':
             run_pak_compare_dumper(data_path)
             safe_input('\nPress Enter to continue...')
 
-        elif choice == '6':
+        elif choice == '5':
             run_file_resizer_tool(data_path)
             safe_input('\nPress Enter to continue...')
 
@@ -7186,7 +7174,7 @@ def lua_tools_menu(data_path: Path):
     while True:
         print_banner()
         menu_table = Table(
-            title="[bold bright_cyan]🌙 LUA MASTER SUITE 🌙[/bold bright_cyan]",
+            title="[bold bright_cyan]🌙 LUA TOOLS SUITE 🌙[/bold bright_cyan]",
             show_header=True,
             header_style="bold bright_cyan",
             box=ROUNDED,
@@ -7197,20 +7185,15 @@ def lua_tools_menu(data_path: Path):
         menu_table.add_column("COMMAND", justify="left", width=24, style="bold bright_white")
         menu_table.add_column("DESCRIPTION", justify="left", style="bright_cyan")
 
-        menu_table.add_row("[1]", "Decompile & Fix Lua", "Decompile .luac bytecode to .lua source & repair headers")
-        menu_table.add_row("[2]", "Compile Lua Source", "Convert .lua source code to .luac bytecode")
-        menu_table.add_row("[3]", "Merge & Create GG Menu", "Combine multiple .lua scripts into GameGuard Menu Studio")
-        menu_table.add_row("[4]", "PAK & Lua Installer Tool", "Embed PAK inside Lua installer OR extract PAK from script")
-        menu_table.add_row("[5]", "Universal Lua Packer", "Pack or unpack Lua scripts with 8-byte magic tags")
-        menu_table.add_row("[6]", "Security & Protection", "String obfuscator, security audit & bytecode header repair")
-        menu_table.add_row("[7]", "Minifier & GG Code Studio", "Minify/Clean Lua scripts & Generate GG Memory Code")
-        menu_table.add_row("[8]", "1-Click Auto Lua Workflow", "Auto-fix syntax -> Auto-compile -> Auto-sync to all folders")
-        menu_table.add_row("[9]", "🤖 AI-Assisted Lua Repair", "Fix broken Lua syntax & manage multi-API keys (Google/Groq)")
+        menu_table.add_row("[1]", "Decompile Lua (.luac)", "Decompile .luac bytecode to .lua source")
+        menu_table.add_row("[2]", "Compile Lua (.lua)", "Convert .lua source code to .luac bytecode")
+        menu_table.add_row("[3]", "1-Click Auto Lua Workflow", "Auto-fix syntax, compile & sync to output folder")
+        menu_table.add_row("[4]", "Advanced Lua Tools Studio 🛠️", "Merger, Installer, Universal Packer, Obfuscator & Minifier")
         menu_table.add_row("[0]", "EXIT ✗", "Return to Main Menu")
 
         console.print(menu_table)
         console.print()
-        choice = safe_input('\033[1;36mSELECT OPTION [1-9] [0]: \033[0m').strip()
+        choice = safe_input('\033[1;36mSELECT OPTION [1-4] [0]: \033[0m').strip()
 
         if choice == '1':
             run_lua_decompiler(data_path)
@@ -7219,63 +7202,68 @@ def lua_tools_menu(data_path: Path):
             run_lua_compiler(data_path)
             safe_input('\nPress Enter to continue...')
         elif choice == '3':
-            run_lua_script_merger(data_path)
-            safe_input('\nPress Enter to continue...')
-        elif choice == '4':
-            console.print("\n[bold cyan]📦 PAK & LUA PAYLOAD TOOLS:[/bold cyan]")
-            console.print("  [1] Embed PAK into Lua Installer Script")
-            console.print("  [2] Extract PAK Payload from Lua Script")
-            sub_c = safe_input("\n-> Select Option [1-2] [1]: ").strip() or '1'
-            if sub_c == '1':
-                run_pak_lua_embedder(data_path)
-            else:
-                run_lua_pak_extractor(data_path)
-            safe_input('\nPress Enter to continue...')
-        elif choice == '5':
-            console.print("\n[bold cyan]📦 UNIVERSAL LUA PACKER & UNPACKER:[/bold cyan]")
-            console.print("  [1] Unpack Tagged Lua File (Auto-Detect)")
-            console.print("  [2] Pack Lua File (8-Byte Tag / Base64 / Zlib / XOR)")
-            sub_c = safe_input("\n-> Select Option [1-2] [1]: ").strip() or '1'
-            if sub_c == '1':
-                run_universal_lua_unpack(data_path)
-            else:
-                run_universal_lua_pack(data_path)
-            safe_input('\nPress Enter to continue...')
-        elif choice == '6':
-            console.print("\n[bold cyan]🔐 LUA SECURITY & PROTECTION TOOLS:[/bold cyan]")
-            console.print("  [1] String Obfuscator (Encrypt strings & URLs)")
-            console.print("  [2] Anti-Bypass Security Audit (Check GG calls & risks)")
-            console.print("  [3] Bytecode Header Fixer (Repair Lua 5.1/5.3 headers)")
-            sub_c = safe_input("\n-> Select Option [1-3] [1]: ").strip() or '1'
-            if sub_c == '1':
-                run_lua_string_obfuscator(data_path)
-            elif sub_c == '2':
-                run_lua_anti_bypass_analyzer(data_path)
-            else:
-                run_lua_header_fixer(data_path)
-            safe_input('\nPress Enter to continue...')
-        elif choice == '7':
-            console.print("\n[bold cyan]⚡ MINIFIER & GG CODE STUDIO:[/bold cyan]")
-            console.print("  [1] Minify, Clean & Pre-Flight Check Lua Script")
-            console.print("  [2] Generate GG Memory Code Templates (Search, Edit, Freeze, Speedhack)")
-            sub_c = safe_input("\n-> Select Option [1-2] [1]: ").strip() or '1'
-            if sub_c == '1':
-                run_lua_script_optimizer(data_path)
-            else:
-                run_gg_code_generator(data_path)
-            safe_input('\nPress Enter to continue...')
-        elif choice == '8':
             run_one_click_auto_lua_workflow(data_path)
             safe_input('\nPress Enter to continue...')
-        elif choice == '9':
-            console.print("\n[bold cyan]🤖 AI-ASSISTED LUA ENGINE & API MANAGER:[/bold cyan]")
-            console.print("  [1] Run AI-Assisted Lua Repair & Syntax Fixer")
-            console.print("  [2] Manage AI API Keys & Active Provider (Google / Groq / OpenRouter)")
-            sub_c = safe_input("\n-> Select Option [1-2] [1]: ").strip() or '1'
+        elif choice == '4':
+            print_banner()
+            adv_table = Table(
+                title="[bold bright_cyan]🛠️ ADVANCED LUA TOOLS STUDIO 🛠️[/bold bright_cyan]",
+                box=ROUNDED,
+                border_style="cyan",
+                expand=True
+            )
+            adv_table.add_column("OPT", justify="center", width=8, style="bold yellow")
+            adv_table.add_column("TOOL NAME", justify="left", style="bold white")
+            adv_table.add_row("[1]", "Merge & Create GG Menu Studio")
+            adv_table.add_row("[2]", "PAK & Lua Installer Tool (Embed/Extract)")
+            adv_table.add_row("[3]", "Universal Lua Packer & Unpacker")
+            adv_table.add_row("[4]", "Lua Security & String Obfuscator")
+            adv_table.add_row("[5]", "Minifier & GG Code Generator")
+            adv_table.add_row("[0]", "Back")
+            console.print(adv_table)
+            
+            sub_c = safe_input("\n-> Select Option [1-5] [0]: ").strip()
             if sub_c == '1':
-                run_ai_assisted_lua_repair(data_path)
-            else:
-                manage_ai_api_keys()
+                run_lua_script_merger(data_path)
+            elif sub_c == '2':
+                console.print("\n[bold cyan]📦 PAK & LUA PAYLOAD TOOLS:[/bold cyan]")
+                console.print("  [1] Embed PAK into Lua Installer Script")
+                console.print("  [2] Extract PAK Payload from Lua Script")
+                embed_c = safe_input("\n-> Select Option [1-2] [1]: ").strip() or '1'
+                if embed_c == '1':
+                    run_pak_lua_embedder(data_path)
+                else:
+                    run_lua_pak_extractor(data_path)
+            elif sub_c == '3':
+                console.print("\n[bold cyan]📦 UNIVERSAL LUA PACKER & UNPACKER:[/bold cyan]")
+                console.print("  [1] Unpack Tagged Lua File (Auto-Detect)")
+                console.print("  [2] Pack Lua File (8-Byte Tag / Base64 / Zlib / XOR)")
+                pack_c = safe_input("\n-> Select Option [1-2] [1]: ").strip() or '1'
+                if pack_c == '1':
+                    run_universal_lua_unpack(data_path)
+                else:
+                    run_universal_lua_pack(data_path)
+            elif sub_c == '4':
+                console.print("\n[bold cyan]🔐 LUA SECURITY & PROTECTION TOOLS:[/bold cyan]")
+                console.print("  [1] String Obfuscator (Encrypt strings & URLs)")
+                console.print("  [2] Anti-Bypass Security Audit (Check GG calls & risks)")
+                console.print("  [3] Bytecode Header Fixer (Repair Lua 5.1/5.3 headers)")
+                sec_c = safe_input("\n-> Select Option [1-3] [1]: ").strip() or '1'
+                if sec_c == '1':
+                    run_lua_string_obfuscator(data_path)
+                elif sec_c == '2':
+                    run_lua_anti_bypass_analyzer(data_path)
+                else:
+                    run_lua_header_fixer(data_path)
+            elif sub_c == '5':
+                console.print("\n[bold cyan]⚡ MINIFIER & GG CODE STUDIO:[/bold cyan]")
+                console.print("  [1] Minify, Clean & Pre-Flight Check Lua Script")
+                console.print("  [2] Generate GG Memory Code Templates")
+                mini_c = safe_input("\n-> Select Option [1-2] [1]: ").strip() or '1'
+                if mini_c == '1':
+                    run_lua_script_optimizer(data_path)
+                else:
+                    run_gg_code_generator(data_path)
             safe_input('\nPress Enter to continue...')
         elif choice == '0':
             break
@@ -8161,26 +8149,18 @@ def ai_tools_menu(data_path: Path):
         menu_table.add_column("COMMAND", justify="left", width=26, style="bold bright_white")
         menu_table.add_column("DESCRIPTION", justify="left", style="bright_cyan")
 
-        menu_table.add_row("[1]", "AI Modding Assistant 🤖", "Real-time AI watcher, folder auto-fix & voice/text commands")
-        menu_table.add_row("[2]", "Friendly AI Chat Companion 💬", "Talk to AI directly & command actions ('lua pack', 'pak unpack')")
-        menu_table.add_row("[3]", "AI-Assisted Lua Repair 🛠️", "Fix broken Lua syntax, missing ends & GG errors")
-        menu_table.add_row("[4]", "Manage AI API Keys & Telegram 🔑", "Setup Gemini/Groq keys & Telegram Auto-Report Bot")
+        menu_table.add_row("[1]", "AI Modding Assistant & Chat 🤖", "Real-time AI watcher, Chat companion, PAK/Lua auto-fix & Lua repair")
+        menu_table.add_row("[2]", "Manage AI API Keys & Telegram 🔑", "Setup Gemini/Groq keys & Telegram Auto-Report Bot")
         menu_table.add_row("[0]", "EXIT ✗", "Return to Main Menu")
 
         console.print(menu_table)
         console.print()
-        choice = safe_input('\033[1;36mSELECT OPTION [1-4] [0]: \033[0m').strip()
+        choice = safe_input('\033[1;36mSELECT OPTION [1-2] [0]: \033[0m').strip()
 
         if choice == '1':
             run_ai_watch_assistant(data_path)
             safe_input('\nPress Enter to continue...')
         elif choice == '2':
-            run_ai_chat_mode(data_path)
-            safe_input('\nPress Enter to continue...')
-        elif choice == '3':
-            run_ai_assisted_lua_repair(data_path)
-            safe_input('\nPress Enter to continue...')
-        elif choice == '4':
             manage_ai_api_keys()
             safe_input('\nPress Enter to continue...')
         elif choice == '0':
@@ -8205,51 +8185,31 @@ def utilities_menu(data_path: Path):
             expand=True
         )
         menu_table.add_column("OPT", justify="center", width=8, style="bold bright_yellow")
-        menu_table.add_column("COMMAND", justify="left", width=22, style="bold bright_white")
+        menu_table.add_column("COMMAND", justify="left", width=24, style="bold bright_white")
         menu_table.add_column("DESCRIPTION", justify="left", style="bright_cyan")
 
-        menu_table.add_row("[1]", "UE4 String Tool", "Extract & repack .uasset/.uexp strings")
-        menu_table.add_row("[2]", "File Finder", "Search .uasset/.uexp/.ubulk by pattern")
-        menu_table.add_row("[3]", "File Resizer & Equalizer", "Match exact byte size of any file (PAK, OBB, LUA)")
-        menu_table.add_row("[4]", "Termux Auto-Setup", "Setup 'leak' direct command & SDCard folders")
-        menu_table.add_row("[5]", "Workspace Summary", "Folder guide & live file count summary")
-        menu_table.add_row("[6]", "Beginner Guide & FAQ 🔰", "Beginner Quick Start & Modding Help")
-        menu_table.add_row("[7]", "Cleanup Workspace", "Delete workspace folders")
-        menu_table.add_row("[8]", "Check Tool Update 🚀", "Force update tool to latest GitHub version")
-        menu_table.add_row("[9]", "Diagnostic & Benchmark ⚡", "Check execution speed, RAM & log hygiene")
+        menu_table.add_row("[1]", "Workspace Summary", "Folder guide & live file count summary")
+        menu_table.add_row("[2]", "Beginner Guide & FAQ 🔰", "Beginner Quick Start & Modding Help")
+        menu_table.add_row("[3]", "Refresh Shortcuts & SDCard", "Refresh Termux 'leak' command & workspace folders")
+        menu_table.add_row("[4]", "Cleanup Workspace", "Delete workspace output folders")
         menu_table.add_row("[0]", "EXIT ✗", "Return to Main Menu")
 
         console.print(menu_table)
         console.print()
-        choice = safe_input('\033[1;36mSELECT OPTION [1-9] [0]: \033[0m').strip()
+        choice = safe_input('\033[1;36mSELECT OPTION [1-4] [0]: \033[0m').strip()
 
         if choice == '1':
-            run_ue4_string_tool(data_path)
-            safe_input('\nPress Enter to continue...')
-        elif choice == '2':
-            run_file_finder_tool(data_path)
-            safe_input('\nPress Enter to continue...')
-        elif choice == '3':
-            run_file_resizer_tool(data_path)
-            safe_input('\nPress Enter to continue...')
-        elif choice == '4':
-            install_termux_shortcut_and_sdcard(data_path)
-            safe_input('\nPress Enter to continue...')
-        elif choice == '5':
             print_banner()
             display_workspace_summary(data_path)
             show_workflow_guide()
             safe_input('\nPress Enter to continue...')
-        elif choice == '6':
+        elif choice == '2':
             run_beginner_guide(data_path)
-        elif choice == '7':
+        elif choice == '3':
+            install_termux_shortcut_and_sdcard(data_path)
+            safe_input('\nPress Enter to continue...')
+        elif choice == '4':
             delete_folder(data_path)
-            safe_input('\nPress Enter to continue...')
-        elif choice == '8' or choice.lower() == 'u':
-            check_and_auto_update(interactive=True)
-            safe_input('\nPress Enter to continue...')
-        elif choice == '9':
-            run_diagnostic_benchmark(data_path)
             safe_input('\nPress Enter to continue...')
         elif choice == '0':
             break
@@ -8337,7 +8297,7 @@ def main_menu():
 
     while True:
         print_banner()
-        console.print("[bold bright_cyan]📂 Termux Shortcuts:[bold bright_white] leak pak | leak lua | leak watch | leak ai | leak utils | leak update[/bold bright_white]\n")
+        console.print("[bold bright_cyan]📂 Termux Shortcuts:[bold bright_white] leak pak | leak lua | leak ai | leak utils | leak update[/bold bright_white]\n")
         menu_table = Table(
             title="[bold bright_cyan]⚡ MAIN CATEGORY MENU ⚡[/bold bright_cyan]",
             show_header=True,
@@ -8350,27 +8310,24 @@ def main_menu():
         menu_table.add_column("CATEGORY", justify="left", width=22, style="bold bright_white")
         menu_table.add_column("DESCRIPTION", justify="left", style="bright_cyan")
 
-        menu_table.add_row("[1]", "PAK Tools 📦", "Extract, Repack, Replace & Inject PAK/OBB/Skins")
-        menu_table.add_row("[2]", "LUA Tools 🌙", "Compile, Decompile, Script Merger & Obfuscator")
-        menu_table.add_row("[3]", "Watch Mode 👁️", "Real-time auto-unpack & auto-compile watcher")
-        menu_table.add_row("[4]", "AI Tools 🤖", "AI Lua Repair & Multi-API Key Manager (Gemini/Groq)")
-        menu_table.add_row("[5]", "Utilities 🛠️", "UE4 String Tool, Resizer, File Finder & FAQ Guide")
+        menu_table.add_row("[1]", "PAK Tools 📦", "Unpack, Repack, Replace & Inject PAK/OBB")
+        menu_table.add_row("[2]", "LUA Tools 🌙", "Compile, Decompile & Auto 1-Click Lua Workflow")
+        menu_table.add_row("[3]", "AI Tools & Companion 🤖", "AI Modding Watcher, Chat AI Companion & Multi-API Keys")
+        menu_table.add_row("[4]", "Utilities & Guide 🛠️", "Workspace Summary, Beginner Guide & Termux Setup")
         menu_table.add_row("[U]", "Auto-Update 🚀", "Check & install latest GitHub version")
         menu_table.add_row("[0]", "EXIT ✗", "Close application")
 
         console.print(menu_table)
         console.print()
-        choice = safe_input('\033[1;36mSELECT OPTION [0-5 / U]: \033[0m').strip()
+        choice = safe_input('\033[1;36mSELECT OPTION [1-4 / U] [0]: \033[0m').strip()
 
         if choice == '1':
             pak_obb_tools_menu(data_path)
         elif choice == '2':
             lua_tools_menu(data_path)
         elif choice == '3':
-            watch_mode_menu(data_path)
-        elif choice == '4':
             ai_tools_menu(data_path)
-        elif choice == '5':
+        elif choice == '4':
             utilities_menu(data_path)
         elif choice.lower() in ['u', 'update', 'autoupdate', 'auto-update']:
             check_and_auto_update(interactive=True)
