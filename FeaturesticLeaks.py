@@ -1857,16 +1857,33 @@ def repack_pak_file_with_block_display(pak_file, edited_root: Path, output_path:
         else:
             stem = p.stem.lower()
             ext = p.suffix.lower()
+            found = False
+            # Pass 1: exact stem and ext
             for dir_path, files in pak_file._index.items():
                 for name, entry in files.items():
                     if Path(name).stem.lower() == stem and Path(name).suffix.lower() == ext:
                         full_path = str(PurePath(dir_path) / name).replace('\\', '/')
                         edited[full_path] = (p, entry)
+                        found = True
                         break
-    
+                if found:
+                    break
+            
+            # Pass 2: flexible stem match (e.g. .luac replacing .lua or no extension)
+            if not found:
+                for dir_path, files in pak_file._index.items():
+                    for name, entry in files.items():
+                        if Path(name).stem.lower() == stem:
+                            full_path = str(PurePath(dir_path) / name).replace('\\', '/')
+                            edited[full_path] = (p, entry)
+                            found = True
+                            break
+                    if found:
+                        break
+
     if not edited:
         console.print('[bold red][X] No files to repack![/bold red]')
-        return
+        raise RuntimeError(f"No matching file found in PAK ({pak_file._file_path.name}) for injected files in '{edited_root.name}'")
     
     total_files = len(edited)
     display = SimpleBlockDisplay(total_files, pak_file._file_path.name)
