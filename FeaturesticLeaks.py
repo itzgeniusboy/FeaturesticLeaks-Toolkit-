@@ -6177,12 +6177,11 @@ def pak_obb_tools_menu(data_path: Path):
         menu_table.add_row("[2]", "Repack & Inject", "Repack workspace, replace edited files, or inject custom path")
         menu_table.add_row("[3]", "OBB Manager", "Unzip & Rezip OBB with size padding")
         menu_table.add_row("[4]", "PAK Compare & Dump", "Compare 2 PAKs or dump index / offsets / hashes")
-        menu_table.add_row("[5]", "File Resizer & Equalizer", "Match exact byte size of any file (PAK, OBB, LUA)")
         menu_table.add_row("[0]", "EXIT ✗", "Return to Main Menu")
 
         console.print(menu_table)
         console.print()
-        choice = safe_input('\033[1;36mSELECT OPTION [1-5] [0]: \033[0m').strip()
+        choice = safe_input('\033[1;36mSELECT OPTION [1-4] [0]: \033[0m').strip()
 
         if choice == '1':
             pak_dir = data_path / "PAK"
@@ -6574,10 +6573,6 @@ def pak_obb_tools_menu(data_path: Path):
 
         elif choice == '4':
             run_pak_compare_dumper(data_path)
-            safe_input('\nPress Enter to continue...')
-
-        elif choice == '5':
-            run_file_resizer_tool(data_path)
             safe_input('\nPress Enter to continue...')
 
         elif choice == '0':
@@ -7188,12 +7183,11 @@ def lua_tools_menu(data_path: Path):
         menu_table.add_row("[1]", "Decompile Lua (.luac)", "Decompile .luac bytecode to .lua source")
         menu_table.add_row("[2]", "Compile Lua (.lua)", "Convert .lua source code to .luac bytecode")
         menu_table.add_row("[3]", "1-Click Auto Lua Workflow", "Auto-fix syntax, compile & sync to output folder")
-        menu_table.add_row("[4]", "Advanced Lua Tools Studio 🛠️", "Merger, Installer, Universal Packer, Obfuscator & Minifier")
         menu_table.add_row("[0]", "EXIT ✗", "Return to Main Menu")
 
         console.print(menu_table)
         console.print()
-        choice = safe_input('\033[1;36mSELECT OPTION [1-4] [0]: \033[0m').strip()
+        choice = safe_input('\033[1;36mSELECT OPTION [1-3] [0]: \033[0m').strip()
 
         if choice == '1':
             run_lua_decompiler(data_path)
@@ -7203,67 +7197,6 @@ def lua_tools_menu(data_path: Path):
             safe_input('\nPress Enter to continue...')
         elif choice == '3':
             run_one_click_auto_lua_workflow(data_path)
-            safe_input('\nPress Enter to continue...')
-        elif choice == '4':
-            print_banner()
-            adv_table = Table(
-                title="[bold bright_cyan]🛠️ ADVANCED LUA TOOLS STUDIO 🛠️[/bold bright_cyan]",
-                box=ROUNDED,
-                border_style="cyan",
-                expand=True
-            )
-            adv_table.add_column("OPT", justify="center", width=8, style="bold yellow")
-            adv_table.add_column("TOOL NAME", justify="left", style="bold white")
-            adv_table.add_row("[1]", "Merge & Create GG Menu Studio")
-            adv_table.add_row("[2]", "PAK & Lua Installer Tool (Embed/Extract)")
-            adv_table.add_row("[3]", "Universal Lua Packer & Unpacker")
-            adv_table.add_row("[4]", "Lua Security & String Obfuscator")
-            adv_table.add_row("[5]", "Minifier & GG Code Generator")
-            adv_table.add_row("[0]", "Back")
-            console.print(adv_table)
-            
-            sub_c = safe_input("\n-> Select Option [1-5] [0]: ").strip()
-            if sub_c == '1':
-                run_lua_script_merger(data_path)
-            elif sub_c == '2':
-                console.print("\n[bold cyan]📦 PAK & LUA PAYLOAD TOOLS:[/bold cyan]")
-                console.print("  [1] Embed PAK into Lua Installer Script")
-                console.print("  [2] Extract PAK Payload from Lua Script")
-                embed_c = safe_input("\n-> Select Option [1-2] [1]: ").strip() or '1'
-                if embed_c == '1':
-                    run_pak_lua_embedder(data_path)
-                else:
-                    run_lua_pak_extractor(data_path)
-            elif sub_c == '3':
-                console.print("\n[bold cyan]📦 UNIVERSAL LUA PACKER & UNPACKER:[/bold cyan]")
-                console.print("  [1] Unpack Tagged Lua File (Auto-Detect)")
-                console.print("  [2] Pack Lua File (8-Byte Tag / Base64 / Zlib / XOR)")
-                pack_c = safe_input("\n-> Select Option [1-2] [1]: ").strip() or '1'
-                if pack_c == '1':
-                    run_universal_lua_unpack(data_path)
-                else:
-                    run_universal_lua_pack(data_path)
-            elif sub_c == '4':
-                console.print("\n[bold cyan]🔐 LUA SECURITY & PROTECTION TOOLS:[/bold cyan]")
-                console.print("  [1] String Obfuscator (Encrypt strings & URLs)")
-                console.print("  [2] Anti-Bypass Security Audit (Check GG calls & risks)")
-                console.print("  [3] Bytecode Header Fixer (Repair Lua 5.1/5.3 headers)")
-                sec_c = safe_input("\n-> Select Option [1-3] [1]: ").strip() or '1'
-                if sec_c == '1':
-                    run_lua_string_obfuscator(data_path)
-                elif sec_c == '2':
-                    run_lua_anti_bypass_analyzer(data_path)
-                else:
-                    run_lua_header_fixer(data_path)
-            elif sub_c == '5':
-                console.print("\n[bold cyan]⚡ MINIFIER & GG CODE STUDIO:[/bold cyan]")
-                console.print("  [1] Minify, Clean & Pre-Flight Check Lua Script")
-                console.print("  [2] Generate GG Memory Code Templates")
-                mini_c = safe_input("\n-> Select Option [1-2] [1]: ").strip() or '1'
-                if mini_c == '1':
-                    run_lua_script_optimizer(data_path)
-                else:
-                    run_gg_code_generator(data_path)
             safe_input('\nPress Enter to continue...')
         elif choice == '0':
             break
