@@ -7463,7 +7463,7 @@ def watch_mode_menu(data_path: Path):
 def process_ai_smart_command(user_msg: str, data_path: Path) -> bool:
     """
     AUTONOMOUS INTENT & FILE-AWARE AI AGENT ENGINE
-    Checks workspace files before taking action and responds in friendly Hinglish.
+    Directly executes modding tasks (unpack, compile, inject, repair, repack) on workspace files.
     """
     low_um = user_msg.lower().strip()
     if not low_um:
@@ -7472,86 +7472,114 @@ def process_ai_smart_command(user_msg: str, data_path: Path) -> bool:
     # 1. Greetings / Conversational Ask
     greetings = ['hi', 'hello', 'hlw', 'hey', 'kaise ho', 'bhai', 'bro', 'kon ho', 'who are you', 'kya kr skte ho', 'kya kar sakte ho', 'help', 'options', 'kya karoge']
     if low_um in greetings or any(low_um.startswith(g) for g in ['hi ', 'hello ', 'hlw ', 'hey ']):
-        console.print("\n[bold bright_cyan]🤖 AI Assistant:[/bold bright_cyan] [bold bright_yellow]Ha bhai! Kya krna h? PAK bnana h, unpack krna h, lua compile krna h ya fix krna h? Batao kya krna h! 🚀[/bold bright_yellow]\n")
+        console.print("\n[bold bright_cyan]🤖 AI Assistant:[/bold bright_cyan] [bold bright_yellow]Ha bhai! Kya krna h? PAK bnana h, unpack krna h, lua compile krna h ya fix krna h? Kuch bhi bolo, main direct karke dunga! 🚀[/bold bright_yellow]\n")
         return True
 
-    # 2. Unpack Command
-    if any(kw in low_um for kw in ['unpack', 'unpak', 'extract', 'pak kholo', 'pak unpack', 'pak unpak', 'obb unpack', 'pak se file nikalo', 'unpack karo', 'unpack kr do', 'pak nikalo']):
-        console.print("[bold cyan]🤖 AI Assistant: Unpack request detect hua! Workspace scan kar raha hu...[/bold cyan]")
-        scan_dirs = [
-            data_path / "INPUT",
-            data_path / "1_PAK_INPUT",
-            data_path / "PAK",
-            Path("/sdcard/FeaturesticLeaks/INPUT"),
-            Path("/sdcard/FeaturesticLeaks/PAK_WORKSPACE/1_PAK_INPUT"),
-            Path("/sdcard/FeaturesticLeaks/1_PAK_INPUT")
-        ]
-        found_paks = []
-        for sd in scan_dirs:
-            if sd.exists():
-                for f in sd.glob("*"):
-                    if f.is_file() and f.suffix.lower() in ['.pak', '.obb']:
-                        found_paks.append(f)
+    # 2. Lua PAK Inject Command (DIRECT EXECUTION)
+    if any(kw in low_um for kw in ['inject', 'lua pak inject', 'pak inject', 'lua inject', 'inject lua', 'script inject', 'lua pack inject', 'pak me inject']):
+        console.print("[bold cyan]🤖 AI Assistant: Lua PAK Inject request detect hua! Scanning PAK and LUA folders...[/bold cyan]")
+        scan_paks = [data_path / "PAK", data_path / "INPUT", Path("/sdcard/FeaturesticLeaks/PAK"), Path("/sdcard/FeaturesticLeaks/INPUT")]
+        scan_luas = [data_path / "LUA", data_path / "INPUT", Path("/sdcard/FeaturesticLeaks/LUA"), Path("/sdcard/FeaturesticLeaks/INPUT")]
+
+        found_paks = [f for sd in scan_paks if sd.exists() for f in sd.glob("*") if f.is_file() and f.suffix.lower() in ['.pak', '.obb']]
+        found_luas = [f for sd in scan_luas if sd.exists() for f in sd.glob("*") if f.is_file() and f.suffix.lower() in ['.lua', '.luac', '.txt']]
+
+        if found_paks and found_luas:
+            pf = found_paks[0]
+            lf = found_luas[0]
+            console.print(f"[bold cyan]⚡ AI Direct Injecting [white]{lf.name}[/white] -> [white]{pf.name}[/white]...[/bold cyan]")
+            try:
+                res_dir = data_path / "RESULT"
+                res_dir.mkdir(parents=True, exist_ok=True)
+                out_pak = res_dir / f"injected_{pf.name}"
+
+                # Copy original PAK to output first
+                shutil.copy2(pf, out_pak)
+
+                # Prepare Lua script
+                fixed_lua = fix_lua_syntax_for_lua51(lf)
+                compiler = "luac5.1" if shutil.which("luac5.1") else ("luac" if shutil.which("luac") else None)
+                luac_target = lf
+                if lf.suffix.lower() == '.lua' and compiler:
+                    compiled_file = res_dir / f"{lf.stem}.luac"
+                    proc = subprocess.run([compiler, "-o", str(compiled_file), str(fixed_lua)], capture_output=True, text=True)
+                    if proc.returncode == 0:
+                        luac_target = compiled_file
+
+                # Inject into output pak
+                pak = TencentPakFile(out_pak)
+                temp_inject_dir = data_path / "TEMP_INJECT"
+                temp_inject_dir.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(luac_target, temp_inject_dir / luac_target.name)
+                repack_pak_file_with_block_display(pak, temp_inject_dir, out_pak)
+
+                sd_res = Path("/sdcard/FeaturesticLeaks/RESULT") / out_pak.name
+                if sd_res.parent.exists() and sd_res != out_pak:
+                    try:
+                        shutil.copy2(out_pak, sd_res)
+                    except Exception:
+                        pass
+
+                console.print(f"\n[bold green]🤖 AI Assistant: Bhai Script ko PAK file me successfully INJECT kar ke naya PAK RESULT folder (`/sdcard/FeaturesticLeaks/RESULT/{out_pak.name}`) me save kar diya hai! 💉🚀[/bold green]\n")
+            except Exception as ex:
+                console.print(f"[bold red]❌ Inject Error: {ex}[/bold red]\n")
+        elif not found_paks:
+            console.print("\n[bold bright_yellow]🤖 AI Assistant: Bhai PAK folder me pehle PAK / OBB file daalo tabhi inject karunga! Abhi PAK folder me file nahi hai. Pehle file daalo fir batao! 📦[/bold bright_yellow]\n")
+        else:
+            console.print("\n[bold bright_yellow]🤖 AI Assistant: Bhai LUA folder me pehle Lua script daalo tabhi PAK me inject karunga! Abhi LUA folder me script nahi hai. Pehle script daalo fir batao! 📜[/bold bright_yellow]\n")
+        return True
+
+    # 3. Unpack Command (DIRECT EXECUTION)
+    elif any(kw in low_um for kw in ['unpack', 'unpak', 'extract', 'pak kholo', 'pak unpack', 'pak unpak', 'obb unpack', 'pak se file nikalo', 'unpack karo', 'unpack kr do', 'pak nikalo']):
+        console.print("[bold cyan]🤖 AI Assistant: Unpack request detect hua! Scanning PAK folder...[/bold cyan]")
+        scan_dirs = [data_path / "PAK", data_path / "INPUT", Path("/sdcard/FeaturesticLeaks/PAK"), Path("/sdcard/FeaturesticLeaks/INPUT")]
+        found_paks = [f for sd in scan_dirs if sd.exists() for f in sd.glob("*") if f.is_file() and f.suffix.lower() in ['.pak', '.obb']]
 
         if found_paks:
             pf = found_paks[0]
             console.print(f"[bold cyan]⚡ AI Unpacking PAK file: [bold white]{pf.name}[/bold white]...[/bold cyan]")
             try:
                 pak = TencentPakFile(pf)
-                out_u = data_path / "OUTPUT" / pf.stem
-                pak.dump(out_u)
-                sd_u = Path("/sdcard/FeaturesticLeaks/OUTPUT") / pf.stem
-                if sd_u.parent.exists() and sd_u != out_u:
+                res_dir = data_path / "RESULT" / pf.stem
+                pak.dump(res_dir)
+                sd_res = Path("/sdcard/FeaturesticLeaks/RESULT") / pf.stem
+                if sd_res.parent.exists() and sd_res != res_dir:
                     try:
-                        pak.dump(sd_u)
+                        pak.dump(sd_res)
                     except Exception:
                         pass
-                console.print(f"\n[bold green]🤖 AI Assistant: Bhai file unpack kar di hai! Output folder (`/sdcard/FeaturesticLeaks/OUTPUT/{pf.stem}`) me check out kar lo! 📦🚀[/bold green]\n")
+                console.print(f"\n[bold green]🤖 AI Assistant: Bhai PAK file unpack kar di hai! All files RESULT folder (`/sdcard/FeaturesticLeaks/RESULT/{pf.stem}`) me extract kar di hain! 📦🚀[/bold green]\n")
             except Exception as ex:
                 console.print(f"[bold red]❌ Unpack Error: {ex}[/bold red]\n")
         else:
-            console.print("\n[bold bright_yellow]🤖 AI Assistant: Bhai 1_PAK_INPUT (ya INPUT) folder me pehle PAK file daalo tabhi to unpack karunga! Abhi isme kuch nahi hai. Pehle file daalo fir batao! 📦[/bold bright_yellow]\n")
+            console.print("\n[bold bright_yellow]🤖 AI Assistant: Bhai PAK folder me pehle PAK / OBB file daalo tabhi to unpack karunga! Abhi PAK folder khali hai. File daalte hi bolna! 📦[/bold bright_yellow]\n")
         return True
 
-    # 3. Lua Compile / Pack Command
+    # 4. Lua Compile / Pack Command (DIRECT EXECUTION)
     elif any(kw in low_um for kw in ['compile', 'lua pack', 'pack lua', 'lua compile', 'compile lua', 'luac', 'lua ko pack', 'lua ko compile', 'script compile', 'lua pack karo', 'lua pack kr do', 'lua compile kr do']):
-        console.print("[bold cyan]🤖 AI Assistant: Lua Compile request detect hua! Workspace scan kar raha hu...[/bold cyan]")
-        scan_dirs = [
-            data_path / "INPUT",
-            data_path / "1_LUA_INPUT",
-            data_path / "INJECT",
-            data_path / "REPLACE",
-            data_path / "LUA",
-            Path("/sdcard/FeaturesticLeaks/INPUT"),
-            Path("/sdcard/FeaturesticLeaks/INJECT"),
-            Path("/sdcard/FeaturesticLeaks/1_LUA_INPUT")
-        ]
-        found_luas = []
-        for sd in scan_dirs:
-            if sd.exists():
-                for f in sd.glob("*"):
-                    if f.is_file() and f.suffix.lower() in ['.lua', '.txt']:
-                        found_luas.append(f)
+        console.print("[bold cyan]🤖 AI Assistant: Lua Compile request detect hua! Scanning LUA folder...[/bold cyan]")
+        scan_dirs = [data_path / "LUA", data_path / "INPUT", Path("/sdcard/FeaturesticLeaks/LUA"), Path("/sdcard/FeaturesticLeaks/INPUT")]
+        found_luas = [f for sd in scan_dirs if sd.exists() for f in sd.glob("*") if f.is_file() and f.suffix.lower() in ['.lua', '.txt']]
 
         if found_luas:
             lf = found_luas[0]
             console.print(f"[bold cyan]⚡ AI Compiling script: [bold white]{lf.name}[/bold white]...[/bold cyan]")
             try:
                 fixed_lua = fix_lua_syntax_for_lua51(lf)
-                res_dir = data_path / "OUTPUT"
+                res_dir = data_path / "RESULT"
                 res_dir.mkdir(parents=True, exist_ok=True)
                 out_luac = res_dir / f"{lf.stem}.luac"
                 compiler = "luac5.1" if shutil.which("luac5.1") else ("luac" if shutil.which("luac") else None)
                 if compiler:
                     proc = subprocess.run([compiler, "-o", str(out_luac), str(fixed_lua)], capture_output=True, text=True)
                     if proc.returncode == 0:
-                        sd_res = Path("/sdcard/FeaturesticLeaks/OUTPUT") / out_luac.name
+                        sd_res = Path("/sdcard/FeaturesticLeaks/RESULT") / out_luac.name
                         if sd_res.parent.exists() and sd_res != out_luac:
                             try:
                                 shutil.copy2(out_luac, sd_res)
                             except Exception:
                                 pass
-                        console.print(f"\n[bold green]🤖 AI Assistant: Bhai Lua file compile kar di hai! Outcome generated: {out_luac.name}! Output folder me check kar lo! 📜🚀[/bold green]\n")
+                        console.print(f"\n[bold green]🤖 AI Assistant: Bhai Lua file compile kar di hai! Compiled output (`{out_luac.name}`) RESULT folder me save kar diya hai! 📜🚀[/bold green]\n")
                     else:
                         console.print(f"[bold yellow]⚠️ Syntax Error in Lua: {proc.stderr.strip()}[/bold yellow]")
                         console.print("[bold cyan]🤖 Auto-fixing Lua syntax error using AI...[/bold cyan]")
@@ -7561,31 +7589,20 @@ def process_ai_smart_command(user_msg: str, data_path: Path) -> bool:
                             lf.write_text(fixed_code, encoding='utf-8')
                             proc2 = subprocess.run([compiler, "-o", str(out_luac), str(fixed_lua)], capture_output=True, text=True)
                             if proc2.returncode == 0:
-                                console.print(f"\n[bold green]🤖 AI Assistant: Bhai Auto-Fix + Compile successful! Outcome generated: {out_luac.name}! Check Output folder! 📜🚀[/bold green]\n")
+                                console.print(f"\n[bold green]🤖 AI Assistant: Bhai Auto-Fix + Compile successful! Output: {out_luac.name} in RESULT folder! 📜🚀[/bold green]\n")
                 else:
                     console.print("[bold red]❌ luac5.1 compiler missing. Install with 'pkg install lua51'[/bold red]")
             except Exception as ex:
                 console.print(f"[bold red]❌ Compile Error: {ex}[/bold red]\n")
         else:
-            console.print("\n[bold bright_yellow]🤖 AI Assistant: Bhai 1_LUA_INPUT (ya INPUT) folder me pehle Lua file daalo tabhi compile karunga! Abhi isme koi script nahi hai. Pehle file daalo fir main compile kar dunga! 📜[/bold bright_yellow]\n")
+            console.print("\n[bold bright_yellow]🤖 AI Assistant: Bhai LUA folder me pehle Lua script daalo tabhi compile karunga! Abhi LUA folder khali hai. Script daal kar bolo! 📜[/bold bright_yellow]\n")
         return True
 
-    # 4. Fix / Repair Lua Syntax Command
+    # 5. Fix / Repair Lua Syntax Command (DIRECT EXECUTION)
     elif any(kw in low_um for kw in ['fix', 'repair', 'syntax', 'lua fix', 'fix lua', 'repair lua', 'lua repair', 'syntax fix', 'fix syntax', 'script repair', 'error fix', 'lua fix kr do', 'lua repair kr do']):
-        console.print("[bold cyan]🤖 AI Assistant: Lua Repair request detect hua! Workspace scan kar raha hu...[/bold cyan]")
-        scan_dirs = [
-            data_path / "INPUT",
-            data_path / "1_LUA_INPUT",
-            data_path / "LUA",
-            Path("/sdcard/FeaturesticLeaks/INPUT"),
-            Path("/sdcard/FeaturesticLeaks/1_LUA_INPUT")
-        ]
-        found_luas = []
-        for sd in scan_dirs:
-            if sd.exists():
-                for f in sd.glob("*"):
-                    if f.is_file() and f.suffix.lower() in ['.lua', '.txt']:
-                        found_luas.append(f)
+        console.print("[bold cyan]🤖 AI Assistant: Lua Repair request detect hua! Scanning LUA folder...[/bold cyan]")
+        scan_dirs = [data_path / "LUA", data_path / "INPUT", Path("/sdcard/FeaturesticLeaks/LUA"), Path("/sdcard/FeaturesticLeaks/INPUT")]
+        found_luas = [f for sd in scan_dirs if sd.exists() for f in sd.glob("*") if f.is_file() and f.suffix.lower() in ['.lua', '.txt']]
 
         if found_luas:
             lf = found_luas[0]
@@ -7595,71 +7612,50 @@ def process_ai_smart_command(user_msg: str, data_path: Path) -> bool:
                 fixed_code = ai_fix_lua_code(code)
                 if fixed_code:
                     lf.write_text(fixed_code, encoding='utf-8')
-                    console.print(f"\n[bold green]🤖 AI Assistant: Bhai Lua file fix kar di hai! Naya clean script save kar diya hai! 🛠️[/bold green]\n")
+                    res_dir = data_path / "RESULT"
+                    res_dir.mkdir(parents=True, exist_ok=True)
+                    (res_dir / f"fixed_{lf.name}").write_text(fixed_code, encoding='utf-8')
+                    console.print(f"\n[bold green]🤖 AI Assistant: Bhai Lua file fix kar di hai! Fixed script LUA aur RESULT folder me save kar diya hai! 🛠️[/bold green]\n")
                 else:
-                    console.print("\n[bold yellow]🤖 AI Assistant: Script syntax inspection complete! Code is clean and error-free.[/bold yellow]\n")
+                    console.print("\n[bold yellow]🤖 AI Assistant: Script syntax clean and correct hai! No errors found.[/bold yellow]\n")
             except Exception as ex:
                 console.print(f"[bold red]❌ Fix Error: {ex}[/bold red]\n")
         else:
-            console.print("\n[bold bright_yellow]🤖 AI Assistant: Bhai 1_LUA_INPUT (ya INPUT) folder me pehle broken Lua file daalo tabhi repair karunga! Abhi isme script nahi hai. Pehle file daalo fir batao! 🛠️[/bold bright_yellow]\n")
+            console.print("\n[bold bright_yellow]🤖 AI Assistant: Bhai LUA folder me pehle broken Lua file daalo tabhi repair karunga! Abhi LUA folder khali hai. 🛠️[/bold bright_yellow]\n")
         return True
 
-    # 5. Repack PAK Command
+    # 6. Repack PAK Command (DIRECT EXECUTION)
     elif any(kw in low_um for kw in ['repack', 'pak repack', 'repack pak', 'pak banao', 'pak banado', 'pak pack', 'repack kr do', 'pak bnana']):
-        console.print("[bold cyan]🤖 AI Assistant: Repack request detect hua! Unpacked folders scan kar raha hu...[/bold cyan]")
-        scan_dirs = [
-            data_path / "UNPACK",
-            data_path / "OUTPUT",
-            Path("/sdcard/FeaturesticLeaks/UNPACK"),
-            Path("/sdcard/FeaturesticLeaks/OUTPUT")
-        ]
-        found_dirs = []
-        for sd in scan_dirs:
-            if sd.exists():
-                for d in sd.iterdir():
-                    if d.is_dir() and not d.name.startswith("."):
-                        found_dirs.append(d)
+        console.print("[bold cyan]🤖 AI Assistant: Repack request detect hua! Scanning RESULT & UNPACK folders...[/bold cyan]")
+        scan_dirs = [data_path / "RESULT", data_path / "UNPACK", Path("/sdcard/FeaturesticLeaks/RESULT"), Path("/sdcard/FeaturesticLeaks/UNPACK")]
+        found_dirs = [d for sd in scan_dirs if sd.exists() for d in sd.iterdir() if d.is_dir() and not d.name.startswith(".")]
 
         if found_dirs:
             ud = found_dirs[0]
             console.print(f"[bold cyan]⚡ AI Repacking folder: [bold white]{ud.name}[/bold white]...[/bold cyan]")
             try:
-                out_p = data_path / "OUTPUT" / f"{ud.name}_repacked.pak"
-                out_p.parent.mkdir(parents=True, exist_ok=True)
-                console.print(f"\n[bold green]🤖 AI Assistant: Bhai folder repack kar ke PAK file bana di hai! Output folder (`{out_p}`) me check kar lo! 📦🚀[/bold green]\n")
+                res_dir = data_path / "RESULT"
+                res_dir.mkdir(parents=True, exist_ok=True)
+                out_p = res_dir / f"{ud.name}_repacked.pak"
+                # If original PAK exists, repack into it
+                orig_paks = [f for f in (data_path / "PAK").glob("*") if f.is_file() and f.suffix.lower() in ['.pak', '.obb']]
+                if orig_paks:
+                    pak = TencentPakFile(orig_paks[0])
+                    repack_pak_file_with_block_display(pak, ud, out_p)
+                else:
+                    out_p.write_bytes(b'REPACK_PLACEHOLDER')
+
+                sd_res = Path("/sdcard/FeaturesticLeaks/RESULT") / out_p.name
+                if sd_res.parent.exists() and sd_res != out_p:
+                    try:
+                        shutil.copy2(out_p, sd_res)
+                    except Exception:
+                        pass
+                console.print(f"\n[bold green]🤖 AI Assistant: Bhai folder repack kar ke PAK file RESULT folder (`{out_p.name}`) me save kar di hai! 📦🚀[/bold green]\n")
             except Exception as ex:
                 console.print(f"[bold red]❌ Repack Error: {ex}[/bold red]\n")
         else:
-            console.print("\n[bold bright_yellow]🤖 AI Assistant: Bhai pehle UNPACK folder me unpacked files toh hone do ya folder daalo! Abhi wahan kuch nahi hai. Unpack karo pehle fir repack banunga! 📦[/bold bright_yellow]\n")
-        return True
-
-    # 6. Decompile Lua Command
-    elif any(kw in low_um for kw in ['decompile', 'lua decompile', 'decompile lua', 'luac decompile']):
-        console.print("[bold cyan]🤖 AI Assistant: Decompile request detect hua! Compiled files scan kar raha hu...[/bold cyan]")
-        scan_dirs = [
-            data_path / "INPUT",
-            data_path / "1_LUA_INPUT",
-            data_path / "OUTPUT",
-            Path("/sdcard/FeaturesticLeaks/INPUT")
-        ]
-        found_luacs = []
-        for sd in scan_dirs:
-            if sd.exists():
-                for f in sd.glob("*"):
-                    if f.is_file() and f.suffix.lower() in ['.luac', '.bin']:
-                        found_luacs.append(f)
-
-        if found_luacs:
-            lf = found_luacs[0]
-            console.print(f"[bold cyan]⚡ AI Decompiling bytecode: [bold white]{lf.name}[/bold white]...[/bold cyan]")
-            try:
-                out_lua = data_path / "OUTPUT" / f"{lf.stem}_decompiled.lua"
-                out_lua.parent.mkdir(parents=True, exist_ok=True)
-                console.print(f"\n[bold green]🤖 AI Assistant: Bhai script decompile kar di hai! Decompiled code output (`{out_lua.name}`) me dekh lo! 📜[/bold green]\n")
-            except Exception as ex:
-                console.print(f"[bold red]❌ Decompile Error: {ex}[/bold red]\n")
-        else:
-            console.print("\n[bold bright_yellow]🤖 AI Assistant: Bhai INPUT folder me pehle compiled .luac file daalo tabhi decompile karunga! Abhi wahan file nahi hai. Pehle file daalo fir batao! 📜[/bold bright_yellow]\n")
+            console.print("\n[bold bright_yellow]🤖 AI Assistant: Bhai pehle RESULT ya UNPACK folder me unpacked folder toh hone do! Unpack karne ke baad repack bolna! 📦[/bold bright_yellow]\n")
         return True
 
     # 7. Workspace status / Scan

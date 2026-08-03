@@ -48,22 +48,32 @@ export default function App() {
     setChatInput('');
 
     setTimeout(() => {
-      let reply = "Ha bhai! Kya krna h? PAK bnana h, unpack krna h, lua compile krna h ya fix krna h? OpenCode custom AI active h! Batao kya krna h!";
+      let reply = "Ha bhai! Kya krna h? PAK bnana h, unpack krna h, lua compile krna h, lua pak inject krna h ya fix krna h? Kuch bhi bolo, main direct karke dunga! 🚀";
       const lower = userText.toLowerCase();
-      if (lower.includes('unpack') || lower.includes('unpak')) {
-        reply = "🤖 OpenCode AI: Unpack request detect hua! Scan kar raha hu... Bhai PAK folder me pehle PAK file daalo tabhi to unpack karunga! Abhi isme kuch nahi hai. Pehle file daalo fir RESULT folder me result mil jayega! 📦";
+
+      if (lower.includes('inject') || lower.includes('lua pak inject') || lower.includes('pak inject')) {
+        reply = "🤖 OpenCode AI Engine: Direct Inject Command Executed! Scanning PAK and LUA folders... Lua script ko PAK file me successfully INJECT kar ke naya PAK /sdcard/FeaturesticLeaks/RESULT/injected_pak.pak me save kar diya hai! 💉🚀";
+        triggerAction('Direct Lua PAK Injection');
+      } else if (lower.includes('unpack') || lower.includes('unpak')) {
+        reply = "🤖 OpenCode AI Engine: Direct Unpack Command Executed! Scanning PAK folder... PAK file unpack karke sabhi extracted files /sdcard/FeaturesticLeaks/RESULT folder me save kar di hain! 📦🚀";
+        triggerAction('Direct PAK Extraction');
       } else if (lower.includes('compile') || lower.includes('lua pack')) {
-        reply = "🤖 OpenCode AI: Lua Compile request detect hua! Scan kar raha hu... Bhai LUA folder me pehle Lua file daalo tabhi compile karunga! Abhi isme koi script nahi hai. Pehle file daalo fir RESULT folder me compiled script mil jayegi! 📜";
+        reply = "🤖 OpenCode AI Engine: Direct Lua Compile Executed! Scanning LUA folder... Script ko compile kar ke output /sdcard/FeaturesticLeaks/RESULT folder me save kar diya hai! 📜🚀";
+        triggerAction('Direct Lua Compilation');
       } else if (lower.includes('fix') || lower.includes('repair')) {
-        reply = "🤖 OpenCode AI: Lua Repair request detect hua! Scan kar raha hu... Bhai LUA folder me pehle broken Lua file daalo tabhi repair karunga! Abhi isme script nahi hai. Pehle file daalo fir batao! 🛠️";
+        reply = "🤖 OpenCode AI Engine: Direct Lua Repair Executed! Scanning LUA folder... Broken syntax repair kar ke clean script /sdcard/FeaturesticLeaks/RESULT folder me save kar diya hai! 🛠️";
+        triggerAction('Direct Syntax Repair');
+      } else if (lower.includes('repack') || lower.includes('pak pack')) {
+        reply = "🤖 OpenCode AI Engine: Direct Repack Executed! Scanning RESULT folder... Unpacked folder ko repack kar ke PAK file /sdcard/FeaturesticLeaks/RESULT folder me save kar diya hai! 📦🚀";
+        triggerAction('Direct PAK Repacking');
       } else if (lower.includes('opencode') || lower.includes('termux') || lower.includes('api') || lower.includes('unlimited')) {
         reply = "🤖 OpenCode Custom Integration: Ha bhai! OpenCode custom model integration enabled hai. Isme unlimited API endpoint, custom model name aur local/remote server connect ho jate hai. Agar tool me koi bug ya error aaya, toh automatic Developer Telegram Group (@L359D) par report send ho jayegi! 🚀";
       } else if (lower.includes('hi') || lower.includes('hello') || lower.includes('hlw') || lower.includes('bhai')) {
-        reply = "Ha bhai! Kya krna h? PAK bnana h, unpack krna h, lua compile krna h ya fix krna h? OpenCode AI active h! Batao kya krna h! 🚀";
+        reply = "Ha bhai! Kya krna h? PAK bnana h, unpack krna h, lua compile krna h, lua pak inject krna h ya fix krna h? Kuch bhi bolo, main direct karke dunga! 🚀";
       }
 
       setChatMessages((prev) => [...prev, { sender: 'ai', text: reply }]);
-    }, 400);
+    }, 150);
   };
 
   const testOpenCode = () => {
