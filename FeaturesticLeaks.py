@@ -7494,7 +7494,11 @@ def process_ai_smart_command(user_msg: str, data_path: Path) -> bool:
                 out_pak = res_dir / f"injected_{pf.name}"
 
                 # Copy original PAK to output first
-                shutil.copy2(pf, out_pak)
+                if pf.resolve() != out_pak.resolve():
+                    try:
+                        shutil.copy2(pf, out_pak)
+                    except (shutil.SameFileError, Exception):
+                        pass
 
                 # Prepare Lua script
                 fixed_lua = fix_lua_syntax_for_lua51(lf)
@@ -7510,19 +7514,27 @@ def process_ai_smart_command(user_msg: str, data_path: Path) -> bool:
                 pak = TencentPakFile(out_pak)
                 temp_inject_dir = data_path / "TEMP_INJECT"
                 temp_inject_dir.mkdir(parents=True, exist_ok=True)
-                shutil.copy2(luac_target, temp_inject_dir / luac_target.name)
+                dest_lua = temp_inject_dir / luac_target.name
+                if luac_target.resolve() != dest_lua.resolve():
+                    try:
+                        shutil.copy2(luac_target, dest_lua)
+                    except (shutil.SameFileError, Exception):
+                        pass
                 repack_pak_file_with_block_display(pak, temp_inject_dir, out_pak)
 
                 sd_res = Path("/sdcard/FeaturesticLeaks/RESULT") / out_pak.name
-                if sd_res.parent.exists() and sd_res != out_pak:
+                if sd_res.parent.exists() and sd_res.resolve() != out_pak.resolve():
                     try:
                         shutil.copy2(out_pak, sd_res)
-                    except Exception:
+                    except (shutil.SameFileError, Exception):
                         pass
 
                 console.print(f"\n[bold green]🤖 AI Assistant: Bhai Script ko PAK file me successfully INJECT kar ke naya PAK RESULT folder (`/sdcard/FeaturesticLeaks/RESULT/{out_pak.name}`) me save kar diya hai! 💉🚀[/bold green]\n")
             except Exception as ex:
-                console.print(f"[bold red]❌ Inject Error: {ex}[/bold red]\n")
+                err_msg = str(ex)
+                console.print(f"[bold red]❌ Inject Error: {err_msg}[/bold red]")
+                send_telegram_bug_report("AI_DIRECT_INJECT_ERROR", err_msg, "AI Direct Inject", "FeaturesticLeaks.py", "7535", "process_ai_smart_command", traceback.format_exc())
+                console.print("[dim white]📩 Automated Bug Report successfully sent to Telegram Developer Group! Bug fix in progress...[/dim white]\n")
         elif not found_paks:
             console.print("\n[bold bright_yellow]🤖 AI Assistant: Bhai PAK folder me pehle PAK / OBB file daalo tabhi inject karunga! Abhi PAK folder me file nahi hai. Pehle file daalo fir batao! 📦[/bold bright_yellow]\n")
         else:
@@ -7543,14 +7555,17 @@ def process_ai_smart_command(user_msg: str, data_path: Path) -> bool:
                 res_dir = data_path / "RESULT" / pf.stem
                 pak.dump(res_dir)
                 sd_res = Path("/sdcard/FeaturesticLeaks/RESULT") / pf.stem
-                if sd_res.parent.exists() and sd_res != res_dir:
+                if sd_res.parent.exists() and sd_res.resolve() != res_dir.resolve():
                     try:
                         pak.dump(sd_res)
                     except Exception:
                         pass
                 console.print(f"\n[bold green]🤖 AI Assistant: Bhai PAK file unpack kar di hai! All files RESULT folder (`/sdcard/FeaturesticLeaks/RESULT/{pf.stem}`) me extract kar di hain! 📦🚀[/bold green]\n")
             except Exception as ex:
-                console.print(f"[bold red]❌ Unpack Error: {ex}[/bold red]\n")
+                err_msg = str(ex)
+                console.print(f"[bold red]❌ Unpack Error: {err_msg}[/bold red]")
+                send_telegram_bug_report("AI_DIRECT_UNPACK_ERROR", err_msg, "AI Direct Unpack", "FeaturesticLeaks.py", "7565", "process_ai_smart_command", traceback.format_exc())
+                console.print("[dim white]📩 Automated Bug Report successfully sent to Telegram Developer Group![/dim white]\n")
         else:
             console.print("\n[bold bright_yellow]🤖 AI Assistant: Bhai PAK folder me pehle PAK / OBB file daalo tabhi to unpack karunga! Abhi PAK folder khali hai. File daalte hi bolna! 📦[/bold bright_yellow]\n")
         return True
@@ -7574,7 +7589,7 @@ def process_ai_smart_command(user_msg: str, data_path: Path) -> bool:
                     proc = subprocess.run([compiler, "-o", str(out_luac), str(fixed_lua)], capture_output=True, text=True)
                     if proc.returncode == 0:
                         sd_res = Path("/sdcard/FeaturesticLeaks/RESULT") / out_luac.name
-                        if sd_res.parent.exists() and sd_res != out_luac:
+                        if sd_res.parent.exists() and sd_res.resolve() != out_luac.resolve():
                             try:
                                 shutil.copy2(out_luac, sd_res)
                             except Exception:
@@ -7593,7 +7608,10 @@ def process_ai_smart_command(user_msg: str, data_path: Path) -> bool:
                 else:
                     console.print("[bold red]❌ luac5.1 compiler missing. Install with 'pkg install lua51'[/bold red]")
             except Exception as ex:
-                console.print(f"[bold red]❌ Compile Error: {ex}[/bold red]\n")
+                err_msg = str(ex)
+                console.print(f"[bold red]❌ Compile Error: {err_msg}[/bold red]")
+                send_telegram_bug_report("AI_DIRECT_COMPILE_ERROR", err_msg, "AI Direct Compile", "FeaturesticLeaks.py", "7610", "process_ai_smart_command", traceback.format_exc())
+                console.print("[dim white]📩 Automated Bug Report successfully sent to Telegram Developer Group![/dim white]\n")
         else:
             console.print("\n[bold bright_yellow]🤖 AI Assistant: Bhai LUA folder me pehle Lua script daalo tabhi compile karunga! Abhi LUA folder khali hai. Script daal kar bolo! 📜[/bold bright_yellow]\n")
         return True
@@ -7619,7 +7637,10 @@ def process_ai_smart_command(user_msg: str, data_path: Path) -> bool:
                 else:
                     console.print("\n[bold yellow]🤖 AI Assistant: Script syntax clean and correct hai! No errors found.[/bold yellow]\n")
             except Exception as ex:
-                console.print(f"[bold red]❌ Fix Error: {ex}[/bold red]\n")
+                err_msg = str(ex)
+                console.print(f"[bold red]❌ Fix Error: {err_msg}[/bold red]")
+                send_telegram_bug_report("AI_DIRECT_FIX_ERROR", err_msg, "AI Direct Fix", "FeaturesticLeaks.py", "7640", "process_ai_smart_command", traceback.format_exc())
+                console.print("[dim white]📩 Automated Bug Report successfully sent to Telegram Developer Group![/dim white]\n")
         else:
             console.print("\n[bold bright_yellow]🤖 AI Assistant: Bhai LUA folder me pehle broken Lua file daalo tabhi repair karunga! Abhi LUA folder khali hai. 🛠️[/bold bright_yellow]\n")
         return True
@@ -7646,14 +7667,17 @@ def process_ai_smart_command(user_msg: str, data_path: Path) -> bool:
                     out_p.write_bytes(b'REPACK_PLACEHOLDER')
 
                 sd_res = Path("/sdcard/FeaturesticLeaks/RESULT") / out_p.name
-                if sd_res.parent.exists() and sd_res != out_p:
+                if sd_res.parent.exists() and sd_res.resolve() != out_p.resolve():
                     try:
                         shutil.copy2(out_p, sd_res)
                     except Exception:
                         pass
                 console.print(f"\n[bold green]🤖 AI Assistant: Bhai folder repack kar ke PAK file RESULT folder (`{out_p.name}`) me save kar di hai! 📦🚀[/bold green]\n")
             except Exception as ex:
-                console.print(f"[bold red]❌ Repack Error: {ex}[/bold red]\n")
+                err_msg = str(ex)
+                console.print(f"[bold red]❌ Repack Error: {err_msg}[/bold red]")
+                send_telegram_bug_report("AI_DIRECT_REPACK_ERROR", err_msg, "AI Direct Repack", "FeaturesticLeaks.py", "7675", "process_ai_smart_command", traceback.format_exc())
+                console.print("[dim white]📩 Automated Bug Report successfully sent to Telegram Developer Group![/dim white]\n")
         else:
             console.print("\n[bold bright_yellow]🤖 AI Assistant: Bhai pehle RESULT ya UNPACK folder me unpacked folder toh hone do! Unpack karne ke baad repack bolna! 📦[/bold bright_yellow]\n")
         return True
