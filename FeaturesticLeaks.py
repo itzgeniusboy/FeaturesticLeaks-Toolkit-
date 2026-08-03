@@ -6922,65 +6922,51 @@ def call_ai_api(prompt: str) -> Optional[str]:
         groq_models = ["llama-3.1-8b-instant", "llama3-8b-8192", "llama-3.2-3b-preview"]
         openrouter_models = ["google/gemini-flash-1.5-8b", "meta-llama/llama-3.1-8b-instruct:free", "google/gemini-flash-1.5"]
 
-    # Check OpenCode Custom Endpoint
+    # Check OpenCode Custom Endpoint (Primary Unlimited Engine)
     cfg = get_ai_config()
-    active_prov = cfg.get("active_provider", "google")
+    active_prov = cfg.get("active_provider", "opencode")
     
-    if active_prov == "opencode":
-        oc_ep = cfg.get("opencode_endpoint", "https://api.opencode.ai/v1").strip()
-        oc_m = cfg.get("opencode_model", "opencode-modding-v1").strip()
-        oc_k = cfg.get("opencode_api_key", "").strip()
-        if oc_ep:
-            try:
-                ep_url = oc_ep.rstrip('/')
-                if not ep_url.endswith("/chat/completions"):
-                    ep_url += "/chat/completions"
-                headers = {"Content-Type": "application/json"}
-                if oc_k:
-                    headers["Authorization"] = f"Bearer {oc_k}"
-                payload = {
-                    "model": oc_m or "opencode-modding-v1",
-                    "messages": [
-                        {"role": "system", "content": SYSTEM_PROMPT},
-                        {"role": "user", "content": prompt}
-                    ],
-                    "max_tokens": 300,
-                    "temperature": 0.2
-                }
-                resp = requests.post(ep_url, json=payload, headers=headers, timeout=12)
-                if resp.status_code == 200:
-                    data = resp.json()
-                    txt = data['choices'][0]['message']['content']
-                    if txt:
-                        return txt.strip()
-            except Exception as ex_oc:
-                send_telegram_bug_report("OPENCODE_ENDPOINT_ERROR", str(ex_oc), "OpenCode Custom Call", "FeaturesticLeaks.py", "7045", "call_ai_api", traceback.format_exc())
+    # Always attempt OpenCode API call first
+    oc_ep = cfg.get("opencode_endpoint", "https://api.opencode.ai/v1").strip()
+    oc_m = cfg.get("opencode_model", "opencode-modding-v1").strip()
+    oc_k = cfg.get("opencode_api_key", "").strip()
+    if oc_ep:
+        try:
+            ep_url = oc_ep.rstrip('/')
+            if not ep_url.endswith("/chat/completions"):
+                ep_url += "/chat/completions"
+            headers = {"Content-Type": "application/json"}
+            if oc_k:
+                headers["Authorization"] = f"Bearer {oc_k}"
+            payload = {
+                "model": oc_m or "opencode-modding-v1",
+                "messages": [
+                    {"role": "system", "content": SYSTEM_PROMPT},
+                    {"role": "user", "content": prompt}
+                ],
+                "max_tokens": 400,
+                "temperature": 0.2
+            }
+            resp = requests.post(ep_url, json=payload, headers=headers, timeout=12)
+            if resp.status_code == 200:
+                data = resp.json()
+                txt = data['choices'][0]['message']['content']
+                if txt:
+                    return txt.strip()
+        except Exception as ex_oc:
+            send_telegram_bug_report("OPENCODE_ENDPOINT_ERROR", str(ex_oc), "OpenCode Custom Call", "FeaturesticLeaks.py", "6950", "call_ai_api", traceback.format_exc())
 
-    # Build key queue across all available providers
+    # Build key queue across secondary providers if configured
     key_queue = [] # list of (provider, key)
 
-    # 1. Add active provider keys
-    for k in cfg.get("keys", {}).get(active_prov, []):
-        if k and (active_prov, k) not in key_queue:
-            key_queue.append((active_prov, k))
-
-    # 2. Add other provider keys
     for prov in ["google", "groq", "openrouter"]:
-        if prov != active_prov:
-            for k in cfg.get("keys", {}).get(prov, []):
-                if k and (prov, k) not in key_queue:
-                    key_queue.append((prov, k))
+        for k in cfg.get("keys", {}).get(prov, []):
+            if k and (prov, k) not in key_queue:
+                key_queue.append((prov, k))
 
-    # 3. Add environment variable keys
     env_gemini = os.environ.get("GEMINI_API_KEY")
     if env_gemini and ("google", env_gemini) not in key_queue:
         key_queue.append(("google", env_gemini))
-    env_groq = os.environ.get("GROQ_API_KEY")
-    if env_groq and ("groq", env_groq) not in key_queue:
-        key_queue.append(("groq", env_groq))
-    env_or = os.environ.get("OPENROUTER_API_KEY")
-    if env_or and ("openrouter", env_or) not in key_queue:
-        key_queue.append(("openrouter", env_or))
 
     if key_queue:
         for prov, key in key_queue:
@@ -7051,19 +7037,17 @@ def call_ai_api(prompt: str) -> Optional[str]:
             except Exception:
                 continue
 
-    # Offline / local direct fallbacks for tool commands when API keys are offline
-    if "pak" in last_user_query:
-        return "📦 **PAK File Guide:**\nPAK file create/repack karne ke liye: Main Menu -> Option [1] (PAK/OBB Tool) -> Option [2] (Repack Folder) select karein! Unpacked files `UNPACK/<folder>` me honi chahiye."
-    elif "lua" in last_user_query:
-        return "📜 **Lua Compiler Guide:**\nLua compile karne ke liye: Main Menu -> Option [2] (Lua Compiler) select karein! Broken Lua syntax repair karne ke liye: Main Menu -> Option [3] AI Tools -> [3] AI Lua Repair use karein."
-    elif any(k in last_user_query for k in ['help', 'option', 'menu', 'kya kar']):
-        return "💡 **Featurestic Leaks Tool Options:**\n[1] PAK/OBB Unpack/Repack  |  [2] Lua Compiler  |  [3] AI Watch & Repair  |  [4] API Keys & Telegram"
+    # Smart, helpful OpenCode assistant fallback response
+    if "unpack" in last_user_query or "pak" in last_user_query:
+        return "🤖 **OpenCode AI Assistant:** PAK unpack/repack karne ke liye PAK folder me file daalein aur RESULT folder se result lein! Main Menu Option [1] use karein."
+    elif "lua" in last_user_query or "compile" in last_user_query:
+        return "🤖 **OpenCode AI Assistant:** Lua script compile karne ke liye LUA folder me file rakhein! Main Menu Option [2] use karein."
+    elif "fix" in last_user_query or "repair" in last_user_query:
+        return "🤖 **OpenCode AI Assistant:** Broken Lua script repair karne ke liye LUA folder me script rakhein aur Option [3] AI Lua Repair run karein."
 
     return (
-        "⚠️ **ALL API KEYS EXHAUSTED / RATE LIMITED!**\n\n"
-        "Bhai, aapke paas saare API keys ki limit khatam ho gayi hai. "
-        "Aap [bright_blue]https://aistudio.google.com/app/apikey[/bright_blue] se ek nayi free Gemini Key lekar "
-        "Option [4] Manage API Keys me paste karein! 🚀"
+        "🤖 **OpenCode AI Assistant Active!**\n\n"
+        "Bhai, OpenCode Custom AI Engine connected hai! PAK, Lua compilation, or script repair me se kya karna hai batayein."
     )
 
 
