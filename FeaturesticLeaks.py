@@ -1319,6 +1319,23 @@ def repack_pak_file_full(pak_file, edited_root, output_path, target_path=None, f
                 if found_match:
                     break
 
+        # Pass 3: Stem-only match (e.g., .luac replacing .lua or vice-versa)
+        if not found_match:
+            stem = p.stem.lower()
+            for dir_path, files in pak_file._index.items():
+                for name, entry in files.items():
+                    if Path(name).stem.lower() == stem:
+                        full_path = str(PurePath(dir_path)/name).replace('\\', '/')
+                        if target_path:
+                            new_fp = f"{target_path.rstrip('/')}/{p.name}"
+                            edited[new_fp] = (p, entry)
+                        else:
+                            edited[full_path] = (p, entry)
+                        found_match = True
+                        break
+                if found_match:
+                    break
+
     if not edited:
         console.print('[bold red][X] No files to repack![/bold red]')
         return 0
@@ -1366,11 +1383,8 @@ def repack_pak_file_full(pak_file, edited_root, output_path, target_path=None, f
                         ne.encrypted = template.encrypted if template else old_entry.encrypted
                         ne.unk1 = template.unk1 if template else old_entry.unk1
                         
-                        if template and target_path:
-                            full_path_str = mp_str + full_path
-                            ne.unk2 = SHA1.new(full_path_str.lower().encode('utf-8')).digest()
-                        else:
-                            ne.unk2 = template.unk2 if template else old_entry.unk2
+                        full_path_str = mp_str + full_path
+                        ne.unk2 = SHA1.new(full_path_str.lower().encode('utf-8')).digest()
                             
                         ne.index_new_sep = template.index_new_sep if template else old_entry.index_new_sep
 
@@ -7594,11 +7608,9 @@ def process_ai_smart_command(user_msg: str, data_path: Path) -> bool:
                     except (shutil.SameFileError, Exception):
                         pass
 
-                try:
-                    repack_pak_file_with_block_display(pak, temp_inject_dir, out_pak)
-                except Exception:
-                    # Fallback to full PAK rebuild with force_add to inject new/unindexed script into PAK
-                    console.print("[yellow]💡 In-place match not found in PAK index. Falling back to Full PAK Inject Mode (force_add)...[/yellow]")
+                count = repack_pak_file_full(pak, temp_inject_dir, out_pak, target_path=None, force_add=False)
+                if count == 0:
+                    console.print("[yellow]💡 In-place match not found in PAK index. Adding script to ShadowTrackerExtra/Content/Lua...[/yellow]")
                     repack_pak_file_full(pak, temp_inject_dir, out_pak, target_path="ShadowTrackerExtra/Content/Lua", force_add=True)
 
                 sd_res = Path("/sdcard/FeaturesticLeaks/RESULT") / out_pak.name
