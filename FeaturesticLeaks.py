@@ -1826,7 +1826,11 @@ def smart_resolve_by_fingerprint(filename: str, repack_file: Path, candidates: l
 
 def repack_pak_file_with_block_display(pak_file, edited_root: Path, output_path: Path):
     """Original repack with simple block display"""
-    shutil.copy2(pak_file._file_path, output_path)
+    if pak_file._file_path.resolve() != output_path.resolve():
+        try:
+            shutil.copy2(pak_file._file_path, output_path)
+        except Exception:
+            pass
     
     pak_name_map = {}
     for dir_path, files in pak_file._index.items():
@@ -4546,7 +4550,24 @@ def send_telegram_bug_report(err_type: str, err_msg: str, action_name: str = "Op
             
             url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
 
-            # Attempt 1: HTML Mode
+            # 1. Try via requests module if available
+            try:
+                import requests
+                r1 = requests.post(url, json={"chat_id": chat_id, "text": report_html, "parse_mode": "HTML"}, timeout=8)
+                if r1.status_code == 200:
+                    return
+                r2 = requests.post(url, json={"chat_id": chat_id, "text": report_plain}, timeout=8)
+                if r2.status_code == 200:
+                    return
+            except Exception:
+                pass
+
+            # 2. Fallback to urllib with unverified SSL context for Android / Termux SSL compatibility
+            import ssl
+            ssl_ctx = ssl.create_default_context()
+            ssl_ctx.check_hostname = False
+            ssl_ctx.verify_mode = ssl.CERT_NONE
+
             payload_html = json.dumps({
                 "chat_id": chat_id,
                 "text": report_html,
@@ -4555,15 +4576,14 @@ def send_telegram_bug_report(err_type: str, err_msg: str, action_name: str = "Op
             
             try:
                 req = urllib.request.Request(url, data=payload_html, headers={"Content-Type": "application/json"})
-                urllib.request.urlopen(req, timeout=6)
+                urllib.request.urlopen(req, timeout=8, context=ssl_ctx)
             except Exception as e_html:
-                # Attempt 2: Plain Text Fallback (Guarantees delivery even if HTML formatting fails)
                 payload_plain = json.dumps({
                     "chat_id": chat_id,
                     "text": report_plain
                 }).encode("utf-8")
                 req_plain = urllib.request.Request(url, data=payload_plain, headers={"Content-Type": "application/json"})
-                urllib.request.urlopen(req_plain, timeout=6)
+                urllib.request.urlopen(req_plain, timeout=8, context=ssl_ctx)
         except Exception:
             pass
 
