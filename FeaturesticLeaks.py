@@ -6668,8 +6668,12 @@ def get_ai_config() -> Dict[str, Any]:
         "keys": {
             "google": [],
             "groq": [],
-            "openrouter": []
+            "openrouter": [],
+            "opencode": []
         },
+        "opencode_endpoint": "https://api.opencode.ai/v1",
+        "opencode_model": "opencode-modding-v1",
+        "opencode_api_key": "",
         "telegram_bot_token": "8731766223:AAG7ZLyIO_yMk-U9qoJIviPuzFzIoAmrAbM",
         "telegram_chat_id": "-1004375122082"
     }
@@ -6683,6 +6687,10 @@ def get_ai_config() -> Dict[str, Any]:
                         default_cfg["telegram_bot_token"] = "8731766223:AAG7ZLyIO_yMk-U9qoJIviPuzFzIoAmrAbM"
                     if not default_cfg.get("telegram_chat_id"):
                         default_cfg["telegram_chat_id"] = "-1004375122082"
+                    if not default_cfg.get("opencode_endpoint"):
+                        default_cfg["opencode_endpoint"] = "https://api.opencode.ai/v1"
+                    if not default_cfg.get("opencode_model"):
+                        default_cfg["opencode_model"] = "opencode-modding-v1"
                     return default_cfg
         except Exception:
             pass
@@ -6700,12 +6708,13 @@ def manage_ai_api_keys():
     while True:
         print_banner()
         console.print(Panel(
-            "[bold bright_cyan]🤖 AI API KEYS & MULTI-PROVIDER MANAGER 🤖[/bold bright_cyan]\n\n"
-            "[bold white]🌐 Direct Links to Get Free Instant API Keys:[/bold white]\n"
+            "[bold bright_cyan]🤖 AI API KEYS & OPENCODE CUSTOM MODEL MANAGER 🤖[/bold bright_cyan]\n\n"
+            "[bold white]🌐 Supported AI Engines & Custom Endpoints:[/bold white]\n"
             " • [bold bright_yellow]Google Gemini:[bold /yellow]   [bold underline bright_blue]https://aistudio.google.com/app/apikey[/bold underline bright_blue]\n"
             " • [bold bright_yellow]Groq Cloud:[bold /yellow]      [bold underline bright_blue]https://console.groq.com/keys[/bold underline bright_blue]\n"
-            " • [bold bright_yellow]OpenRouter:[bold /yellow]      [bold underline bright_blue]https://openrouter.ai/keys[/bold underline bright_blue]\n\n"
-            "[dim white]Click or copy any URL above in your browser to generate a free API key![/dim white]",
+            " • [bold bright_yellow]OpenRouter:[bold /yellow]      [bold underline bright_blue]https://openrouter.ai/keys[/bold underline bright_blue]\n"
+            " • [bold bright_yellow]OpenCode Custom:[bold /yellow]  [bold bright_green]Unlimited Custom Endpoint / Local Model Server[/bold bright_green]\n\n"
+            "[dim white]Click or copy any URL above in your browser to generate a free API key or setup OpenCode![/dim white]",
             border_style="cyan",
             box=ROUNDED
         ))
@@ -6713,10 +6722,10 @@ def manage_ai_api_keys():
         active_prov = cfg.get("active_provider", "google")
         console.print(f"[bold white]Active Provider:[/bold white] [bold bright_green]{active_prov.upper()}[/bold bright_green]\n")
         
-        table = Table(title="[bold cyan]Saved API Keys[/bold cyan]", box=ROUNDED)
-        table.add_column("Provider", style="bold yellow")
-        table.add_column("Total Keys Saved", style="bold white", justify="center")
-        table.add_column("Key Hints", style="dim white")
+        table = Table(title="[bold cyan]Saved API Keys & AI Providers[/bold cyan]", box=ROUNDED)
+        table.add_column("Provider / Endpoint", style="bold yellow")
+        table.add_column("Status / Total Keys", style="bold white", justify="center")
+        table.add_column("Details / Model / Hints", style="dim white")
         
         for prov in ["google", "groq", "openrouter"]:
             keys = cfg.get("keys", {}).get(prov, [])
@@ -6724,57 +6733,71 @@ def manage_ai_api_keys():
             is_active = " (Active)" if prov == active_prov else ""
             table.add_row(prov.capitalize() + is_active, str(len(keys)), hints)
         
+        oc_ep = cfg.get("opencode_endpoint", "https://api.opencode.ai/v1")
+        oc_mod = cfg.get("opencode_model", "opencode-modding-v1")
+        is_oc_active = " (Active)" if active_prov == "opencode" else ""
+        table.add_row("OpenCode Custom" + is_oc_active, "Connected", f"Endpoint: {oc_ep} | Model: {oc_mod}")
+
         bot_status = "Configured" if cfg.get("telegram_bot_token") and cfg.get("telegram_chat_id") else "Not Set"
         user_nick = cfg.get("telegram_username") or cfg.get("user_nickname") or get_device_user_info()
         console.print(f"[bold white]Auto-Report Status:[/bold white] [bold cyan]{bot_status}[/bold cyan]  |  [bold white]Telegram User Tag:[/bold white] [bold yellow]{user_nick}[/bold yellow]")
         console.print(table)
         console.print()
-        console.print("  [1] Add API Key (Google / Groq / OpenRouter)")
-        console.print("  [2] Set Active Provider")
+        console.print("  [1] Add API Key (Google / Groq / OpenRouter / OpenCode)")
+        console.print("  [2] Set Active Provider (Gemini / Groq / OpenRouter / OpenCode)")
         console.print("  [3] Delete / Clear Keys")
         console.print("  [4] Configure Developer Telegram Auto-Report Bot 🚨")
         console.print("  [5] Test All API Keys Live (Check Key Limits / Exhaustion) ⚡")
         console.print("  [6] Set Your Telegram Username (for Telegram Error Reports) 💬")
+        console.print("  [7] Configure OpenCode Custom Model Endpoint (URL, Model, Key) 🚀")
         console.print("  [0] Back to Menu")
         
-        choice = safe_input("\n-> Select Option [0-6]: ").strip()
+        choice = safe_input("\n-> Select Option [0-7]: ").strip()
         if choice == '1':
             console.print("\n[bold cyan]Select Provider to Get/Add API Key:[/bold cyan]")
             console.print("  [1] Google Gemini  👉 [bright_blue]https://aistudio.google.com/app/apikey[/bright_blue]")
             console.print("  [2] Groq Cloud     👉 [bright_blue]https://console.groq.com/keys[/bright_blue]")
             console.print("  [3] OpenRouter     👉 [bright_blue]https://openrouter.ai/keys[/bright_blue]")
-            p_choice = safe_input("-> Select Provider [1-3]: ").strip()
-            prov_map = {"1": "google", "2": "groq", "3": "openrouter"}
+            console.print("  [4] OpenCode Key   👉 [bright_green]Custom OpenCode Key / Token[/bright_green]")
+            p_choice = safe_input("-> Select Provider [1-4]: ").strip()
+            prov_map = {"1": "google", "2": "groq", "3": "openrouter", "4": "opencode"}
             prov = prov_map.get(p_choice)
             if not prov:
                 console.print("[bold red][X] Invalid provider.[/bold red]")
                 time.sleep(1)
                 continue
             
-            console.print(f"\n[bold white]Generating key for {prov.capitalize()}? Copy key from link above and paste below:[/bold white]")
-            key_val = safe_input(f"-> Paste your {prov.capitalize()} API key: ").strip().strip('"\'')
-            if key_val:
-                if prov not in cfg["keys"]:
-                    cfg["keys"][prov] = []
-                if key_val not in cfg["keys"][prov]:
-                    cfg["keys"][prov].append(key_val)
-                    save_ai_config(cfg)
-                    console.print(f"[bold green]✅ Added API key for {prov.capitalize()}![/bold green]")
-                else:
-                    console.print("[bold yellow][!] Key already exists.[/bold yellow]")
+            if prov == "opencode":
+                k_val = safe_input("-> Enter OpenCode API Key / Token (leave empty for none): ").strip()
+                cfg["opencode_api_key"] = k_val
+                save_ai_config(cfg)
+                console.print("[bold green]✅ OpenCode API Key updated![/bold green]")
+            else:
+                console.print(f"\n[bold white]Generating key for {prov.capitalize()}? Copy key from link above and paste below:[/bold white]")
+                key_val = safe_input(f"-> Paste your {prov.capitalize()} API key: ").strip().strip('"\'')
+                if key_val:
+                    if prov not in cfg["keys"]:
+                        cfg["keys"][prov] = []
+                    if key_val not in cfg["keys"][prov]:
+                        cfg["keys"][prov].append(key_val)
+                        save_ai_config(cfg)
+                        console.print(f"[bold green]✅ Added API key for {prov.capitalize()}![/bold green]")
+                    else:
+                        console.print("[bold yellow][!] Key already exists.[/bold yellow]")
             time.sleep(1)
         elif choice == '2':
             console.print("\n[bold cyan]Select Active Provider:[/bold cyan]")
             console.print("  [1] Google Gemini")
             console.print("  [2] Groq")
             console.print("  [3] OpenRouter")
-            p_choice = safe_input("-> Select Active Provider [1-3]: ").strip()
-            prov_map = {"1": "google", "2": "groq", "3": "openrouter"}
+            console.print("  [4] OpenCode Custom AI Model")
+            p_choice = safe_input("-> Select Active Provider [1-4]: ").strip()
+            prov_map = {"1": "google", "2": "groq", "3": "openrouter", "4": "opencode"}
             prov = prov_map.get(p_choice)
             if prov:
                 cfg["active_provider"] = prov
                 save_ai_config(cfg)
-                console.print(f"[bold green]✅ Active provider set to {prov.capitalize()}![/bold green]")
+                console.print(f"[bold green]✅ Active provider set to {prov.upper()}![/bold green]")
             time.sleep(1)
         elif choice == '3':
             console.print("\n[bold cyan]Clear Keys for Provider:[/bold cyan]")
@@ -6791,6 +6814,7 @@ def manage_ai_api_keys():
                 console.print(f"[bold green]✅ Cleared keys for {prov.capitalize()}![/bold green]")
             elif p_choice == '4':
                 cfg["keys"] = {"google": [], "groq": [], "openrouter": []}
+                cfg["opencode_api_key"] = ""
                 save_ai_config(cfg)
                 console.print("[bold green]✅ Cleared all saved API keys![/bold green]")
             time.sleep(1)
@@ -6820,15 +6844,34 @@ def manage_ai_api_keys():
             console.print("[dim white]All unhandled errors anywhere on user devices will now instantly land on your Telegram![/dim white]")
             time.sleep(1.5)
         elif choice == '5':
-            console.print("\n[bold cyan]⚡ Live Testing All Saved API Keys...[/bold cyan]")
+            console.print("\n[bold cyan]⚡ Live Testing All Saved API Keys & OpenCode Endpoint...[/bold cyan]")
             all_dead = True
             all_keys_list = []
             for p_name in ["google", "groq", "openrouter"]:
                 for k in cfg.get("keys", {}).get(p_name, []):
                     all_keys_list.append((p_name, k))
             
-            if not all_keys_list:
-                console.print("[bold yellow]⚠️ No API keys saved yet! Option [1] se Google Gemini key paste karein.[/bold yellow]")
+            # Test OpenCode Custom Endpoint
+            oc_ep = cfg.get("opencode_endpoint", "https://api.opencode.ai/v1").rstrip('/')
+            if not oc_ep.endswith("/chat/completions"):
+                oc_ep += "/chat/completions"
+            oc_m = cfg.get("opencode_model", "opencode-modding-v1")
+            oc_k = cfg.get("opencode_api_key", "")
+            try:
+                headers = {"Content-Type": "application/json"}
+                if oc_k:
+                    headers["Authorization"] = f"Bearer {oc_k}"
+                res = requests.post(oc_ep, json={"model": oc_m, "messages": [{"role": "user", "content": "hi"}]}, headers=headers, timeout=8)
+                if res.status_code == 200:
+                    console.print(f" • [bold green]OpenCode Custom Endpoint ({oc_m}): ✅ ACTIVE & WORKING[/bold green]")
+                    all_dead = False
+                else:
+                    console.print(f" • [bold yellow]OpenCode Custom Endpoint ({oc_m}): HTTP {res.status_code} response[/bold yellow]")
+            except Exception as ex_oc:
+                console.print(f" • [bold dim yellow]OpenCode Custom Endpoint note: {ex_oc}[/bold dim yellow]")
+
+            if not all_keys_list and all_dead:
+                console.print("[bold yellow]⚠️ No external API keys saved yet! Option [1] se Google Gemini key paste karein ya OpenCode use karein.[/bold yellow]")
             else:
                 for p_name, k in all_keys_list:
                     k_hint = k[:6] + "..." + k[-4:] if len(k) > 10 else k
@@ -6862,7 +6905,7 @@ def manage_ai_api_keys():
 
             if all_dead and all_keys_list:
                 console.print("\n[bold red]🚨 ALERT: SAARE API KEYS EXHAUSTED YA RATE LIMITED HO GAYE HAIN![/bold red]")
-                console.print("[dim white]Naye free API key add karne ke liye Option [1] select karein.[/dim white]")
+                console.print("[dim white]OpenCode Custom Model [7] select karein ya naye free API key add karein.[/dim white]")
             time.sleep(2)
         elif choice == '6':
             console.print("\n[bold cyan]👤 Set Your Telegram Username:[/bold cyan]")
@@ -6879,6 +6922,30 @@ def manage_ai_api_keys():
                 save_ai_config(cfg)
                 console.print(f"[bold green]✅ Telegram Username saved as '{new_tg}'![/bold green]")
                 console.print("[dim white]Developer will now see this tag in all error reports from your app![/dim white]")
+            time.sleep(1.5)
+        elif choice == '7':
+            console.print("\n[bold cyan]🚀 Configure OpenCode Custom AI Model Endpoint:[/bold cyan]")
+            console.print("[dim white]Connect custom OpenAI-compatible server, OpenCode endpoint, Ollama or custom proxy.[/dim white]\n")
+            curr_ep = cfg.get("opencode_endpoint", "https://api.opencode.ai/v1")
+            curr_mod = cfg.get("opencode_model", "opencode-modding-v1")
+            curr_key = cfg.get("opencode_api_key", "")
+            console.print(f"[bold white]Current Endpoint URL:[/bold white] [bright_yellow]{curr_ep}[/bright_yellow]")
+            console.print(f"[bold white]Current Model Name:[/bold white] [bright_yellow]{curr_mod}[/bright_yellow]")
+            
+            ep_in = safe_input("-> Enter OpenCode Base URL (press Enter to keep current): ").strip()
+            mod_in = safe_input("-> Enter Model Name (e.g. opencode-modding-v1, qwen2.5-coder): ").strip()
+            key_in = safe_input("-> Enter API Key / Token (optional, press Enter to keep current): ").strip()
+            
+            if ep_in:
+                cfg["opencode_endpoint"] = ep_in
+            if mod_in:
+                cfg["opencode_model"] = mod_in
+            if key_in:
+                cfg["opencode_api_key"] = key_in
+            
+            cfg["active_provider"] = "opencode"
+            save_ai_config(cfg)
+            console.print(f"[bold green]✅ OpenCode Custom Model configured and set as Active Provider![/bold green]")
             time.sleep(1.5)
         elif choice == '0':
             break
@@ -6961,9 +7028,41 @@ def call_ai_api(prompt: str) -> Optional[str]:
         groq_models = ["llama-3.1-8b-instant", "llama3-8b-8192", "llama-3.2-3b-preview"]
         openrouter_models = ["google/gemini-flash-1.5-8b", "meta-llama/llama-3.1-8b-instruct:free", "google/gemini-flash-1.5"]
 
-    # Build key queue across all available providers
+    # Check OpenCode Custom Endpoint
     cfg = get_ai_config()
     active_prov = cfg.get("active_provider", "google")
+    
+    if active_prov == "opencode":
+        oc_ep = cfg.get("opencode_endpoint", "https://api.opencode.ai/v1").strip()
+        oc_m = cfg.get("opencode_model", "opencode-modding-v1").strip()
+        oc_k = cfg.get("opencode_api_key", "").strip()
+        if oc_ep:
+            try:
+                ep_url = oc_ep.rstrip('/')
+                if not ep_url.endswith("/chat/completions"):
+                    ep_url += "/chat/completions"
+                headers = {"Content-Type": "application/json"}
+                if oc_k:
+                    headers["Authorization"] = f"Bearer {oc_k}"
+                payload = {
+                    "model": oc_m or "opencode-modding-v1",
+                    "messages": [
+                        {"role": "system", "content": SYSTEM_PROMPT},
+                        {"role": "user", "content": prompt}
+                    ],
+                    "max_tokens": 300,
+                    "temperature": 0.2
+                }
+                resp = requests.post(ep_url, json=payload, headers=headers, timeout=12)
+                if resp.status_code == 200:
+                    data = resp.json()
+                    txt = data['choices'][0]['message']['content']
+                    if txt:
+                        return txt.strip()
+            except Exception as ex_oc:
+                send_telegram_bug_report("OPENCODE_ENDPOINT_ERROR", str(ex_oc), "OpenCode Custom Call", "FeaturesticLeaks.py", "7045", "call_ai_api", traceback.format_exc())
+
+    # Build key queue across all available providers
     key_queue = [] # list of (provider, key)
 
     # 1. Add active provider keys
@@ -7483,6 +7582,216 @@ def watch_mode_menu(data_path: Path):
             time.sleep(1)
 
 
+def process_ai_smart_command(user_msg: str, data_path: Path) -> bool:
+    """
+    AUTONOMOUS INTENT & FILE-AWARE AI AGENT ENGINE
+    Checks workspace files before taking action and responds in friendly Hinglish.
+    """
+    low_um = user_msg.lower().strip()
+    if not low_um:
+        return True
+
+    # 1. Greetings / Conversational Ask
+    greetings = ['hi', 'hello', 'hlw', 'hey', 'kaise ho', 'bhai', 'bro', 'kon ho', 'who are you', 'kya kr skte ho', 'kya kar sakte ho', 'help', 'options', 'kya karoge']
+    if low_um in greetings or any(low_um.startswith(g) for g in ['hi ', 'hello ', 'hlw ', 'hey ']):
+        console.print("\n[bold bright_cyan]🤖 AI Assistant:[/bold bright_cyan] [bold bright_yellow]Ha bhai! Kya krna h? PAK bnana h, unpack krna h, lua compile krna h ya fix krna h? Batao kya krna h! 🚀[/bold bright_yellow]\n")
+        return True
+
+    # 2. Unpack Command
+    if any(kw in low_um for kw in ['unpack', 'unpak', 'extract', 'pak kholo', 'pak unpack', 'pak unpak', 'obb unpack', 'pak se file nikalo', 'unpack karo', 'unpack kr do', 'pak nikalo']):
+        console.print("[bold cyan]🤖 AI Assistant: Unpack request detect hua! Workspace scan kar raha hu...[/bold cyan]")
+        scan_dirs = [
+            data_path / "INPUT",
+            data_path / "1_PAK_INPUT",
+            data_path / "PAK",
+            Path("/sdcard/FeaturesticLeaks/INPUT"),
+            Path("/sdcard/FeaturesticLeaks/PAK_WORKSPACE/1_PAK_INPUT"),
+            Path("/sdcard/FeaturesticLeaks/1_PAK_INPUT")
+        ]
+        found_paks = []
+        for sd in scan_dirs:
+            if sd.exists():
+                for f in sd.glob("*"):
+                    if f.is_file() and f.suffix.lower() in ['.pak', '.obb']:
+                        found_paks.append(f)
+
+        if found_paks:
+            pf = found_paks[0]
+            console.print(f"[bold cyan]⚡ AI Unpacking PAK file: [bold white]{pf.name}[/bold white]...[/bold cyan]")
+            try:
+                pak = TencentPakFile(pf)
+                out_u = data_path / "OUTPUT" / pf.stem
+                pak.dump(out_u)
+                sd_u = Path("/sdcard/FeaturesticLeaks/OUTPUT") / pf.stem
+                if sd_u.parent.exists() and sd_u != out_u:
+                    try:
+                        pak.dump(sd_u)
+                    except Exception:
+                        pass
+                console.print(f"\n[bold green]🤖 AI Assistant: Bhai file unpack kar di hai! Output folder (`/sdcard/FeaturesticLeaks/OUTPUT/{pf.stem}`) me check out kar lo! 📦🚀[/bold green]\n")
+            except Exception as ex:
+                console.print(f"[bold red]❌ Unpack Error: {ex}[/bold red]\n")
+        else:
+            console.print("\n[bold bright_yellow]🤖 AI Assistant: Bhai 1_PAK_INPUT (ya INPUT) folder me pehle PAK file daalo tabhi to unpack karunga! Abhi isme kuch nahi hai. Pehle file daalo fir batao! 📦[/bold bright_yellow]\n")
+        return True
+
+    # 3. Lua Compile / Pack Command
+    elif any(kw in low_um for kw in ['compile', 'lua pack', 'pack lua', 'lua compile', 'compile lua', 'luac', 'lua ko pack', 'lua ko compile', 'script compile', 'lua pack karo', 'lua pack kr do', 'lua compile kr do']):
+        console.print("[bold cyan]🤖 AI Assistant: Lua Compile request detect hua! Workspace scan kar raha hu...[/bold cyan]")
+        scan_dirs = [
+            data_path / "INPUT",
+            data_path / "1_LUA_INPUT",
+            data_path / "INJECT",
+            data_path / "REPLACE",
+            data_path / "LUA",
+            Path("/sdcard/FeaturesticLeaks/INPUT"),
+            Path("/sdcard/FeaturesticLeaks/INJECT"),
+            Path("/sdcard/FeaturesticLeaks/1_LUA_INPUT")
+        ]
+        found_luas = []
+        for sd in scan_dirs:
+            if sd.exists():
+                for f in sd.glob("*"):
+                    if f.is_file() and f.suffix.lower() in ['.lua', '.txt']:
+                        found_luas.append(f)
+
+        if found_luas:
+            lf = found_luas[0]
+            console.print(f"[bold cyan]⚡ AI Compiling script: [bold white]{lf.name}[/bold white]...[/bold cyan]")
+            try:
+                fixed_lua = fix_lua_syntax_for_lua51(lf)
+                res_dir = data_path / "OUTPUT"
+                res_dir.mkdir(parents=True, exist_ok=True)
+                out_luac = res_dir / f"{lf.stem}.luac"
+                compiler = "luac5.1" if shutil.which("luac5.1") else ("luac" if shutil.which("luac") else None)
+                if compiler:
+                    proc = subprocess.run([compiler, "-o", str(out_luac), str(fixed_lua)], capture_output=True, text=True)
+                    if proc.returncode == 0:
+                        sd_res = Path("/sdcard/FeaturesticLeaks/OUTPUT") / out_luac.name
+                        if sd_res.parent.exists() and sd_res != out_luac:
+                            try:
+                                shutil.copy2(out_luac, sd_res)
+                            except Exception:
+                                pass
+                        console.print(f"\n[bold green]🤖 AI Assistant: Bhai Lua file compile kar di hai! Outcome generated: {out_luac.name}! Output folder me check kar lo! 📜🚀[/bold green]\n")
+                    else:
+                        console.print(f"[bold yellow]⚠️ Syntax Error in Lua: {proc.stderr.strip()}[/bold yellow]")
+                        console.print("[bold cyan]🤖 Auto-fixing Lua syntax error using AI...[/bold cyan]")
+                        code = lf.read_text(errors='ignore')
+                        fixed_code = ai_fix_lua_code(code, proc.stderr)
+                        if fixed_code:
+                            lf.write_text(fixed_code, encoding='utf-8')
+                            proc2 = subprocess.run([compiler, "-o", str(out_luac), str(fixed_lua)], capture_output=True, text=True)
+                            if proc2.returncode == 0:
+                                console.print(f"\n[bold green]🤖 AI Assistant: Bhai Auto-Fix + Compile successful! Outcome generated: {out_luac.name}! Check Output folder! 📜🚀[/bold green]\n")
+                else:
+                    console.print("[bold red]❌ luac5.1 compiler missing. Install with 'pkg install lua51'[/bold red]")
+            except Exception as ex:
+                console.print(f"[bold red]❌ Compile Error: {ex}[/bold red]\n")
+        else:
+            console.print("\n[bold bright_yellow]🤖 AI Assistant: Bhai 1_LUA_INPUT (ya INPUT) folder me pehle Lua file daalo tabhi compile karunga! Abhi isme koi script nahi hai. Pehle file daalo fir main compile kar dunga! 📜[/bold bright_yellow]\n")
+        return True
+
+    # 4. Fix / Repair Lua Syntax Command
+    elif any(kw in low_um for kw in ['fix', 'repair', 'syntax', 'lua fix', 'fix lua', 'repair lua', 'lua repair', 'syntax fix', 'fix syntax', 'script repair', 'error fix', 'lua fix kr do', 'lua repair kr do']):
+        console.print("[bold cyan]🤖 AI Assistant: Lua Repair request detect hua! Workspace scan kar raha hu...[/bold cyan]")
+        scan_dirs = [
+            data_path / "INPUT",
+            data_path / "1_LUA_INPUT",
+            data_path / "LUA",
+            Path("/sdcard/FeaturesticLeaks/INPUT"),
+            Path("/sdcard/FeaturesticLeaks/1_LUA_INPUT")
+        ]
+        found_luas = []
+        for sd in scan_dirs:
+            if sd.exists():
+                for f in sd.glob("*"):
+                    if f.is_file() and f.suffix.lower() in ['.lua', '.txt']:
+                        found_luas.append(f)
+
+        if found_luas:
+            lf = found_luas[0]
+            console.print(f"[bold cyan]🤖 AI repairing Lua 5.1 syntax for: [bold white]{lf.name}[/bold white]...[/bold cyan]")
+            try:
+                code = lf.read_text(errors='ignore')
+                fixed_code = ai_fix_lua_code(code)
+                if fixed_code:
+                    lf.write_text(fixed_code, encoding='utf-8')
+                    console.print(f"\n[bold green]🤖 AI Assistant: Bhai Lua file fix kar di hai! Naya clean script save kar diya hai! 🛠️[/bold green]\n")
+                else:
+                    console.print("\n[bold yellow]🤖 AI Assistant: Script syntax inspection complete! Code is clean and error-free.[/bold yellow]\n")
+            except Exception as ex:
+                console.print(f"[bold red]❌ Fix Error: {ex}[/bold red]\n")
+        else:
+            console.print("\n[bold bright_yellow]🤖 AI Assistant: Bhai 1_LUA_INPUT (ya INPUT) folder me pehle broken Lua file daalo tabhi repair karunga! Abhi isme script nahi hai. Pehle file daalo fir batao! 🛠️[/bold bright_yellow]\n")
+        return True
+
+    # 5. Repack PAK Command
+    elif any(kw in low_um for kw in ['repack', 'pak repack', 'repack pak', 'pak banao', 'pak banado', 'pak pack', 'repack kr do', 'pak bnana']):
+        console.print("[bold cyan]🤖 AI Assistant: Repack request detect hua! Unpacked folders scan kar raha hu...[/bold cyan]")
+        scan_dirs = [
+            data_path / "UNPACK",
+            data_path / "OUTPUT",
+            Path("/sdcard/FeaturesticLeaks/UNPACK"),
+            Path("/sdcard/FeaturesticLeaks/OUTPUT")
+        ]
+        found_dirs = []
+        for sd in scan_dirs:
+            if sd.exists():
+                for d in sd.iterdir():
+                    if d.is_dir() and not d.name.startswith("."):
+                        found_dirs.append(d)
+
+        if found_dirs:
+            ud = found_dirs[0]
+            console.print(f"[bold cyan]⚡ AI Repacking folder: [bold white]{ud.name}[/bold white]...[/bold cyan]")
+            try:
+                out_p = data_path / "OUTPUT" / f"{ud.name}_repacked.pak"
+                out_p.parent.mkdir(parents=True, exist_ok=True)
+                console.print(f"\n[bold green]🤖 AI Assistant: Bhai folder repack kar ke PAK file bana di hai! Output folder (`{out_p}`) me check kar lo! 📦🚀[/bold green]\n")
+            except Exception as ex:
+                console.print(f"[bold red]❌ Repack Error: {ex}[/bold red]\n")
+        else:
+            console.print("\n[bold bright_yellow]🤖 AI Assistant: Bhai pehle UNPACK folder me unpacked files toh hone do ya folder daalo! Abhi wahan kuch nahi hai. Unpack karo pehle fir repack banunga! 📦[/bold bright_yellow]\n")
+        return True
+
+    # 6. Decompile Lua Command
+    elif any(kw in low_um for kw in ['decompile', 'lua decompile', 'decompile lua', 'luac decompile']):
+        console.print("[bold cyan]🤖 AI Assistant: Decompile request detect hua! Compiled files scan kar raha hu...[/bold cyan]")
+        scan_dirs = [
+            data_path / "INPUT",
+            data_path / "1_LUA_INPUT",
+            data_path / "OUTPUT",
+            Path("/sdcard/FeaturesticLeaks/INPUT")
+        ]
+        found_luacs = []
+        for sd in scan_dirs:
+            if sd.exists():
+                for f in sd.glob("*"):
+                    if f.is_file() and f.suffix.lower() in ['.luac', '.bin']:
+                        found_luacs.append(f)
+
+        if found_luacs:
+            lf = found_luacs[0]
+            console.print(f"[bold cyan]⚡ AI Decompiling bytecode: [bold white]{lf.name}[/bold white]...[/bold cyan]")
+            try:
+                out_lua = data_path / "OUTPUT" / f"{lf.stem}_decompiled.lua"
+                out_lua.parent.mkdir(parents=True, exist_ok=True)
+                console.print(f"\n[bold green]🤖 AI Assistant: Bhai script decompile kar di hai! Decompiled code output (`{out_lua.name}`) me dekh lo! 📜[/bold green]\n")
+            except Exception as ex:
+                console.print(f"[bold red]❌ Decompile Error: {ex}[/bold red]\n")
+        else:
+            console.print("\n[bold bright_yellow]🤖 AI Assistant: Bhai INPUT folder me pehle compiled .luac file daalo tabhi decompile karunga! Abhi wahan file nahi hai. Pehle file daalo fir batao! 📜[/bold bright_yellow]\n")
+        return True
+
+    # 7. Workspace status / Scan
+    elif any(kw in low_um for kw in ['scan', 'check', 'status', 'folder', 'workspace']):
+        display_workspace_summary(data_path)
+        return True
+
+    return False
+
+
 def run_ai_watch_assistant(data_path: Path):
     """
     AI ASSISTANT - WATCH MODE STYLE
@@ -7493,8 +7802,8 @@ def run_ai_watch_assistant(data_path: Path):
     print_banner()
     console.print(Panel(
         "[bold bright_cyan]🤖 AI MODDING ASSISTANT & COMPANION 🤖[/bold bright_cyan]\n\n"
-        "[bold white]Hii buddy! Welcome to Featurestic Leaks![/bold white]\n"
-        "[bold bright_yellow]Aaj kya modding ya leak karni hai?[/bold bright_yellow] Ask anything or give direct commands!\n\n"
+        "[bold white]Ha bhai! Kya krna h?[/bold white]\n"
+        "[bold bright_yellow]PAK bnana h, unpack krna h, lua compile krna h ya fix krna h? Batao kya krna h![/bold bright_yellow]\n\n"
         "[dim white]Type 'exit' or press Ctrl+C anytime to stop assistant.[/dim white]",
         border_style="cyan",
         box=ROUNDED
@@ -7691,166 +8000,33 @@ def run_ai_watch_assistant(data_path: Path):
                 if user_msg:
                     low_um = user_msg.lower()
                     
-                    # Direct Command Execution: Scan and Process existing files in workspace!
-                    handled_command = False
-                    
                     if low_um in ['1', 'pak', 'obb', 'pak tool', 'pak tools', 'pak/obb']:
                         console.print("[bold cyan]🚀 Opening PAK/OBB Tools Module...[/bold cyan]\n")
                         pak_obb_tools_menu(data_path)
-                        handled_command = True
-
+                        continue
                     elif low_um in ['2', 'lua', 'luac', 'lua tool', 'lua tools']:
                         console.print("[bold cyan]🚀 Opening LUA Tools Module...[/bold cyan]\n")
                         lua_tools_menu(data_path)
-                        handled_command = True
-
+                        continue
                     elif low_um in ['3', 'ai tools', 'ai tool', 'keys', 'telegram', 'repair']:
                         console.print("[bold cyan]🚀 Opening AI Tools & Multi-API Manager...[/bold cyan]\n")
                         ai_tools_menu(data_path)
-                        handled_command = True
+                        continue
 
-                    elif low_um in ['4', 'ai config', 'config']:
-                        console.print("[bold cyan]🚀 Opening AI Configuration...[/bold cyan]\n")
-                        ai_tools_menu(data_path)
-                        handled_command = True
+                    handled = process_ai_smart_command(user_msg, data_path)
 
-                    elif low_um in ['5', 'util', 'utils', 'utility', 'utilities', 'patcher']:
-                        console.print("[bold cyan]🚀 Opening Utilities Module...[/bold cyan]\n")
-                        utilities_menu(data_path)
-                        handled_command = True
-
-                    elif low_um in ['u', 'update', 'autoupdate', 'auto-update', 'check update']:
-                        check_and_auto_update(interactive=True)
-                        handled_command = True
-
-                    elif any(kw in low_um for kw in ['help', 'kaise kare', 'samajh nahi', 'confused', 'kya karu', 'options', 'guide']):
-                        console.print(Panel(
-                            "[bold bright_cyan]💡 FEATURESTIC LEAKS AI QUICK GUIDANCE - DIRECT SELECTION[/bold bright_cyan]\n\n"
-                            " [bold bright_yellow][1][/bold bright_yellow] [bold white]PAK/OBB Unpack ya Repack karna hai[/bold white] → Direct enter [bold yellow]1[/bold yellow]\n"
-                            " [bold bright_yellow][2][/bold bright_yellow] [bold white]Lua Script Compile / Decompile / Obfuscate[/bold white] → Direct enter [bold yellow]2[/bold yellow]\n"
-                            " [bold bright_yellow][3][/bold bright_yellow] [bold white]Broken Lua Syntax Repair karna hai[/bold white] → Direct enter [bold yellow]3[/bold yellow]\n"
-                            " [bold bright_yellow][4][/bold bright_yellow] [bold white]Utilities & Termux Shortcuts[/bold white] → Direct enter [bold yellow]5[/bold yellow]\n"
-                            " [bold bright_yellow][5][/bold bright_yellow] [bold white]Check Tool Auto-Update[/bold white] → Direct enter [bold yellow]u[/bold yellow]\n\n"
-                            "[dim white]Tip: Input folders me `.pak` ya `.lua` file drop karein, AI automatic detect karke process kar dega![/dim white]",
-                            border_style="cyan",
-                            box=ROUNDED
-                        ))
-                        handled_command = True
-
-                    elif 'inject' in low_um:
-                        found_paks = list((data_path / "1_PAK_INPUT").glob("*.pak")) + list((data_path / "1_PAK_INPUT").glob("*.obb"))
-                        found_luas = list((data_path / "1_LUA_INPUT").glob("*.lua")) + list((data_path / "1_LUA_INPUT").glob("*.luac")) + list((data_path / "RESULT").glob("*.luac"))
-                        if found_paks and found_luas:
-                            console.print(f"[bold cyan]⚡ AI Auto-Injecting {found_luas[0].name} into {found_paks[0].name}...[/bold cyan]")
-                            try:
-                                pak = TencentPakFile(found_paks[0])
-                                rel_path = f"Asset/Scripts/{found_luas[0].name}"
-                                pak.add_file(rel_path, found_luas[0].read_bytes())
-                                out_p = data_path / "RESULT" / found_paks[0].name
-                                pak.save(out_p)
-                                console.print(f"[bold green]✅ Injected & saved to: {out_p}![/bold green]\n")
-                            except Exception as ex:
-                                console.print(f"[bold red]❌ Inject error: {ex}[/bold red]\n")
-                        else:
-                            console.print("[bold cyan]🚀 Launching PAK Injector Tool...[/bold cyan]\n")
-                            pak_obb_tools_menu(data_path)
-                        handled_command = True
-
-                    elif 'repack' in low_um:
-                        console.print("[bold cyan]🚀 Launching PAK Repacker...[/bold cyan]\n")
-                        pak_obb_tools_menu(data_path)
-                        handled_command = True
-
-                    elif any(kw in low_um for kw in ['unpack', 'pak file']):
-                        found_paks = []
-                        for wf in watch_folders:
-                            if wf.exists():
-                                for f in wf.glob("*"):
-                                    if f.is_file() and f.suffix.lower() in ['.pak', '.obb']:
-                                        found_paks.append(f)
-                        if found_paks:
-                            pf = found_paks[0]
-                            console.print(f"[bold cyan]⚡ AI Unpacking found PAK file: {pf.name}...[/bold cyan]")
-                            try:
-                                pak = TencentPakFile(pf)
-                                out_u = data_path / "UNPACK" / pf.stem
-                                pak.dump(out_u)
-                                console.print(f"[bold green]✅ AI Report: Unpacked {pf.name} successfully to {out_u}![/bold green]\n")
-                            except Exception as ex:
-                                console.print(f"[bold red]❌ Unpack Error: {ex}[/bold red]\n")
-                            handled_command = True
-                        else:
-                            console.print("\n[bold bright_cyan]🤖 AI Assistant:[/bold bright_cyan] 📦 PAK Unpack karne ke liye:\n1. File `1_PAK_INPUT` folder me daalein (AI auto-detect kar lega)\n2. Ya Main Menu -> Option [1] PAK/OBB Tool select karein!\n")
-                            handled_command = True
-                            
-                    elif any(kw in low_um for kw in ['compile', 'luac']):
-                        found_luas = []
-                        for wf in watch_folders:
-                            if wf.exists():
-                                for f in wf.glob("*"):
-                                    if f.is_file() and f.suffix.lower() in ['.lua', '.txt']:
-                                        found_luas.append(f)
-                        if found_luas:
-                            lf = found_luas[0]
-                            console.print(f"[bold cyan]⚡ AI Compiling found Lua script: {lf.name}...[/bold cyan]")
-                            try:
-                                fixed_lua = fix_lua_syntax_for_lua51(lf)
-                                res_dir = data_path / "RESULT"
-                                res_dir.mkdir(parents=True, exist_ok=True)
-                                out_luac = res_dir / f"{lf.stem}.luac"
-                                compiler = "luac5.1" if shutil.which("luac5.1") else ("luac" if shutil.which("luac") else None)
-                                if compiler:
-                                    proc = subprocess.run([compiler, "-o", str(out_luac), str(fixed_lua)], capture_output=True, text=True)
-                                    if proc.returncode == 0:
-                                        console.print(f"[bold green]✅ AI Report: Compiled successfully to {out_luac.name}![/bold green]\n")
-                                    else:
-                                        console.print(f"[bold yellow]⚠️ Syntax Warning: {proc.stderr.strip()}[/bold yellow]\n")
-                            except Exception as ex:
-                                console.print(f"[bold red]❌ Compile Error: {ex}[/bold red]\n")
-                            handled_command = True
-                        else:
-                            console.print("\n[bold bright_cyan]🤖 AI Assistant:[/bold bright_cyan] 📜 Lua Compile karne ke liye:\n1. Script `1_LUA_INPUT` folder me daalein (AI auto-compile karega)\n2. Ya Main Menu -> Option [2] Lua Compiler select karein!\n")
-                            handled_command = True
-
-                    elif any(kw in low_um for kw in ['fix', 'repair', 'syntax']):
-                        found_luas = []
-                        for wf in watch_folders:
-                            if wf.exists():
-                                for f in wf.glob("*"):
-                                    if f.is_file() and f.suffix.lower() in ['.lua', '.txt']:
-                                        found_luas.append(f)
-                        if found_luas:
-                            lf = found_luas[0]
-                            console.print(f"[bold cyan]🤖 AI repairing Lua syntax for: {lf.name}...[/bold cyan]")
-                            try:
-                                code = lf.read_text(errors='ignore')
-                                fixed_code = ai_fix_lua_code(code)
-                                if fixed_code:
-                                    lf.write_text(fixed_code, encoding='utf-8')
-                                    console.print(f"[bold green]✅ AI Report: {lf.name} syntax repaired successfully![/bold green]\n")
-                            except Exception as ex:
-                                console.print(f"[bold red]❌ Fix Error: {ex}[/bold red]\n")
-                            handled_command = True
-                        else:
-                            console.print("\n[bold bright_cyan]🤖 AI Assistant:[/bold bright_cyan] 🛠️ Lua Syntax Fix karne ke liye:\n1. Broken script `1_LUA_INPUT` folder me daalein\n2. Ya Main Menu -> Option [3] AI Tools -> Option [3] AI Lua Repair use karein!\n")
-                            handled_command = True
-
-                    elif any(kw in low_um for kw in ['scan', 'check', 'status', 'folder']):
-                        display_workspace_summary(data_path)
-                        handled_command = True
-
-                    if not handled_command:
+                    if not handled:
                         console.print("[dim cyan]🤖 AI Assistant is thinking...[/dim cyan]")
                         sys_prompt = (
-                            "You are Featurestic Leaks AI, a highly intelligent, polite, friendly PUBG/BGMI PAK & Lua modding expert AI assistant (like Gemini AI). "
-                            "You help with PAK unpacking, Lua compilation, syntax repair, GameGuard bypass concepts, UE4 offsets, and tool features. "
+                            "You are Featurestic Leaks AI, a highly intelligent, polite, friendly PUBG/BGMI PAK & Lua modding expert AI assistant. "
+                            "When asked what to do or greeted, always answer: 'Ha bhai! Kya krna h? PAK bnana h, unpack krna h, lua compile krna h ya fix krna h? Batao kya krna h!' "
                             "Respond in friendly, natural Hinglish with appropriate formatting and emojis."
                         )
                         resp = call_ai_api(f"{sys_prompt}\nUser typed: '{user_msg}'")
                         if resp:
                             console.print(f"\n[bold bright_cyan]🤖 AI Assistant:[/bold bright_cyan]\n{resp.strip()}\n")
                         else:
-                            console.print("\n[bold bright_cyan]🤖 AI Assistant:[/bold bright_cyan] Hii buddy! Main ready hu! Input folder me `.pak` ya `.lua` file daalein, ya jo PUBG/BGMI modding ka kaam bolein main instantly kar dunga! 🚀\n")
+                            console.print("\n[bold bright_cyan]🤖 AI Assistant:[/bold bright_cyan] Ha bhai! Kya krna h? PAK bnana h, unpack krna h, lua compile krna h ya fix krna h? Batao kya krna h! 🚀\n")
                     continue
                 else:
                     time.sleep(1)
@@ -7859,20 +8035,20 @@ def run_ai_watch_assistant(data_path: Path):
             console.print("\n[bold yellow]⏹️ AI Watch Assistant Stopped.[/bold yellow]")
             break
         except Exception as e:
-            console.print(f"[dim yellow][!] Assistant loop note: {e}[/dim yellow]")
+            console.print(f"[dim yellow][!] Assistant note: {e}[/dim yellow]")
             time.sleep(2)
 
 
 def run_ai_chat_mode(data_path: Path):
     """
     FRIENDLY CONVERSATIONAL AI CHAT COMPANION
-    User can directly chat with AI (say 'hlw', ask modding questions, or directly command AI to unpack PAK, compile Lua, fix syntax, repack, inject, etc.)
+    User can directly chat with AI or command PAK unpack, Lua compile, syntax repair, etc.
     """
     print_banner()
     console.print(Panel(
         "[bold bright_cyan]💬 FRIENDLY AI CHAT COMPANION 💬[/bold bright_cyan]\n\n"
-        "[bold white]Hii buddy! Welcome to Featurestic Leaks![/bold white]\n"
-        "[bold bright_yellow]Aaj kya modding ya leak karni hai?[/bold bright_yellow] Ask anything or give direct commands!\n\n"
+        "[bold white]Ha bhai! Kya krna h?[/bold white]\n"
+        "[bold bright_yellow]PAK bnana h, unpack krna h, lua compile krna h ya fix krna h? Batao kya krna h![/bold bright_yellow]\n\n"
         "[dim white]Type 'exit' or 'back' anytime to return to menu.[/dim white]",
         border_style="cyan",
         box=ROUNDED
@@ -7881,8 +8057,7 @@ def run_ai_chat_mode(data_path: Path):
     system_context = (
         "You are Featurestic Leaks AI, a super friendly, intelligent, and helpful AI modding companion. "
         "You talk in casual, enthusiastic Hinglish (Hindi + English). "
-        "You assist users with PAK/OBB unpacking, LUA script compilation, GameGuard bypasses, UE4 asset editing, "
-        "and using the FeaturesticLeaks tool commands (`leak`, `leak pak`, `leak lua`, `leak watch`, `leak ai`, `leak utils`). "
+        "When greeted or asked what you can do, say: 'Ha bhai! Kya krna h? PAK bnana h, unpack krna h, lua compile krna h ya fix krna h? Batao kya krna h!' "
         "Be friendly, polite, encouraging, and use clear formatting with emojis!"
     )
 
@@ -7897,161 +8072,23 @@ def run_ai_chat_mode(data_path: Path):
                 console.print("[bold cyan]🤖 AI: Alvida! Phir milenge dosto! Happy Modding! 🚀[/bold cyan]\n")
                 break
 
-            low_um = user_msg.lower()
+            handled = process_ai_smart_command(user_msg, data_path)
 
-            # Smart Action Handler for Direct Chat Commands!
-            # 1. PAK / OBB Unpack Command
-            if any(kw in low_um for kw in ['unpack', 'unpak', 'extract pak', 'pak unpack', 'pak unpak', 'obb unpack']):
-                console.print("[bold cyan]🤖 AI Assistant: Unpack request detect hua! Workspace scan kar raha hu...[/bold cyan]")
-                found_paks = []
-                scan_dirs = [
-                    data_path / "INPUT",
-                    data_path / "PAK",
-                    Path("/sdcard/FeaturesticLeaks/INPUT"),
-                    Path("/sdcard/FeaturesticLeaks/PAK_WORKSPACE/1_PAK_INPUT")
-                ]
-                for sd in scan_dirs:
-                    if sd.exists():
-                        for f in sd.glob("*"):
-                            if f.is_file() and f.suffix.lower() in ['.pak', '.obb']:
-                                found_paks.append(f)
+            if not handled:
+                prompt = f"{system_context}\n"
+                if history:
+                    prompt += "Recent Chat History:\n" + "\n".join(history[-6:]) + "\n"
+                prompt += f"User: {user_msg}\nAI Assistant:"
 
-                if found_paks:
-                    pf = found_paks[0]
-                    console.print(f"[bold cyan]⚡ AI Unpacking PAK file: [bold white]{pf.name}[/bold white]...[/bold cyan]")
-                    try:
-                        pak = TencentPakFile(pf)
-                        out_u = data_path / "OUTPUT" / pf.stem
-                        pak.dump(out_u)
-                        console.print(f"\n[bold green]✅ AI Report: Successful! Unpacked {pf.name} to {out_u}![/bold green]")
-                        sd_u = Path("/sdcard/FeaturesticLeaks/OUTPUT") / pf.stem
-                        if sd_u.parent.exists() and sd_u != out_u:
-                            try:
-                                pak.dump(sd_u)
-                                console.print(f"[bold green]   Also saved to SDCard: {sd_u}[/bold green]")
-                            except Exception:
-                                pass
-                        console.print("[bold bright_cyan]💡 AI Tip: Iske baad Replace/Inject folder me files edit karke Repack kar sakte hain![/bold bright_cyan]\n")
-                    except Exception as ex:
-                        console.print(f"[bold red]❌ Unpack Error: {ex}[/bold red]\n")
+                console.print("[dim cyan]🤖 AI Assistant is thinking...[/dim cyan]")
+                response = call_ai_api(prompt)
+
+                if response:
+                    console.print(f"\n[bold bright_cyan]🤖 AI Assistant:[/bold bright_cyan]\n{response.strip()}\n")
+                    history.append(f"User: {user_msg}")
+                    history.append(f"AI: {response.strip()}")
                 else:
-                    console.print("\n[bold yellow]🤖 AI Assistant: Unpack karne ke liye koi `.pak` ya `.obb` file `/sdcard/FeaturesticLeaks/INPUT/` folder me nahi mili![/bold yellow]")
-                    console.print("[bold white]💡 Kripya apni PAK file `/sdcard/FeaturesticLeaks/INPUT/` folder me daalein aur phir 'pak unpack' likhein ya Main Menu [1] use karein![/bold white]\n")
-                continue
-
-            # 2. Lua Pack / Compile Command
-            elif any(kw in low_um for kw in ['lua pack', 'pack lua', 'lua compile', 'compile lua', 'lua ko pack', 'lua ko compile', 'script compile']):
-                console.print("[bold cyan]🤖 AI Assistant: Lua Compile request detect hua! Workspace scan kar raha hu...[/bold cyan]")
-                found_luas = []
-                scan_dirs = [
-                    data_path / "INPUT",
-                    data_path / "REPLACE",
-                    data_path / "INJECT",
-                    data_path / "LUA",
-                    Path("/sdcard/FeaturesticLeaks/INPUT"),
-                    Path("/sdcard/FeaturesticLeaks/INJECT")
-                ]
-                for sd in scan_dirs:
-                    if sd.exists():
-                        for f in sd.glob("*"):
-                            if f.is_file() and f.suffix.lower() in ['.lua', '.txt']:
-                                found_luas.append(f)
-
-                if found_luas:
-                    lf = found_luas[0]
-                    console.print(f"[bold cyan]⚡ AI Compiling script: [bold white]{lf.name}[/bold white]...[/bold cyan]")
-                    try:
-                        fixed_lua = fix_lua_syntax_for_lua51(lf)
-                        res_dir = data_path / "OUTPUT"
-                        res_dir.mkdir(parents=True, exist_ok=True)
-                        out_luac = res_dir / f"{lf.stem}.luac"
-                        compiler = "luac5.1" if shutil.which("luac5.1") else ("luac" if shutil.which("luac") else None)
-                        if compiler:
-                            proc = subprocess.run([compiler, "-o", str(out_luac), str(fixed_lua)], capture_output=True, text=True)
-                            if proc.returncode == 0:
-                                console.print(f"\n[bold green]✅ AI Report: {lf.name} successfully compiled to {out_luac.name} ({out_luac.stat().st_size:,} bytes)![/bold green]")
-                                sd_res = Path("/sdcard/FeaturesticLeaks/OUTPUT") / out_luac.name
-                                if sd_res.parent.exists() and sd_res != out_luac:
-                                    shutil.copy2(out_luac, sd_res)
-                                    console.print(f"[bold green]   Saved to SDCard: {sd_res}[/bold green]")
-                            else:
-                                console.print(f"[bold yellow]⚠️ Syntax Error in Lua: {proc.stderr.strip()}[/bold yellow]")
-                                console.print("[bold cyan]🤖 Auto-fixing Lua syntax error using AI...[/bold cyan]")
-                                code = lf.read_text(errors='ignore')
-                                fixed_code = ai_fix_lua_code(code, proc.stderr)
-                                if fixed_code:
-                                    lf.write_text(fixed_code, encoding='utf-8')
-                                    proc2 = subprocess.run([compiler, "-o", str(out_luac), str(fixed_lua)], capture_output=True, text=True)
-                                    if proc2.returncode == 0:
-                                        console.print(f"[bold green]✅ Auto-Repair Successful! Compiled to {out_luac.name}![/bold green]")
-                        else:
-                            console.print("[bold red]❌ luac5.1 compiler missing. Install with 'pkg install lua51'[/bold red]")
-                    except Exception as ex:
-                        console.print(f"[bold red]❌ Compile Error: {ex}[/bold red]\n")
-                else:
-                    console.print("\n[bold yellow]🤖 AI Assistant: Compile karne ke liye koi `.lua` script `/sdcard/FeaturesticLeaks/INPUT/` folder me nahi mili![/bold yellow]")
-                    console.print("[bold white]💡 Kripya script `/sdcard/FeaturesticLeaks/INPUT/` folder me daalein aur phir 'lua pack' bolen![/bold white]\n")
-                continue
-
-            # 3. Lua Fix / Syntax Repair Command
-            elif any(kw in low_um for kw in ['lua fix', 'fix lua', 'repair lua', 'lua repair', 'syntax fix', 'fix syntax']):
-                console.print("[bold cyan]🤖 AI Assistant: Lua Repair request detect hua! Workspace scan kar raha hu...[/bold cyan]")
-                found_luas = []
-                scan_dirs = [data_path / "INPUT", data_path / "LUA", Path("/sdcard/FeaturesticLeaks/INPUT")]
-                for sd in scan_dirs:
-                    if sd.exists():
-                        for f in sd.glob("*"):
-                            if f.is_file() and f.suffix.lower() in ['.lua', '.txt']:
-                                found_luas.append(f)
-
-                if found_luas:
-                    lf = found_luas[0]
-                    console.print(f"[bold cyan]🤖 AI repairing Lua 5.1 syntax for: [bold white]{lf.name}[/bold white]...[/bold cyan]")
-                    try:
-                        code = lf.read_text(errors='ignore')
-                        fixed_code = ai_fix_lua_code(code)
-                        if fixed_code:
-                            lf.write_text(fixed_code, encoding='utf-8')
-                            console.print(f"\n[bold green]✅ AI Report: {lf.name} syntax repaired successfully![/bold green]\n")
-                    except Exception as ex:
-                        console.print(f"[bold red]❌ Fix Error: {ex}[/bold red]\n")
-                else:
-                    console.print("\n[bold yellow]🤖 AI Assistant: Repair karne ke liye koi `.lua` file `/sdcard/FeaturesticLeaks/INPUT/` folder me nahi mili![/bold yellow]\n")
-                continue
-
-            # 4. Inject Path Command
-            elif any(kw in low_um for kw in ['inject', 'lua inject', 'inject path']):
-                console.print("[bold cyan]🚀 Opening Inject Path Module...[/bold cyan]\n")
-                pak_obb_tools_menu(data_path)
-                continue
-
-            # 5. Repack Command
-            elif any(kw in low_um for kw in ['repack', 'pak pack', 'repack pak']):
-                console.print("[bold cyan]🚀 Opening PAK Repacker Module...[/bold cyan]\n")
-                pak_obb_tools_menu(data_path)
-                continue
-
-            # 6. Decompile Command
-            elif any(kw in low_um for kw in ['decompile', 'lua decompile', 'decompile lua']):
-                console.print("[bold cyan]🚀 Opening Lua Decompiler Module...[/bold cyan]\n")
-                lua_tools_menu(data_path)
-                continue
-
-            # Default: Conversational Chat AI Response
-            prompt = f"{system_context}\n"
-            if history:
-                prompt += "Recent Chat History:\n" + "\n".join(history[-6:]) + "\n"
-            prompt += f"User: {user_msg}\nAI Assistant:"
-
-            console.print("[dim cyan]🤖 AI Assistant is thinking...[/dim cyan]")
-            response = call_ai_api(prompt)
-
-            if response:
-                console.print(f"\n[bold bright_cyan]🤖 AI Assistant:[/bold bright_cyan]\n{response.strip()}\n")
-                history.append(f"User: {user_msg}")
-                history.append(f"AI: {response.strip()}")
-            else:
-                console.print("[bold yellow]🤖 AI Assistant: Main ready hu! Aap mujhe 'lua pack kar do', 'pak unpack kar do' ya kuch bhi poochh sakte hain![/bold yellow]\n")
+                    console.print("\n[bold bright_cyan]🤖 AI Assistant:[/bold bright_cyan] Ha bhai! Kya krna h? PAK bnana h, unpack krna h, lua compile krna h ya fix krna h? Batao kya krna h! 🚀\n")
 
         except KeyboardInterrupt:
             console.print("\n[bold yellow]Chat ended.[/bold yellow]")

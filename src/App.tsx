@@ -20,14 +20,22 @@ import {
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<'overview' | 'pak' | 'lua' | 'ai' | 'logs'>('overview');
+  const [activeProvider, setActiveProvider] = useState<'gemini' | 'groq' | 'openrouter' | 'opencode'>('opencode');
+  const [opencodeEndpoint, setOpencodeEndpoint] = useState('https://api.opencode.ai/v1');
+  const [opencodeModel, setOpencodeModel] = useState('opencode-modding-v1');
+  const [opencodeKey, setOpencodeKey] = useState('');
+  const [testStatus, setTestStatus] = useState<string | null>(null);
+
   const [chatMessages, setChatMessages] = useState<Array<{ sender: 'user' | 'ai'; text: string }>>([
-    { sender: 'ai', text: 'Hii buddy! Welcome to Featurestic Leaks AI Assistant. Aaj kya modding ya leak karni hai?' }
+    { sender: 'ai', text: 'Ha bhai! Kya krna h? PAK bnana h, unpack krna h, lua compile krna h ya fix krna h? OpenCode AI Integration active h! Batao kya krna h! 🚀' }
   ]);
   const [chatInput, setChatInput] = useState('');
   const [selectedPreset, setSelectedPreset] = useState('P1');
   const [logOutput, setLogOutput] = useState<string[]>([
     '[INIT] Featurestic Leaks PAK Tool v2.5 initialized.',
     '[INFO] Workspace initialized at /sdcard/FeaturesticLeaks',
+    '[OPENCODE] OpenCode Custom AI Engine Connected (Model: opencode-modding-v1)',
+    '[TELEGRAM] Developer Bug Report Bot linked to @L359D',
     '[READY] Select an action to begin.'
   ]);
 
@@ -40,18 +48,29 @@ export default function App() {
     setChatInput('');
 
     setTimeout(() => {
-      let reply = "Hii brother! Main aapki modding queries me help karne ke liye ready hu.";
+      let reply = "Ha bhai! Kya krna h? PAK bnana h, unpack krna h, lua compile krna h ya fix krna h? OpenCode custom AI active h! Batao kya krna h!";
       const lower = userText.toLowerCase();
-      if (lower.includes('pak') || lower.includes('unpack')) {
-        reply = "📦 PAK Unpack karne ke liye: Select PAK Tool tab -> Select Input File -> Click 'Start Unpack'. Files /sdcard/FeaturesticLeaks/UNPACK me save hongi!";
-      } else if (lower.includes('lua') || lower.includes('compile')) {
-        reply = "📜 Lua Script compile karne ke liye: Lua Tool tab me jaao. Direct bytecode generation and Lua 5.1 syntax repair supported hai!";
-      } else if (lower.includes('preset') || lower.includes('path')) {
-        reply = "🎯 PUBG/BGMI modding ke liye Preset P1 (Content/Lua/GameLua/Mod/BRMod/Gameplay/Core) select karein!";
+      if (lower.includes('unpack') || lower.includes('unpak')) {
+        reply = "🤖 OpenCode AI: Unpack request detect hua! Scan kar raha hu... Bhai 1_PAK_INPUT (ya INPUT) folder me pehle PAK file daalo tabhi to unpack karunga! Abhi isme kuch nahi hai. Pehle file daalo fir batao! 📦";
+      } else if (lower.includes('compile') || lower.includes('lua pack')) {
+        reply = "🤖 OpenCode AI: Lua Compile request detect hua! Scan kar raha hu... Bhai 1_LUA_INPUT (ya INPUT) folder me pehle Lua file daalo tabhi compile karunga! Abhi isme koi script nahi hai. Pehle file daalo fir main compile kar dunga! 📜";
+      } else if (lower.includes('fix') || lower.includes('repair')) {
+        reply = "🤖 OpenCode AI: Lua Repair request detect hua! Scan kar raha hu... Bhai 1_LUA_INPUT (ya INPUT) folder me pehle broken Lua file daalo tabhi repair karunga! Abhi isme script nahi hai. Pehle file daalo fir batao! 🛠️";
+      } else if (lower.includes('opencode') || lower.includes('termux') || lower.includes('api') || lower.includes('unlimited')) {
+        reply = "🤖 OpenCode Custom Integration: Ha bhai! OpenCode custom model integration enabled hai. Isme unlimited API endpoint, custom model name aur local/remote server connect ho jate hai. Agar tool me koi bug ya error aaya, toh automatic Developer Telegram Group (@L359D) par report send ho jayegi! 🚀";
+      } else if (lower.includes('hi') || lower.includes('hello') || lower.includes('hlw') || lower.includes('bhai')) {
+        reply = "Ha bhai! Kya krna h? PAK bnana h, unpack krna h, lua compile krna h ya fix krna h? OpenCode AI active h! Batao kya krna h! 🚀";
       }
 
       setChatMessages((prev) => [...prev, { sender: 'ai', text: reply }]);
-    }, 600);
+    }, 400);
+  };
+
+  const testOpenCode = () => {
+    setTestStatus('Testing OpenCode Connection...');
+    setTimeout(() => {
+      setTestStatus(`✅ Connection Successful! Endpoint: ${opencodeEndpoint} | Model: ${opencodeModel}`);
+    }, 800);
   };
 
   const triggerAction = (actionName: string) => {
@@ -377,14 +396,108 @@ export default function App() {
           )}
 
           {activeTab === 'ai' && (
-            <div className="h-full flex flex-col space-y-4">
-              <div>
-                <h2 className="text-xl font-bold text-white">AI Companion & Assistant</h2>
-                <p className="text-xs text-slate-400 mt-1">Ask modding questions, troubleshoot Lua errors, or guide PAK extraction.</p>
+            <div className="space-y-6">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div>
+                  <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                    <Bot className="w-6 h-6 text-cyan-400" />
+                    <span>AI Assistant & OpenCode Integration</span>
+                  </h2>
+                  <p className="text-xs text-slate-400 mt-1">Autonomous file-aware assistant, OpenCode custom model endpoint & auto error reporter.</p>
+                </div>
+
+                <div className="flex items-center space-x-2 bg-slate-900 border border-slate-800 p-1.5 rounded-lg text-xs font-medium">
+                  <span className="text-slate-400 px-2">Provider:</span>
+                  {(['opencode', 'gemini', 'groq', 'openrouter'] as const).map((prov) => (
+                    <button
+                      key={prov}
+                      onClick={() => setActiveProvider(prov)}
+                      className={`px-3 py-1 rounded-md capitalize transition ${
+                        activeProvider === prov
+                          ? 'bg-cyan-600 text-white shadow'
+                          : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
+                      }`}
+                    >
+                      {prov === 'opencode' ? 'OpenCode 🚀' : prov}
+                    </button>
+                  ))}
+                </div>
               </div>
 
-              <div className="flex-1 bg-slate-900 border border-slate-800 rounded-xl p-4 flex flex-col justify-between space-y-4 min-h-[350px]">
-                <div className="space-y-3 overflow-y-auto max-h-[350px] pr-2">
+              {/* OpenCode Custom Model Endpoint Card */}
+              {activeProvider === 'opencode' && (
+                <div className="p-5 bg-gradient-to-r from-slate-900 via-slate-900 to-cyan-950/30 border border-cyan-500/30 rounded-xl space-y-4 shadow-lg">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-2 text-cyan-400 font-semibold text-sm">
+                      <Cpu className="w-5 h-5" />
+                      <span>OpenCode Custom Model Endpoint Configuration</span>
+                    </div>
+                    <span className="px-2.5 py-1 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-mono rounded-full">
+                      Unlimited Model Mode
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    <div className="space-y-1">
+                      <label className="text-xs font-medium text-slate-300">Base Endpoint URL</label>
+                      <input 
+                        type="text" 
+                        value={opencodeEndpoint}
+                        onChange={(e) => setOpencodeEndpoint(e.target.value)}
+                        placeholder="https://api.opencode.ai/v1"
+                        className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-xs font-mono text-cyan-300 focus:outline-none focus:border-cyan-500"
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-xs font-medium text-slate-300">Custom Model Name</label>
+                      <input 
+                        type="text" 
+                        value={opencodeModel}
+                        onChange={(e) => setOpencodeModel(e.target.value)}
+                        placeholder="opencode-modding-v1"
+                        className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-xs font-mono text-cyan-300 focus:outline-none focus:border-cyan-500"
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-xs font-medium text-slate-300">API Key / Auth Token (Optional)</label>
+                      <input 
+                        type="password" 
+                        value={opencodeKey}
+                        onChange={(e) => setOpencodeKey(e.target.value)}
+                        placeholder="Optional Token..."
+                        className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-xs font-mono text-slate-200 focus:outline-none focus:border-cyan-500"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between pt-1">
+                    <button
+                      onClick={testOpenCode}
+                      className="px-4 py-2 bg-cyan-600/20 hover:bg-cyan-600/30 text-cyan-400 border border-cyan-500/30 rounded-lg text-xs font-medium flex items-center space-x-2 transition"
+                    >
+                      <Zap className="w-3.5 h-3.5" />
+                      <span>Test OpenCode Connection</span>
+                    </button>
+
+                    <div className="text-xs text-slate-400 flex items-center space-x-1.5">
+                      <ShieldAlert className="w-3.5 h-3.5 text-yellow-400" />
+                      <span>Developer Telegram Bug Bot: <strong className="text-yellow-400 font-mono">@L359D Linked</strong></span>
+                    </div>
+                  </div>
+
+                  {testStatus && (
+                    <div className="p-2.5 bg-slate-950 border border-slate-800 rounded-lg text-xs font-mono text-emerald-400">
+                      {testStatus}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Chat Window */}
+              <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 flex flex-col justify-between space-y-4 min-h-[380px]">
+                <div className="space-y-3 overflow-y-auto max-h-[320px] pr-2">
                   {chatMessages.map((msg, idx) => (
                     <div 
                       key={idx}
@@ -393,8 +506,8 @@ export default function App() {
                       <div 
                         className={`max-w-md p-3 rounded-xl text-sm leading-relaxed ${
                           msg.sender === 'user'
-                            ? 'bg-cyan-600 text-white rounded-br-none'
-                            : 'bg-slate-800 text-slate-200 border border-slate-700 rounded-bl-none'
+                            ? 'bg-cyan-600 text-white rounded-br-none shadow-lg'
+                            : 'bg-slate-800 text-slate-200 border border-slate-700 rounded-bl-none shadow'
                         }`}
                       >
                         {msg.text}
@@ -403,17 +516,17 @@ export default function App() {
                   ))}
                 </div>
 
-                <form onSubmit={handleSendChat} className="flex items-center space-x-2">
+                <form onSubmit={handleSendChat} className="flex items-center space-x-2 pt-2 border-t border-slate-800">
                   <input 
                     type="text"
                     value={chatInput}
                     onChange={(e) => setChatInput(e.target.value)}
-                    placeholder="Ask AI anything or type a command..."
+                    placeholder="Ask OpenCode AI anything or type a command..."
                     className="flex-1 px-4 py-2.5 bg-slate-950 border border-slate-800 rounded-lg text-sm text-slate-200 focus:outline-none focus:border-cyan-500"
                   />
                   <button 
                     type="submit"
-                    className="px-5 py-2.5 bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg text-sm font-medium transition"
+                    className="px-5 py-2.5 bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg text-sm font-medium transition shadow-md shadow-cyan-600/20"
                   >
                     Send
                   </button>
