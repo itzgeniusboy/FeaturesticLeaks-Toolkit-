@@ -7581,6 +7581,11 @@ def process_ai_smart_command(user_msg: str, data_path: Path) -> bool:
                 # Inject into output pak
                 pak = TencentPakFile(out_pak)
                 temp_inject_dir = data_path / "TEMP_INJECT"
+                if temp_inject_dir.exists():
+                    try:
+                        shutil.rmtree(temp_inject_dir, ignore_errors=True)
+                    except Exception:
+                        pass
                 temp_inject_dir.mkdir(parents=True, exist_ok=True)
                 dest_lua = temp_inject_dir / luac_target.name
                 if luac_target.resolve() != dest_lua.resolve():
@@ -7588,7 +7593,13 @@ def process_ai_smart_command(user_msg: str, data_path: Path) -> bool:
                         shutil.copy2(luac_target, dest_lua)
                     except (shutil.SameFileError, Exception):
                         pass
-                repack_pak_file_with_block_display(pak, temp_inject_dir, out_pak)
+
+                try:
+                    repack_pak_file_with_block_display(pak, temp_inject_dir, out_pak)
+                except Exception:
+                    # Fallback to full PAK rebuild with force_add to inject new/unindexed script into PAK
+                    console.print("[yellow]💡 In-place match not found in PAK index. Falling back to Full PAK Inject Mode (force_add)...[/yellow]")
+                    repack_pak_file_full(pak, temp_inject_dir, out_pak, target_path="ShadowTrackerExtra/Content/Lua", force_add=True)
 
                 sd_res = Path("/sdcard/FeaturesticLeaks/RESULT") / out_pak.name
                 if sd_res.parent.exists() and sd_res.resolve() != out_pak.resolve():
