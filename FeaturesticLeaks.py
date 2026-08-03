@@ -4497,7 +4497,10 @@ def send_telegram_bug_report(err_type: str, err_msg: str, action_name: str = "Op
     Sends automated bug report silently to Developer Telegram Bot/Chat in a background thread.
     Filter out API key limit / exhaustion alerts so developer group isn't spammed!
     Includes User/Device identification so developer knows who generated the report!
+    Uses html.escape and plain-text fallback so messages NEVER fail to deliver.
     """
+    import html
+
     # Filter out API rate limit / key limit alerts
     if any(k in str(err_type).upper() or k in str(err_msg).upper() for k in ["API_KEY", "EXHAUSTED", "RATE_LIMIT", "HTTP 429"]):
         if err_type != "TEST_PING":
@@ -4514,25 +4517,53 @@ def send_telegram_bug_report(err_type: str, err_msg: str, action_name: str = "Op
                 
             dev_user = get_device_user_info()
             
-            report_text = (
+            # Use real html.escape to sanitize tracebacks and unhandled error strings
+            safe_user = html.escape(str(dev_user))
+            safe_action = html.escape(str(action_name))
+            safe_err_type = html.escape(str(err_type))
+            safe_msg = html.escape(str(err_msg)[:500])
+            safe_tb = html.escape(str(tb_str)[-800:]) if tb_str else "N/A"
+
+            report_html = (
                 f"🚨 <b>FEATURESTIC LEAKS - CODE BUG REPORT</b> 🚨\n\n"
-                f"👤 <b>User / Telegram:</b> <code>{escape(dev_user)}</code>\n"
-                f"📌 <b>Action:</b> {action_name}\n"
-                f"⚠️ <b>Error Type:</b> {err_type}\n"
+                f"👤 <b>User / Telegram:</b> <code>{safe_user}</code>\n"
+                f"📌 <b>Action:</b> {safe_action}\n"
+                f"⚠️ <b>Error Type:</b> {safe_err_type}\n"
                 f"📍 <b>Location:</b> {file_info}:{line_no} in <code>{func_name}()</code>\n"
-                f"💬 <b>Details:</b> <code>{escape(err_msg[:300])}</code>\n\n"
-                f"📜 <b>Traceback snippet:</b>\n<code>{escape(tb_str[-800:]) if tb_str else 'N/A'}</code>"
+                f"💬 <b>Details:</b> <code>{safe_msg}</code>\n\n"
+                f"📜 <b>Traceback snippet:</b>\n<code>{safe_tb}</code>"
+            )
+
+            report_plain = (
+                f"🚨 FEATURESTIC LEAKS - CODE BUG REPORT 🚨\n\n"
+                f"👤 User / Telegram: {dev_user}\n"
+                f"📌 Action: {action_name}\n"
+                f"⚠️ Error Type: {err_type}\n"
+                f"📍 Location: {file_info}:{line_no} in {func_name}()\n"
+                f"💬 Details: {err_msg[:500]}\n\n"
+                f"📜 Traceback snippet:\n{tb_str[-800:] if tb_str else 'N/A'}"
             )
             
             url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
-            payload = json.dumps({
+
+            # Attempt 1: HTML Mode
+            payload_html = json.dumps({
                 "chat_id": chat_id,
-                "text": report_text,
+                "text": report_html,
                 "parse_mode": "HTML"
             }).encode("utf-8")
             
-            req = urllib.request.Request(url, data=payload, headers={"Content-Type": "application/json"})
-            urllib.request.urlopen(req, timeout=5)
+            try:
+                req = urllib.request.Request(url, data=payload_html, headers={"Content-Type": "application/json"})
+                urllib.request.urlopen(req, timeout=6)
+            except Exception as e_html:
+                # Attempt 2: Plain Text Fallback (Guarantees delivery even if HTML formatting fails)
+                payload_plain = json.dumps({
+                    "chat_id": chat_id,
+                    "text": report_plain
+                }).encode("utf-8")
+                req_plain = urllib.request.Request(url, data=payload_plain, headers={"Content-Type": "application/json"})
+                urllib.request.urlopen(req_plain, timeout=6)
         except Exception:
             pass
 
