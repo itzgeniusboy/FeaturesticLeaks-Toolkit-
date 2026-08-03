@@ -4759,7 +4759,7 @@ def check_and_auto_update(interactive: bool = False):
 
         if remote_hash != local_hash:
             has_update = True
-            UPDATE_NOTIF_BANNER = "🔥 [bold bright_yellow]NEW TOOL UPDATE AVAILABLE![/bold bright_yellow] [dim white]Press [bold cyan][U][/bold cyan] or run [bold cyan]Option [5] -> [9][/bold cyan] to Auto-Update Instantly![/dim white]"
+            UPDATE_NOTIF_BANNER = "🔥 [bold bright_yellow]NEW TOOL UPDATE AVAILABLE![/bold bright_yellow] [dim white]Press [bold cyan][U][/bold cyan] in Main Menu to Auto-Update Instantly![/dim white]"
 
         if interactive:
             if not has_update and not raw_resp:
@@ -6555,7 +6555,7 @@ def pak_obb_tools_menu(data_path: Path):
                             "[bold white]🎮 Game me Lua execute na hone standard reasons & solution:[/bold white]\n"
                             " 1. [bold yellow]Filename Match:[/bold yellow] Script ka name game ke require filename se match hona chahiye (e.g. `BRMod.lua`, `Main.lua`, `BattleMain.lua`).\n"
                             " 2. [bold yellow]Target Path:[/bold yellow] BGMI me [bold cyan]Preset P1[/bold cyan] (`Content/Lua/GameLua/Mod/BRMod/Gameplay/Core`) ya Global me [bold cyan]Preset P5[/bold cyan] use karein.\n"
-                            " 3. [bold yellow]Lua 5.1 Syntax:[/bold yellow] Pehle [bold cyan]Option [2] -> Option [8] (1-Click Auto Lua Workflow)[/bold cyan] chalayein taaki Lua 5.1 syntax errors fix ho jayein!",
+                            " 3. [bold yellow]Lua 5.1 Syntax:[/bold yellow] Pehle [bold cyan]Category [2] (LUA Tools)[/bold cyan] se Auto Lua Workflow chalayein taaki Lua 5.1 syntax errors fix ho jayein!",
                             title="[bold bright_yellow] 💡 GAME LUA RUNNING TIPS [/bold bright_yellow]",
                             border_style="bright_green",
                             box=ROUNDED
@@ -6914,8 +6914,8 @@ def call_ai_api(prompt: str) -> Optional[str]:
         'kya kar sakte ho': "Main Featurestic Leaks AI Engine hu! Main PAK/OBB files unpack/repack kar sakta hu, Lua scripts repair kar sakta hu aur automated bug reports generate kar sakta hu!",
         'kon ho': "Main Featurestic Leaks AI Assistant hu! Created to assist you with PAK/OBB & Lua modding!",
         'who are you': "I am Featurestic Leaks AI Engine — your ultimate GameGuard, PAK/OBB & Lua 5.1 modding buddy!",
-        'help': "💡 **FEATURESTIC LEAKS AI QUICK GUIDANCE:**\n• **Option [1]**: AI Watch Assistant (Folder auto-listen & auto-process)\n• **Option [2]**: Friendly Chat (Aap yahan mughse kuch bhi poochh sakte hain)\n• **Option [3]**: AI Lua Syntax Repair (Broken .lua auto-fix)\n• **Option [4]**: Manage API Keys & Telegram Auto-Report Bot",
-        'options': "💡 Main FeaturesticLeaks tool options:\n[1] PAK/OBB Tool  |  [2] Lua Compiler  |  [3] AI Tools  |  [4] Utilities",
+        'help': "💡 **FEATURESTIC LEAKS AI QUICK GUIDANCE:**\n• **Option [1]**: AI Modding Assistant & Chat (Folder auto-listen, Chat & Lua Repair)\n• **Option [2]**: Manage API Keys & Telegram Auto-Report Bot",
+        'options': "💡 Main FeaturesticLeaks tool options:\n[1] PAK/OBB Tool  |  [2] Lua Compiler  |  [3] AI Tools",
         'bhai': "Haan bhai bolo! Main aapka Featurestic Leaks AI Assistant hu. Batao kya help chahiye?",
         'bro': "Yo bro! What's up? Direct apana query ya script question poochho!",
         'thanks': "Arey koi nahi bhai! Always happy to help! Enjoy modding! 🚀",
@@ -6940,7 +6940,7 @@ def call_ai_api(prompt: str) -> Optional[str]:
         "   - Give direct, step-by-step menu directions within Featurestic Leaks:\n"
         "     * PAK Unpack/Repack: Main Menu -> Option [1] PAK/OBB Tool -> Option [2] Repack\n"
         "     * Lua Compile/Decompile: Main Menu -> Option [2] Lua Compiler\n"
-        "     * AI Syntax Fix: Main Menu -> Option [3] AI Tools -> Option [3] AI Lua Repair\n"
+        "     * AI Syntax Fix: Main Menu -> Option [3] AI Tools -> Option [1] AI Modding Assistant\n"
         "5. Speak in polite, friendly Hinglish with emojis. Use 'bhai' or 'brother'. NEVER call the user 'beta' or strange names.\n"
         "6. Do NOT write long paragraphs or off-topic advice. Keep replies brief and accurate."
     )
@@ -7492,12 +7492,9 @@ def run_ai_watch_assistant(data_path: Path):
     """
     print_banner()
     console.print(Panel(
-        "[bold bright_cyan]🤖 AI MODDING ASSISTANT (WATCH MODE) 🤖[/bold bright_cyan]\n\n"
-        "[bold white]Conversational Real-time AI Engine[/bold white]\n"
-        " • [bright_yellow]Detects incoming files in workspace input folders every 2 seconds[/bright_yellow]\n"
-        " • [bright_cyan]Asks you what action to perform (Unpack, Compile, AI Fix, Auto, Skip)[/bright_cyan]\n"
-        " • [bright_green]Responds to natural voice/text commands ('Haan', 'Nahi', 'Unpack', 'Fix', etc.)[/bright_green]\n"
-        " • [bright_magenta]Auto-generates error reports & fixes bugs automatically![/bright_magenta]\n\n"
+        "[bold bright_cyan]🤖 AI MODDING ASSISTANT & COMPANION 🤖[/bold bright_cyan]\n\n"
+        "[bold white]Hii buddy! Welcome to Featurestic Leaks![/bold white]\n"
+        "[bold bright_yellow]Aaj kya modding ya leak karni hai?[/bold bright_yellow] Ask anything or give direct commands!\n\n"
         "[dim white]Type 'exit' or press Ctrl+C anytime to stop assistant.[/dim white]",
         border_style="cyan",
         box=ROUNDED
@@ -7686,14 +7683,7 @@ def run_ai_watch_assistant(data_path: Path):
                             pass
 
             if not new_file:
-                console.print(Panel(
-                    "[bold bright_yellow]⚡ QUICK SHORTCUTS (Type and Press Enter):[/bold bright_yellow]\n"
-                    " [bold white][1] PAK Tools  [2] Lua Tools  [3] AI Repair  [4] AI Config  [5] Utilities  [U] Auto-Update[/bold white]\n"
-                    " [bold bright_cyan][inject] Auto-Inject  [repack] Repack PAK  [scan] Folder Status  [help] Guide[/bold bright_cyan]",
-                    border_style="dim cyan",
-                    box=ROUNDED
-                ))
-                user_msg = safe_input("\n💬 You (Type command/query or press Enter to scan): ").strip()
+                user_msg = safe_input("\n💬 You: ").strip()
                 if user_msg.lower() in ['exit', 'quit', 'back', 'cancel', '0']:
                     console.print("[bold cyan]🤖 AI Assistant: Watch mode stopped. Main menu me wapas aa gaye![/bold cyan]")
                     break
@@ -7851,11 +7841,16 @@ def run_ai_watch_assistant(data_path: Path):
 
                     if not handled_command:
                         console.print("[dim cyan]🤖 AI Assistant is thinking...[/dim cyan]")
-                        resp = call_ai_api(f"You are Featurestic Leaks AI Assistant in Watch Mode. User typed: '{user_msg}'. Respond in friendly Hinglish with emojis.")
+                        sys_prompt = (
+                            "You are Featurestic Leaks AI, a highly intelligent, polite, friendly PUBG/BGMI PAK & Lua modding expert AI assistant (like Gemini AI). "
+                            "You help with PAK unpacking, Lua compilation, syntax repair, GameGuard bypass concepts, UE4 offsets, and tool features. "
+                            "Respond in friendly, natural Hinglish with appropriate formatting and emojis."
+                        )
+                        resp = call_ai_api(f"{sys_prompt}\nUser typed: '{user_msg}'")
                         if resp:
                             console.print(f"\n[bold bright_cyan]🤖 AI Assistant:[/bold bright_cyan]\n{resp.strip()}\n")
                         else:
-                            console.print("\n[bold bright_cyan]🤖 AI Assistant:[/bold bright_cyan] Main ready hu! Input folder me `.pak` ya `.lua` file daalein, main usko instantly process kar dunga! 🚀\n")
+                            console.print("\n[bold bright_cyan]🤖 AI Assistant:[/bold bright_cyan] Hii buddy! Main ready hu! Input folder me `.pak` ya `.lua` file daalein, ya jo PUBG/BGMI modding ka kaam bolein main instantly kar dunga! 🚀\n")
                     continue
                 else:
                     time.sleep(1)
@@ -7876,10 +7871,8 @@ def run_ai_chat_mode(data_path: Path):
     print_banner()
     console.print(Panel(
         "[bold bright_cyan]💬 FRIENDLY AI CHAT COMPANION 💬[/bold bright_cyan]\n\n"
-        "[bold white]Apne AI Modding Buddy se bol kar kaam karayein ya baatein karein![/bold white]\n"
-        " • [bright_yellow]'Hello', 'Kaise ho', 'PAK kaise unpack karu?'[/bright_yellow]\n"
-        " • [bright_green]Direct Actions: 'lua pack kar do', 'pak unpack kar do', 'lua fix kar do', 'repack kar do'[/bright_green]\n"
-        " • [bright_cyan]Full GameGuard, Unreal Engine, PAK/OBB & Lua 5.1 Expert Knowledge![/bright_cyan]\n\n"
+        "[bold white]Hii buddy! Welcome to Featurestic Leaks![/bold white]\n"
+        "[bold bright_yellow]Aaj kya modding ya leak karni hai?[/bold bright_yellow] Ask anything or give direct commands!\n\n"
         "[dim white]Type 'exit' or 'back' anytime to return to menu.[/dim white]",
         border_style="cyan",
         box=ROUNDED
@@ -8178,7 +8171,7 @@ def run_beginner_guide(data_path: Path):
     )
     guide_table.add_row(
         "🚀 1-Click Auto Lua",
-        "Option [2] (Lua Tool) -> Option [8] (1-Click Auto Workflow) chalayein! Ye syntax error fix karta hai, compile karta hai aur output sync karta hai!"
+        "Category [2] (LUA Tools) -> 1-Click Auto Workflow chalayein! Ye syntax error fix karta hai, compile karta hai aur output sync karta hai!"
     )
     
     console.print(guide_table)
@@ -8230,7 +8223,7 @@ def main_menu():
 
     while True:
         print_banner()
-        console.print("[bold bright_cyan]📂 Termux Shortcuts:[bold bright_white] leak pak | leak lua | leak ai | leak utils | leak update[/bold bright_white]\n")
+        console.print("[bold bright_cyan]📂 Termux Shortcuts:[bold bright_white] leak pak | leak lua | leak ai | leak update[/bold bright_white]\n")
         menu_table = Table(
             title="[bold bright_cyan]⚡ MAIN CATEGORY MENU ⚡[/bold bright_cyan]",
             show_header=True,
@@ -8246,13 +8239,12 @@ def main_menu():
         menu_table.add_row("[1]", "PAK Tools 📦", "Unpack, Repack, Replace & Inject PAK/OBB")
         menu_table.add_row("[2]", "LUA Tools 🌙", "Compile, Decompile & Auto 1-Click Lua Workflow")
         menu_table.add_row("[3]", "AI Tools & Companion 🤖", "AI Modding Watcher, Chat AI Companion & Multi-API Keys")
-        menu_table.add_row("[4]", "Utilities & Guide 🛠️", "Workspace Summary, Beginner Guide & Termux Setup")
         menu_table.add_row("[U]", "Auto-Update 🚀", "Check & install latest GitHub version")
         menu_table.add_row("[0]", "EXIT ✗", "Close application")
 
         console.print(menu_table)
         console.print()
-        choice = safe_input('\033[1;36mSELECT OPTION [1-4 / U] [0]: \033[0m').strip()
+        choice = safe_input('\033[1;36mSELECT OPTION [1-3 / U] [0]: \033[0m').strip()
 
         if choice == '1':
             pak_obb_tools_menu(data_path)
@@ -8260,8 +8252,6 @@ def main_menu():
             lua_tools_menu(data_path)
         elif choice == '3':
             ai_tools_menu(data_path)
-        elif choice == '4':
-            utilities_menu(data_path)
         elif choice.lower() in ['u', 'update', 'autoupdate', 'auto-update']:
             check_and_auto_update(interactive=True)
             safe_input('\nPress Enter to continue...')
