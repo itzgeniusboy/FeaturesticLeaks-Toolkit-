@@ -1927,44 +1927,29 @@ def repack_gamepatch(pak, repack_dir, output_pak):
     repack_pak_file_with_block_display(pak_file=pak, edited_root=repack_dir, output_path=output_pak)
 
 def ensure_directories(base_dir: Path):
-    # Clean Organized PAK Workspace
-    pak_ws = base_dir / "PAK_WORKSPACE"
-    (pak_ws / "1_PAK_INPUT").mkdir(parents=True, exist_ok=True)
-    (pak_ws / "2_UNPACK").mkdir(parents=True, exist_ok=True)
-    (pak_ws / "3_REPLACE").mkdir(parents=True, exist_ok=True)
-    (pak_ws / "4_INJECT").mkdir(parents=True, exist_ok=True)
-    (pak_ws / "5_RESULT").mkdir(parents=True, exist_ok=True)
-
-    # Clean Organized LUA Workspace
-    lua_ws = base_dir / "LUA_WORKSPACE"
-    (lua_ws / "1_LUA_INPUT").mkdir(parents=True, exist_ok=True)
-    (lua_ws / "2_DECOMPILED").mkdir(parents=True, exist_ok=True)
-    (lua_ws / "3_COMPILED").mkdir(parents=True, exist_ok=True)
-    (lua_ws / "4_RESULT").mkdir(parents=True, exist_ok=True)
-
+    # Clean, Simple 4 Main Folders Workspace
+    (base_dir / "INPUT").mkdir(parents=True, exist_ok=True)
+    (base_dir / "OUTPUT").mkdir(parents=True, exist_ok=True)
+    (base_dir / "REPLACE").mkdir(parents=True, exist_ok=True)
+    (base_dir / "INJECT").mkdir(parents=True, exist_ok=True)
     (base_dir / "LOGS").mkdir(parents=True, exist_ok=True)
 
     sdcard_path = Path("/sdcard/FeaturesticLeaks")
     try:
         if sdcard_path.parent.exists():
             sdcard_path.mkdir(parents=True, exist_ok=True)
-            s_pak_ws = sdcard_path / "PAK_WORKSPACE"
-            (s_pak_ws / "1_PAK_INPUT").mkdir(parents=True, exist_ok=True)
-            (s_pak_ws / "2_UNPACK").mkdir(parents=True, exist_ok=True)
-            (s_pak_ws / "3_REPLACE").mkdir(parents=True, exist_ok=True)
-            (s_pak_ws / "4_INJECT").mkdir(parents=True, exist_ok=True)
-            (s_pak_ws / "5_RESULT").mkdir(parents=True, exist_ok=True)
-
-            s_lua_ws = sdcard_path / "LUA_WORKSPACE"
-            (s_lua_ws / "1_LUA_INPUT").mkdir(parents=True, exist_ok=True)
-            (s_lua_ws / "2_DECOMPILED").mkdir(parents=True, exist_ok=True)
-            (s_lua_ws / "3_COMPILED").mkdir(parents=True, exist_ok=True)
-            (s_lua_ws / "4_RESULT").mkdir(parents=True, exist_ok=True)
-
+            (sdcard_path / "INPUT").mkdir(parents=True, exist_ok=True)
+            (sdcard_path / "OUTPUT").mkdir(parents=True, exist_ok=True)
+            (sdcard_path / "REPLACE").mkdir(parents=True, exist_ok=True)
+            (sdcard_path / "INJECT").mkdir(parents=True, exist_ok=True)
             (sdcard_path / "LOGS").mkdir(parents=True, exist_ok=True)
 
-            # Auto-cleanup empty legacy folders from SDCard & workspace so File Manager is kept clean
-            legacy_dirs = ["PAK", "UNPACK", "REPLACE", "INJECT", "LUA", "REPACK", "RESULT", "PAK TOOL"]
+            # Auto-cleanup empty legacy folders from SDCard & workspace so File Manager is kept ultra-clean
+            legacy_dirs = [
+                "PAK_WORKSPACE", "LUA_WORKSPACE", "PAK", "LUA", "UNPACK", "REPACK", "RESULT",
+                "PAK TOOL", "ERROR_REPORTS", "1_PAK_INPUT", "2_UNPACK", "3_REPLACE", "4_INJECT", "5_RESULT",
+                "1_LUA_INPUT", "2_DECOMPILED", "3_COMPILED", "4_RESULT"
+            ]
             for target in [base_dir, sdcard_path]:
                 for leg in legacy_dirs:
                     leg_p = target / leg
@@ -1997,67 +1982,45 @@ def ensure_directories(base_dir: Path):
 def display_workspace_summary(data_path: Path):
     sd_path = Path("/sdcard/FeaturesticLeaks")
     
-    def get_cnt(folder_name: str, subfolder: str = "") -> int:
+    def get_cnt(folders: list) -> int:
         cnt = 0
-        paths = []
-        p1 = data_path / folder_name
-        if subfolder: p1 = p1 / subfolder
-        paths.append(p1)
-        
-        if sd_path.exists():
-            p2 = sd_path / folder_name
-            if subfolder: p2 = p2 / subfolder
-            paths.append(p2)
-            
-        for p in paths:
-            if p.exists():
-                try:
-                    for root, dirs, files in os.walk(p):
-                        cnt += len(files)
-                except Exception:
-                    pass
+        visited = set()
+        for folder_name in folders:
+            for parent in [data_path, sd_path]:
+                p = parent / folder_name
+                if p.exists() and p not in visited:
+                    visited.add(p)
+                    try:
+                        for root, dirs, files in os.walk(p):
+                            cnt += len(files)
+                    except Exception:
+                        pass
         return cnt
 
-    pak_cnt = get_cnt("PAK_WORKSPACE", "1_PAK_INPUT") + get_cnt("PAK")
-    unpack_cnt = get_cnt("PAK_WORKSPACE", "2_UNPACK") + get_cnt("UNPACK")
-    replace_cnt = get_cnt("PAK_WORKSPACE", "3_REPLACE") + get_cnt("REPLACE")
-    inject_cnt = get_cnt("PAK_WORKSPACE", "4_INJECT") + get_cnt("INJECT")
-    result_pak_cnt = get_cnt("PAK_WORKSPACE", "5_RESULT")
-
-    lua_input_cnt = get_cnt("LUA_WORKSPACE", "1_LUA_INPUT") + get_cnt("LUA")
-    lua_decomp_cnt = get_cnt("LUA_WORKSPACE", "2_DECOMPILED")
-    lua_comp_cnt = get_cnt("LUA_WORKSPACE", "3_COMPILED")
-    lua_result_cnt = get_cnt("LUA_WORKSPACE", "4_RESULT") + get_cnt("RESULT")
+    input_cnt = get_cnt(["INPUT", "PAK", "LUA", "PAK_WORKSPACE/1_PAK_INPUT", "LUA_WORKSPACE/1_LUA_INPUT"])
+    output_cnt = get_cnt(["OUTPUT", "UNPACK", "RESULT", "REPACK", "PAK_WORKSPACE/2_UNPACK", "PAK_WORKSPACE/5_RESULT", "LUA_WORKSPACE/2_DECOMPILED", "LUA_WORKSPACE/3_COMPILED", "LUA_WORKSPACE/4_RESULT"])
+    replace_cnt = get_cnt(["REPLACE", "PAK_WORKSPACE/3_REPLACE"])
+    inject_cnt = get_cnt(["INJECT", "PAK_WORKSPACE/4_INJECT"])
 
     table = Table(
-        title="[bold bright_cyan]📂 ORGANIZED WORKSPACE STATUS 📂[/bold bright_cyan]",
+        title="[bold bright_cyan]📂 SIMPLE & ORGANIZED WORKSPACE 📂[/bold bright_cyan]",
         border_style="bright_cyan",
         box=ROUNDED,
         show_header=True,
         header_style="bold bright_cyan",
         expand=True
     )
-    table.add_column("Workspace Folder", justify="left", style="bold bright_cyan", width=24)
-    table.add_column("Purpose / Direct Path", justify="left", style="bold bright_white")
+    table.add_column("Folder Name", justify="left", style="bold bright_cyan", width=18)
+    table.add_column("Purpose & Simple Description", justify="left", style="bold bright_white")
     table.add_column("Files", justify="center", style="bold bright_yellow", width=10)
 
-    # Section 1: PAK Tools Workspace
-    table.add_row("[bold yellow]📦 PAK_WORKSPACE/[/bold yellow]", "[dim]Subfolders for PAK & OBB Modding[/dim]", "")
-    table.add_row("  ├ 📥 1_PAK_INPUT", "Put original game .pak / .obb files here", f"[bold bright_yellow]{pak_cnt}[/bold bright_yellow]")
-    table.add_row("  ├ 📂 2_UNPACK", "Extracted files from Unpack tool", f"[bold bright_yellow]{unpack_cnt}[/bold bright_yellow]")
-    table.add_row("  ├ ✏️ 3_REPLACE", "Put edited files here to replace PAK files", f"[bold bright_yellow]{replace_cnt}[/bold bright_yellow]")
-    table.add_row("  ├ 💉 4_INJECT", "Put custom files here for Inject Path mode", f"[bold bright_yellow]{inject_cnt}[/bold bright_yellow]")
-    table.add_row("  └ 🚀 5_RESULT", "Final repacked .pak files saved here", f"[bold bright_yellow]{result_pak_cnt}[/bold bright_yellow]")
-
-    # Section 2: LUA Tools Workspace
-    table.add_row("[bold cyan]🌙 LUA_WORKSPACE/[/bold cyan]", "[dim]Subfolders for Lua Scripts Modding[/dim]", "")
-    table.add_row("  ├ 📜 1_LUA_INPUT", "Put .lua / .luac scripts here for Lua tools", f"[bold bright_yellow]{lua_input_cnt}[/bold bright_yellow]")
-    table.add_row("  ├ 🔓 2_DECOMPILED", "Decompiled .lua source files saved here", f"[bold bright_yellow]{lua_decomp_cnt}[/bold bright_yellow]")
-    table.add_row("  ├ ⚙️ 3_COMPILED", "Compiled .luac bytecode saved here", f"[bold bright_yellow]{lua_comp_cnt}[/bold bright_yellow]")
-    table.add_row("  └ 🎉 4_RESULT", "Final processed & auto-fixed scripts saved here", f"[bold bright_yellow]{lua_result_cnt}[/bold bright_yellow]")
+    table.add_row("📥 INPUT/", "Put original .pak, .obb, or .lua scripts here", f"[bold bright_yellow]{input_cnt}[/bold bright_yellow]")
+    table.add_row("🚀 OUTPUT/", "Unpacked folders, repacked files & compiled scripts saved here", f"[bold bright_yellow]{output_cnt}[/bold bright_yellow]")
+    table.add_row("✏️ REPLACE/", "Put edited files here to replace files inside PAK", f"[bold bright_yellow]{replace_cnt}[/bold bright_yellow]")
+    table.add_row("💉 INJECT/", "Put custom files here for Inject Path mode", f"[bold bright_yellow]{inject_cnt}[/bold bright_yellow]")
 
     console.print(table)
-    console.print("[bold bright_cyan]💡 Workspace Location: [bold bright_white]/sdcard/FeaturesticLeaks/[/bold bright_white] (ZArchiver me direct dikhega)[/bold bright_cyan]\n")
+    console.print("[bold bright_cyan]💡 Workspace Location: [bold bright_white]/sdcard/FeaturesticLeaks/[/bold bright_white] (Super clean & easy)[/bold bright_cyan]\n")
 
 # ============================================================================
 # LUA ENGINE & PSEUDO-DECOMPILER (Pure Python + External Tools Fallback)
@@ -4983,7 +4946,7 @@ def pick_file_from_folder(action_title: str, default_folder: Path, extensions: L
             
         # Multi-folder scan fallback for common workspace directories
         extra_subdirs = [
-            "LUA", "RESULT", "REPLACE", "UNPACK", "PAK",
+            "INPUT", "OUTPUT", "REPLACE", "INJECT", "PAK", "LUA", "UNPACK", "RESULT",
             "PAK_WORKSPACE/1_PAK_INPUT", "PAK_WORKSPACE/2_UNPACK", "PAK_WORKSPACE/3_REPLACE", "PAK_WORKSPACE/4_INJECT", "PAK_WORKSPACE/5_RESULT",
             "LUA_WORKSPACE/1_LUA_INPUT", "LUA_WORKSPACE/2_DECOMPILED", "LUA_WORKSPACE/3_COMPILED", "LUA_WORKSPACE/4_RESULT"
         ]
@@ -7620,11 +7583,12 @@ def run_ai_watch_assistant(data_path: Path):
     ))
 
     watch_folders = [
-        data_path / "PAK",
-        data_path / "LUA",
+        data_path / "INPUT",
         data_path / "INJECT",
-        Path("/sdcard/FeaturesticLeaks/PAK_WORKSPACE/1_PAK_INPUT"),
-        Path("/sdcard/FeaturesticLeaks/LUA_WORKSPACE/1_LUA_INPUT")
+        Path("/sdcard/FeaturesticLeaks/INPUT"),
+        Path("/sdcard/FeaturesticLeaks/INJECT"),
+        data_path / "PAK",
+        data_path / "LUA"
     ]
     for wf in watch_folders:
         try:
@@ -7986,13 +7950,14 @@ def run_ai_watch_assistant(data_path: Path):
 def run_ai_chat_mode(data_path: Path):
     """
     FRIENDLY CONVERSATIONAL AI CHAT COMPANION
-    User can directly chat with AI (say 'hlw', ask modding questions, ask how to use tools, get script advice, etc.)
+    User can directly chat with AI (say 'hlw', ask modding questions, or directly command AI to unpack PAK, compile Lua, fix syntax, repack, inject, etc.)
     """
     print_banner()
     console.print(Panel(
         "[bold bright_cyan]💬 FRIENDLY AI CHAT COMPANION 💬[/bold bright_cyan]\n\n"
-        "[bold white]Apne AI Modding Buddy se kuch bhi poochho![/bold white]\n"
-        " • [bright_yellow]'Hello', 'Kaise ho', 'PAK kaise unpack karu?', 'Lua fix kaise karein?'[/bright_yellow]\n"
+        "[bold white]Apne AI Modding Buddy se bol kar kaam karayein ya baatein karein![/bold white]\n"
+        " • [bright_yellow]'Hello', 'Kaise ho', 'PAK kaise unpack karu?'[/bright_yellow]\n"
+        " • [bright_green]Direct Actions: 'lua pack kar do', 'pak unpack kar do', 'lua fix kar do', 'repack kar do'[/bright_green]\n"
         " • [bright_cyan]Full GameGuard, Unreal Engine, PAK/OBB & Lua 5.1 Expert Knowledge![/bright_cyan]\n\n"
         "[dim white]Type 'exit' or 'back' anytime to return to menu.[/dim white]",
         border_style="cyan",
@@ -8018,6 +7983,147 @@ def run_ai_chat_mode(data_path: Path):
                 console.print("[bold cyan]🤖 AI: Alvida! Phir milenge dosto! Happy Modding! 🚀[/bold cyan]\n")
                 break
 
+            low_um = user_msg.lower()
+
+            # Smart Action Handler for Direct Chat Commands!
+            # 1. PAK / OBB Unpack Command
+            if any(kw in low_um for kw in ['unpack', 'unpak', 'extract pak', 'pak unpack', 'pak unpak', 'obb unpack']):
+                console.print("[bold cyan]🤖 AI Assistant: Unpack request detect hua! Workspace scan kar raha hu...[/bold cyan]")
+                found_paks = []
+                scan_dirs = [
+                    data_path / "INPUT",
+                    data_path / "PAK",
+                    Path("/sdcard/FeaturesticLeaks/INPUT"),
+                    Path("/sdcard/FeaturesticLeaks/PAK_WORKSPACE/1_PAK_INPUT")
+                ]
+                for sd in scan_dirs:
+                    if sd.exists():
+                        for f in sd.glob("*"):
+                            if f.is_file() and f.suffix.lower() in ['.pak', '.obb']:
+                                found_paks.append(f)
+
+                if found_paks:
+                    pf = found_paks[0]
+                    console.print(f"[bold cyan]⚡ AI Unpacking PAK file: [bold white]{pf.name}[/bold white]...[/bold cyan]")
+                    try:
+                        pak = TencentPakFile(pf)
+                        out_u = data_path / "OUTPUT" / pf.stem
+                        pak.dump(out_u)
+                        console.print(f"\n[bold green]✅ AI Report: Successful! Unpacked {pf.name} to {out_u}![/bold green]")
+                        sd_u = Path("/sdcard/FeaturesticLeaks/OUTPUT") / pf.stem
+                        if sd_u.parent.exists() and sd_u != out_u:
+                            try:
+                                pak.dump(sd_u)
+                                console.print(f"[bold green]   Also saved to SDCard: {sd_u}[/bold green]")
+                            except Exception:
+                                pass
+                        console.print("[bold bright_cyan]💡 AI Tip: Iske baad Replace/Inject folder me files edit karke Repack kar sakte hain![/bold bright_cyan]\n")
+                    except Exception as ex:
+                        console.print(f"[bold red]❌ Unpack Error: {ex}[/bold red]\n")
+                else:
+                    console.print("\n[bold yellow]🤖 AI Assistant: Unpack karne ke liye koi `.pak` ya `.obb` file `/sdcard/FeaturesticLeaks/INPUT/` folder me nahi mili![/bold yellow]")
+                    console.print("[bold white]💡 Kripya apni PAK file `/sdcard/FeaturesticLeaks/INPUT/` folder me daalein aur phir 'pak unpack' likhein ya Main Menu [1] use karein![/bold white]\n")
+                continue
+
+            # 2. Lua Pack / Compile Command
+            elif any(kw in low_um for kw in ['lua pack', 'pack lua', 'lua compile', 'compile lua', 'lua ko pack', 'lua ko compile', 'script compile']):
+                console.print("[bold cyan]🤖 AI Assistant: Lua Compile request detect hua! Workspace scan kar raha hu...[/bold cyan]")
+                found_luas = []
+                scan_dirs = [
+                    data_path / "INPUT",
+                    data_path / "REPLACE",
+                    data_path / "INJECT",
+                    data_path / "LUA",
+                    Path("/sdcard/FeaturesticLeaks/INPUT"),
+                    Path("/sdcard/FeaturesticLeaks/INJECT")
+                ]
+                for sd in scan_dirs:
+                    if sd.exists():
+                        for f in sd.glob("*"):
+                            if f.is_file() and f.suffix.lower() in ['.lua', '.txt']:
+                                found_luas.append(f)
+
+                if found_luas:
+                    lf = found_luas[0]
+                    console.print(f"[bold cyan]⚡ AI Compiling script: [bold white]{lf.name}[/bold white]...[/bold cyan]")
+                    try:
+                        fixed_lua = fix_lua_syntax_for_lua51(lf)
+                        res_dir = data_path / "OUTPUT"
+                        res_dir.mkdir(parents=True, exist_ok=True)
+                        out_luac = res_dir / f"{lf.stem}.luac"
+                        compiler = "luac5.1" if shutil.which("luac5.1") else ("luac" if shutil.which("luac") else None)
+                        if compiler:
+                            proc = subprocess.run([compiler, "-o", str(out_luac), str(fixed_lua)], capture_output=True, text=True)
+                            if proc.returncode == 0:
+                                console.print(f"\n[bold green]✅ AI Report: {lf.name} successfully compiled to {out_luac.name} ({out_luac.stat().st_size:,} bytes)![/bold green]")
+                                sd_res = Path("/sdcard/FeaturesticLeaks/OUTPUT") / out_luac.name
+                                if sd_res.parent.exists() and sd_res != out_luac:
+                                    shutil.copy2(out_luac, sd_res)
+                                    console.print(f"[bold green]   Saved to SDCard: {sd_res}[/bold green]")
+                            else:
+                                console.print(f"[bold yellow]⚠️ Syntax Error in Lua: {proc.stderr.strip()}[/bold yellow]")
+                                console.print("[bold cyan]🤖 Auto-fixing Lua syntax error using AI...[/bold cyan]")
+                                code = lf.read_text(errors='ignore')
+                                fixed_code = ai_fix_lua_code(code, proc.stderr)
+                                if fixed_code:
+                                    lf.write_text(fixed_code, encoding='utf-8')
+                                    proc2 = subprocess.run([compiler, "-o", str(out_luac), str(fixed_lua)], capture_output=True, text=True)
+                                    if proc2.returncode == 0:
+                                        console.print(f"[bold green]✅ Auto-Repair Successful! Compiled to {out_luac.name}![/bold green]")
+                        else:
+                            console.print("[bold red]❌ luac5.1 compiler missing. Install with 'pkg install lua51'[/bold red]")
+                    except Exception as ex:
+                        console.print(f"[bold red]❌ Compile Error: {ex}[/bold red]\n")
+                else:
+                    console.print("\n[bold yellow]🤖 AI Assistant: Compile karne ke liye koi `.lua` script `/sdcard/FeaturesticLeaks/INPUT/` folder me nahi mili![/bold yellow]")
+                    console.print("[bold white]💡 Kripya script `/sdcard/FeaturesticLeaks/INPUT/` folder me daalein aur phir 'lua pack' bolen![/bold white]\n")
+                continue
+
+            # 3. Lua Fix / Syntax Repair Command
+            elif any(kw in low_um for kw in ['lua fix', 'fix lua', 'repair lua', 'lua repair', 'syntax fix', 'fix syntax']):
+                console.print("[bold cyan]🤖 AI Assistant: Lua Repair request detect hua! Workspace scan kar raha hu...[/bold cyan]")
+                found_luas = []
+                scan_dirs = [data_path / "INPUT", data_path / "LUA", Path("/sdcard/FeaturesticLeaks/INPUT")]
+                for sd in scan_dirs:
+                    if sd.exists():
+                        for f in sd.glob("*"):
+                            if f.is_file() and f.suffix.lower() in ['.lua', '.txt']:
+                                found_luas.append(f)
+
+                if found_luas:
+                    lf = found_luas[0]
+                    console.print(f"[bold cyan]🤖 AI repairing Lua 5.1 syntax for: [bold white]{lf.name}[/bold white]...[/bold cyan]")
+                    try:
+                        code = lf.read_text(errors='ignore')
+                        fixed_code = ai_fix_lua_code(code)
+                        if fixed_code:
+                            lf.write_text(fixed_code, encoding='utf-8')
+                            console.print(f"\n[bold green]✅ AI Report: {lf.name} syntax repaired successfully![/bold green]\n")
+                    except Exception as ex:
+                        console.print(f"[bold red]❌ Fix Error: {ex}[/bold red]\n")
+                else:
+                    console.print("\n[bold yellow]🤖 AI Assistant: Repair karne ke liye koi `.lua` file `/sdcard/FeaturesticLeaks/INPUT/` folder me nahi mili![/bold yellow]\n")
+                continue
+
+            # 4. Inject Path Command
+            elif any(kw in low_um for kw in ['inject', 'lua inject', 'inject path']):
+                console.print("[bold cyan]🚀 Opening Inject Path Module...[/bold cyan]\n")
+                pak_obb_tools_menu(data_path)
+                continue
+
+            # 5. Repack Command
+            elif any(kw in low_um for kw in ['repack', 'pak pack', 'repack pak']):
+                console.print("[bold cyan]🚀 Opening PAK Repacker Module...[/bold cyan]\n")
+                pak_obb_tools_menu(data_path)
+                continue
+
+            # 6. Decompile Command
+            elif any(kw in low_um for kw in ['decompile', 'lua decompile', 'decompile lua']):
+                console.print("[bold cyan]🚀 Opening Lua Decompiler Module...[/bold cyan]\n")
+                lua_tools_menu(data_path)
+                continue
+
+            # Default: Conversational Chat AI Response
             prompt = f"{system_context}\n"
             if history:
                 prompt += "Recent Chat History:\n" + "\n".join(history[-6:]) + "\n"
@@ -8031,7 +8137,7 @@ def run_ai_chat_mode(data_path: Path):
                 history.append(f"User: {user_msg}")
                 history.append(f"AI: {response.strip()}")
             else:
-                console.print("[bold yellow]🤖 AI Assistant: Hey! Main abhi yahan hu. Kuch bhi poochho PAK, OBB ya Lua modding ke bare me![/bold yellow]\n")
+                console.print("[bold yellow]🤖 AI Assistant: Main ready hu! Aap mujhe 'lua pack kar do', 'pak unpack kar do' ya kuch bhi poochh sakte hain![/bold yellow]\n")
 
         except KeyboardInterrupt:
             console.print("\n[bold yellow]Chat ended.[/bold yellow]")
@@ -8056,7 +8162,7 @@ def ai_tools_menu(data_path: Path):
         menu_table.add_column("DESCRIPTION", justify="left", style="bright_cyan")
 
         menu_table.add_row("[1]", "AI Modding Assistant 🤖", "Real-time AI watcher, folder auto-fix & voice/text commands")
-        menu_table.add_row("[2]", "Friendly AI Chat Companion 💬", "Talk to AI directly ('hlw', ask modding questions & tips)")
+        menu_table.add_row("[2]", "Friendly AI Chat Companion 💬", "Talk to AI directly & command actions ('lua pack', 'pak unpack')")
         menu_table.add_row("[3]", "AI-Assisted Lua Repair 🛠️", "Fix broken Lua syntax, missing ends & GG errors")
         menu_table.add_row("[4]", "Manage AI API Keys & Telegram 🔑", "Setup Gemini/Groq keys & Telegram Auto-Report Bot")
         menu_table.add_row("[0]", "EXIT ✗", "Return to Main Menu")
@@ -8086,166 +8192,71 @@ def ai_tools_menu(data_path: Path):
 
 _BOOTED = False
 
-def run_url_lib_patcher_tool(data_path: Path):
-    """
-    URL & LIB PATCHER TOOL
-    Allows searching, inspecting, and replacing encrypted URLs in .so, .exe, .bin, .bytes files using XOR keys.
-    """
-    print_banner()
-    console.print(Panel(
-        "[bold cyan]🔗 URL & LIB PATCHER TOOL (SO / BINARY URL MODDER)[/bold cyan]\n"
-        "[dim white]Search, list, and replace encrypted http:// & https:// URLs inside .so game libraries, binaries & scripts![/dim white]",
-        border_style="cyan",
-        box=ROUNDED
-    ))
 
-    so_dir = data_path / "REPLACE"
-    so_dir.mkdir(parents=True, exist_ok=True)
-
-    target_file, _ = pick_file_from_folder("Select Library / Binary File", so_dir, extensions=[".so", ".bin", ".exe", ".bytes", ".dat", ".txt"])
-    if not target_file or not target_file.exists():
-        console.print("[bold red][X] No file selected.[/bold red]")
-        return
-
-    current_key = 0x2E
-
-    def xor_crypt(data: bytes, key: int) -> bytes:
-        return bytes([b ^ (key & 0xFF) for b in data])
-
-    def find_urls(data: bytes) -> List[Tuple[int, str]]:
-        url_pattern = re.compile(rb"https?://[A-Za-z0-9\./\_\-?=&%:#]+")
-        return [(m.start(), m.group().decode(errors="ignore")) for m in url_pattern.finditer(data)]
-
+def utilities_menu(data_path: Path):
     while True:
         print_banner()
-        patch_table = Table(
-            title=f"[bold bright_green]⚙️ LIB URL PATCHER - [{target_file.name}][/bold bright_green]",
+        menu_table = Table(
+            title="[bold bright_cyan]🛠️ UTILITIES & HELP 🛠️[/bold bright_cyan]",
             show_header=True,
-            header_style="bold green",
+            header_style="bold bright_cyan",
             box=ROUNDED,
-            border_style="green",
+            border_style="bright_cyan",
             expand=True
         )
-        patch_table.add_column("OPT", style="bold yellow", justify="center", width=8)
-        patch_table.add_column("ACTION", style="bold white", justify="left", width=22)
-        patch_table.add_column("INFO", style="dim cyan", justify="left")
+        menu_table.add_column("OPT", justify="center", width=8, style="bold bright_yellow")
+        menu_table.add_column("COMMAND", justify="left", width=22, style="bold bright_white")
+        menu_table.add_column("DESCRIPTION", justify="left", style="bright_cyan")
 
-        patch_table.add_row("[1]", "List Found URLs", "Scan & list all http/https URLs inside file")
-        patch_table.add_row("[2]", "Set XOR Key", f"Current Key: [bold yellow]0x{current_key:02X}[/bold yellow] ({current_key})")
-        patch_table.add_row("[3]", "Replace URL(s)", "Patch URLs with new domain/panel link (Saves patched file)")
-        patch_table.add_row("[4]", "Select Different File", f"Current: {target_file.name}")
-        patch_table.add_row("[0]", "Back to Main Menu", "Return to main menu")
+        menu_table.add_row("[1]", "UE4 String Tool", "Extract & repack .uasset/.uexp strings")
+        menu_table.add_row("[2]", "File Finder", "Search .uasset/.uexp/.ubulk by pattern")
+        menu_table.add_row("[3]", "File Resizer & Equalizer", "Match exact byte size of any file (PAK, OBB, LUA)")
+        menu_table.add_row("[4]", "Termux Auto-Setup", "Setup 'leak' direct command & SDCard folders")
+        menu_table.add_row("[5]", "Workspace Summary", "Folder guide & live file count summary")
+        menu_table.add_row("[6]", "Beginner Guide & FAQ 🔰", "Beginner Quick Start & Modding Help")
+        menu_table.add_row("[7]", "Cleanup Workspace", "Delete workspace folders")
+        menu_table.add_row("[8]", "Check Tool Update 🚀", "Force update tool to latest GitHub version")
+        menu_table.add_row("[9]", "Diagnostic & Benchmark ⚡", "Check execution speed, RAM & log hygiene")
+        menu_table.add_row("[0]", "EXIT ✗", "Return to Main Menu")
 
-        console.print(patch_table)
+        console.print(menu_table)
         console.print()
-        choice = safe_input("\033[1;36mSELECT OPTION [0-4]: \033[0m").strip()
+        choice = safe_input('\033[1;36mSELECT OPTION [1-9] [0]: \033[0m').strip()
 
         if choice == '1':
-            try:
-                raw_data = target_file.read_bytes()
-                dec_data = xor_crypt(raw_data, current_key)
-                urls = find_urls(dec_data)
-                if not urls:
-                    console.print(f"[bold red][X] No URLs found with XOR Key 0x{current_key:02X}. Try changing key (Opt 2).[/bold red]")
-                else:
-                    url_table = Table(title=f"URLs Found in {target_file.name} ({len(urls)} total)", box=ROUNDED, border_style="cyan")
-                    url_table.add_column("#", style="yellow", justify="center")
-                    url_table.add_column("Offset", style="dim white")
-                    url_table.add_column("Len", style="magenta")
-                    url_table.add_column("URL", style="bold white")
-                    for idx, (offset, url_str) in enumerate(urls, 1):
-                        url_table.add_row(str(idx), hex(offset), str(len(url_str)), url_str)
-                    console.print(url_table)
-            except Exception as e:
-                handle_exception(e, "List URLs", data_path)
+            run_ue4_string_tool(data_path)
             safe_input('\nPress Enter to continue...')
-
         elif choice == '2':
-            key_inp = safe_input("-> Enter XOR Key (e.g. 0x2E or 46 or 0x00) [0x2E]: ").strip()
-            if key_inp:
-                try:
-                    if key_inp.startswith(('0x', '0X')):
-                        current_key = int(key_inp, 16) & 0xFF
-                    else:
-                        current_key = int(key_inp) & 0xFF
-                    console.print(f"[bold green]✓ XOR Key updated to 0x{current_key:02X} ({current_key})[/bold green]")
-                except ValueError:
-                    console.print("[bold red][X] Invalid key format![/bold red]")
+            run_file_finder_tool(data_path)
             safe_input('\nPress Enter to continue...')
-
         elif choice == '3':
-            try:
-                raw_data = target_file.read_bytes()
-                dec_data = xor_crypt(raw_data, current_key)
-                urls = find_urls(dec_data)
-                if not urls:
-                    console.print(f"[bold red][X] No URLs found to replace with Key 0x{current_key:02X}.[/bold red]")
-                    safe_input('\nPress Enter to continue...')
-                    continue
-
-                url_table = Table(title=f"Select URL to Replace", box=ROUNDED, border_style="cyan")
-                url_table.add_column("#", style="yellow", justify="center")
-                url_table.add_column("Len", style="magenta")
-                url_table.add_column("URL", style="bold white")
-                for idx, (offset, url_str) in enumerate(urls, 1):
-                    url_table.add_row(str(idx), str(len(url_str)), url_str)
-                console.print(url_table)
-
-                sel_str = safe_input("-> Enter URL number to replace (1-N) or 'C' to cancel: ").strip()
-                if sel_str.upper() == 'C' or not sel_str.isdigit():
-                    continue
-
-                idx_num = int(sel_str) - 1
-                if not (0 <= idx_num < len(urls)):
-                    console.print("[bold red][X] Invalid selection number.[/bold red]")
-                    safe_input('\nPress Enter to continue...')
-                    continue
-
-                old_offset, old_url = urls[idx_num]
-                console.print(f"\n[bold cyan]Original URL:[/bold cyan] {old_url} (Len: {len(old_url)})")
-                new_url = safe_input("-> Enter NEW URL (e.g., https://my-panel.com/api): ").strip()
-                if not new_url:
-                    console.print("[yellow][!] Operation cancelled (empty URL).[/yellow]")
-                    safe_input('\nPress Enter to continue...')
-                    continue
-
-                patched = bytearray(dec_data)
-                old_bytes = old_url.encode('utf-8')
-                new_bytes = new_url.encode('utf-8')
-
-                if len(new_bytes) > len(old_bytes):
-                    extra = len(new_bytes) - len(old_bytes)
-                    patched = bytearray(patched[:old_offset] + new_bytes + patched[old_offset + len(old_bytes):])
-                else:
-                    patched[old_offset:old_offset + len(new_bytes)] = new_bytes
-                    pad_len = len(old_bytes) - len(new_bytes)
-                    if pad_len > 0:
-                        patched[old_offset + len(new_bytes):old_offset + len(old_bytes)] = b'\x00' * pad_len
-
-                enc_patched = xor_crypt(bytes(patched), current_key)
-
-                result_dir = data_path / "RESULT"
-                result_dir.mkdir(parents=True, exist_ok=True)
-                out_name = f"{target_file.stem}_patched{target_file.suffix}"
-                out_file = result_dir / out_name
-                out_file.write_bytes(enc_patched)
-
-                console.print(f"\n[bold green]✅ URL Patched Successfully![/bold green]")
-                console.print(f"[bold white]Old URL:[/bold white] {old_url}")
-                console.print(f"[bold bright_green]New URL:[/bold bright_green] {new_url}")
-                console.print(f"[bold cyan]Saved to:[/bold cyan] {out_file}")
-
-            except Exception as e:
-                handle_exception(e, "URL Replacement", data_path)
+            run_file_resizer_tool(data_path)
             safe_input('\nPress Enter to continue...')
-
         elif choice == '4':
-            new_f, _ = pick_file_from_folder("Select Library / Binary File", so_dir, extensions=[".so", ".bin", ".exe", ".bytes", ".dat", ".txt"])
-            if new_f and new_f.exists():
-                target_file = new_f
-
+            install_termux_shortcut_and_sdcard(data_path)
+            safe_input('\nPress Enter to continue...')
+        elif choice == '5':
+            print_banner()
+            display_workspace_summary(data_path)
+            show_workflow_guide()
+            safe_input('\nPress Enter to continue...')
+        elif choice == '6':
+            run_beginner_guide(data_path)
+        elif choice == '7':
+            delete_folder(data_path)
+            safe_input('\nPress Enter to continue...')
+        elif choice == '8' or choice.lower() == 'u':
+            check_and_auto_update(interactive=True)
+            safe_input('\nPress Enter to continue...')
+        elif choice == '9':
+            run_diagnostic_benchmark(data_path)
+            safe_input('\nPress Enter to continue...')
         elif choice == '0':
             break
+        else:
+            console.print('[bold red][X] Invalid choice.[/bold red]')
+            time.sleep(1)
+
 
 def run_beginner_guide(data_path: Path):
     print_banner()
@@ -8262,7 +8273,7 @@ def run_beginner_guide(data_path: Path):
 
     guide_table.add_row(
         "📦 PAK/OBB Unpack",
-        "1. PAK/OBB file ko `/sdcard/FeaturesticLeaks/PAK/` me daalo.\n2. Option [1] -> Option [1] (Unpack Package). Output `/sdcard/FeaturesticLeaks/UNPACK/` me milega."
+        "1. PAK/OBB file ko `/sdcard/FeaturesticLeaks/INPUT/` me daalo.\n2. Option [1] -> Option [1] (Unpack Package) ya Chat AI me 'pak unpack' bolen! Output `/sdcard/FeaturesticLeaks/OUTPUT/` me milega."
     )
     guide_table.add_row(
         "🛠️ Lua Inject into PAK",
@@ -8270,15 +8281,11 @@ def run_beginner_guide(data_path: Path):
     )
     guide_table.add_row(
         "⚡ Why Lua Fails?",
-        "• Plain text .lua vs Bytecode .luac: Game bytecode chahti hai. Option [2] se Auto-Compile karein.\n• Wrong Target Path: Hamesha `P1` select karein PUBG/BGMI Gameplay Lua mods ke liye!"
+        "• Plain text .lua vs Bytecode .luac: Game bytecode chahti hai. Option [2] se Auto-Compile karein ya Chat AI me 'lua pack' bolen.\n• Wrong Target Path: Hamesha `P1` select karein PUBG/BGMI Gameplay Lua mods ke liye!"
     )
     guide_table.add_row(
         "🚀 1-Click Auto Lua",
         "Option [2] (Lua Tool) -> Option [8] (1-Click Auto Workflow) chalayein! Ye syntax error fix karta hai, compile karta hai aur output sync karta hai!"
-    )
-    guide_table.add_row(
-        "🔗 URL & LIB Patcher",
-        "Option [5] (Utilities) -> Option [3] (URL & LIB Patcher) se `.so` libraries me encrypted links scan karke new panel URLs inject karein!"
     )
     
     console.print(guide_table)
@@ -8347,7 +8354,7 @@ def main_menu():
         menu_table.add_row("[2]", "LUA Tools 🌙", "Compile, Decompile, Script Merger & Obfuscator")
         menu_table.add_row("[3]", "Watch Mode 👁️", "Real-time auto-unpack & auto-compile watcher")
         menu_table.add_row("[4]", "AI Tools 🤖", "AI Lua Repair & Multi-API Key Manager (Gemini/Groq)")
-        menu_table.add_row("[5]", "Utilities 🛠️", "UE4 String Tool, Lib Patcher, Finder & FAQ Guide")
+        menu_table.add_row("[5]", "Utilities 🛠️", "UE4 String Tool, Resizer, File Finder & FAQ Guide")
         menu_table.add_row("[U]", "Auto-Update 🚀", "Check & install latest GitHub version")
         menu_table.add_row("[0]", "EXIT ✗", "Close application")
 
