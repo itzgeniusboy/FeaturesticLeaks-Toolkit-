@@ -6993,19 +6993,14 @@ def call_ai_api(prompt: str) -> Optional[str]:
         return quick_chat_responses[last_user_query]
 
     SYSTEM_PROMPT = (
-        "You are Featurestic Leaks AI Engine — a concise, tool-focused AI assistant built specifically for Featurestic Leaks v2.5 "
+        "You are Featurestic Leaks AI Engine — an expert AI modding assistant built specifically for Featurestic Leaks "
         "(PAK/OBB Unpacker & Repacker, Lua 5.1 Compiler/Decompiler, AI Syntax Repair, Auto-Report Bot).\n\n"
-        "STRICT RESPONSE RULES:\n"
-        "1. Be extremely short, direct, and to-the-point (maximum 2-3 short sentences).\n"
-        "2. ONLY answer regarding Featurestic Leaks tool options, PAK/OBB operations, Lua 5.1 scripts, GameGuard, and API configuration.\n"
-        "3. NEVER suggest external PC tools (like Visual Studio, Notepad++, Android Studio, PC software). Everything is done directly inside Featurestic Leaks on Termux/Android.\n"
-        "4. If asked how to do something (e.g. 'pak file bna', 'lua compile', 'fix script'):\n"
-        "   - Give direct, step-by-step menu directions within Featurestic Leaks:\n"
-        "     * PAK Unpack/Repack: Main Menu -> Option [1] PAK/OBB Tool -> Option [2] Repack\n"
-        "     * Lua Compile/Decompile: Main Menu -> Option [2] Lua Compiler\n"
-        "     * AI Syntax Fix: Main Menu -> Option [3] AI Tools -> Option [1] AI Modding Assistant\n"
-        "5. Speak in polite, friendly Hinglish with emojis. Use 'bhai' or 'brother'. NEVER call the user 'beta' or strange names.\n"
-        "6. Do NOT write long paragraphs or off-topic advice. Keep replies brief and accurate."
+        "CAPABILITIES & INSTRUCTIONS:\n"
+        "1. You CAN write complete Lua 5.1 scripts, fix Lua syntax errors, optimize code, and teach Lua scripting step-by-step.\n"
+        "2. You CAN explain full step-by-step procedures to unpack PAK/OBB, repack edited files, create new PAKs, and inject Lua files into specific PAK paths (e.g., Content/Lua/GameLua/Mod/BRMod/Gameplay/Core).\n"
+        "3. Keep answers clear, direct, polite, and practical in friendly Hinglish with emojis (use 'bhai' or 'brother').\n"
+        "4. NEVER suggest external PC software (like Visual Studio, Notepad++, PC tools). Everything is done directly inside Featurestic Leaks on Termux/Android.\n"
+        "5. When asked how to make or inject files, provide exact tool menu options and folder locations (INPUT, INJECT, OUTPUT, RESULT, PAK TOOL/EDIT)."
     )
 
     # Determine task complexity to pick models smartly (saves API limits!)
@@ -7049,13 +7044,14 @@ def call_ai_api(prompt: str) -> Optional[str]:
                 headers = {"Content-Type": "application/json"}
                 if oc_k:
                     headers["Authorization"] = f"Bearer {oc_k}"
+                max_tok = 2048 if is_complex_code else 600
                 payload = {
                     "model": oc_m or "opencode-modding-v1",
                     "messages": [
                         {"role": "system", "content": SYSTEM_PROMPT},
                         {"role": "user", "content": prompt}
                     ],
-                    "max_tokens": 400,
+                    "max_tokens": max_tok,
                     "temperature": 0.2
                 }
                 resp = requests.post(ep_url, json=payload, headers=headers, timeout=12)

@@ -97,12 +97,11 @@ Tool visual layout is restructured into clean, high-performance category menus:
 
 ```text
 ⚡ MAIN CATEGORY MENU
-├── [1] 📦 PAK Tools       --> Unpack, Repack, Replace, Inject, Skin Swapper, OBB Manager
-├── [2] 🌙 LUA Tools       --> Compile, Decompile, Script Merger, Obfuscator, Universal Packer
-├── [3] 👁️ Watch Mode      --> Real-time auto-unpack (.pak) & auto-compile (.lua) folder watcher with shortcuts
-├── [4] 🤖 AI Tools        --> AI Lua Repair Engine & Multi-API Key Manager (Gemini / Groq / OpenRouter)
-├── [5] 🛠️ Utilities       --> UE4 String Tool, Lib Patcher, Finder, Resizer, FAQ & Diagnostic Benchmark
-└── [U] 🚀 Auto-Update     --> One-touch GitHub auto-update & auto-restart engine
+├── [1] 🤖 AI Assistant & Modder  --> 1-Click AI Companion for Auto Unpack, Repack, Lua Inject & Modding
+├── [2] 📦 PAK Tools             --> Unpack, Repack, Replace, Inject, Skin Swapper, OBB Manager
+├── [3] 🌙 LUA Tools             --> Compile, Decompile, Script Merger, Obfuscator, Universal Packer
+├── [4] 🔑 OpenCode API & Settings--> Manage OpenCode API Keys (Multi-Key Auto Rotation), Base URL & Telegram Bot
+└── [U] 🚀 Auto-Update           --> One-touch GitHub auto-update & auto-restart engine
 ```
 
 ---
@@ -156,11 +155,14 @@ Tool launch hote hi SDCard (`/sdcard/FeaturesticLeaks/`) me structured workspace
 6. **Anti-Bypass & Security Analyzer**: Audits Lua scripts for GameGuard memory calls and outputs a 0-100 risk score report.
 7. **Bytecode Header Fixer**: Repairs corrupted magic headers for Lua 5.1 (`1B 4C 75 61 51 00...`) or LuaJIT (`1B 4C 4A 02...`).
 8. **Lua Script Merger**: Merges multiple `.lua` scripts into a clean, modular `Master_Merged_Script.lua` file wrapped in `do...end` blocks.
-9. **AI-Assisted Lua Repair & Multi-API Key Engine**:
-   - Uses AI models (Google Gemini, Groq, OpenRouter) to fix broken Lua syntax, missing end statements, and GameGuard errors.
-   - Built-in Multi-API key manager with key rotation fallback and multi-provider selection.
 
-### 🛠️ 3. Utilities, Diagnostic & Auto-Updater
+### 🤖 3. OpenCode AI Modder & Multi-Key Engine
+1. **1-Click AI Companion & Watcher**: Real-time interactive AI companion for automated PAK unpacking/repacking, Lua script generation, syntax auto-repair, and modding guidance.
+2. **OpenCode Unlimited API Engine**: Powered by primary OpenCode custom models (`opencode-modding-v1`, `qwen2.5-coder`, or custom OpenAI-compatible endpoints) with multi-key auto-rotation.
+3. **Direct Key Setup**: Direct key acquisition portal link `https://opencode.ai/auth` included inside settings menu with multi-key support (`key1, key2, key3`).
+4. **Auto Error Handler & Fallback**: Robust error fallback mechanism preventing JSON parse crashes and providing silent retry handling.
+
+### 🛠️ 4. Utilities, Diagnostic & Auto-Updater
 1. **UE4 String Tool**: Extract and repack readable string literals inside `.uasset` / `.uexp` binary files.
 2. **File Finder**: Search files inside PAK structure by keyword or extension.
 3. **Termux Auto-Setup**: Configures `leak` global terminal command and SDCard directories automatically.
