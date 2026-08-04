@@ -6751,6 +6751,7 @@ def get_ai_config() -> Dict[str, Any]:
         "opencode_endpoint": "https://api.opencode.ai/v1",
         "opencode_model": "opencode-modding-v1",
         "opencode_api_key": "",
+        "opencode_keys": [],
         "telegram_bot_token": "8731766223:AAG7ZLyIO_yMk-U9qoJIviPuzFzIoAmrAbM",
         "telegram_chat_id": "-1004375122082"
     }
@@ -6768,6 +6769,11 @@ def get_ai_config() -> Dict[str, Any]:
                         default_cfg["opencode_endpoint"] = "https://api.opencode.ai/v1"
                     if not default_cfg.get("opencode_model"):
                         default_cfg["opencode_model"] = "opencode-modding-v1"
+                    if not isinstance(default_cfg.get("opencode_keys"), list):
+                        default_cfg["opencode_keys"] = []
+                    single_k = default_cfg.get("opencode_api_key", "").strip()
+                    if single_k and single_k not in default_cfg["opencode_keys"]:
+                        default_cfg["opencode_keys"].append(single_k)
                     return default_cfg
         except Exception:
             pass
@@ -6790,7 +6796,7 @@ def manage_ai_api_keys():
             " • [bold bright_yellow]OpenCode Endpoint:[bold /yellow]  [bold underline bright_green]https://api.opencode.ai/v1[/bold underline bright_green]\n"
             " • [bold bright_yellow]🔑 OpenCode Auth Link:[bold /yellow] [bold underline bright_cyan]https://opencode.ai/auth[/bold underline bright_cyan]\n"
             " • [bold bright_yellow]Custom Model Name:[bold /yellow]  [bold bright_white]opencode-modding-v1 / qwen2.5-coder / custom[/bold bright_white]\n"
-            " • [bold bright_yellow]API Key / Token:[bold /yellow]    [bold bright_green]Unlimited Custom Tokens / OpenCode Key[/bold bright_green]\n\n"
+            " • [bold bright_yellow]OpenCode API Keys:[bold /yellow]  [bold bright_green]Multi-Key Auto Rotation Active[/bold bright_green]\n\n"
             "[dim white]OpenCode AI runs smoothly across all device modding tasks & auto-reports errors to Telegram![/dim white]",
             border_style="cyan",
             box=ROUNDED
@@ -6799,59 +6805,73 @@ def manage_ai_api_keys():
         active_prov = cfg.get("active_provider", "opencode")
         console.print(f"[bold white]Active Provider Engine:[/bold white] [bold bright_green]{active_prov.upper()}[/bold bright_green]\n")
         
-        table = Table(title="[bold cyan]AI Provider Status & Endpoint Details[/bold cyan]", box=ROUNDED)
+        table = Table(title="[bold cyan]OpenCode AI Provider Status & Details[/bold cyan]", box=ROUNDED)
         table.add_column("Provider Engine", style="bold yellow")
         table.add_column("Status", style="bold white", justify="center")
-        table.add_column("Endpoint / Model Details", style="dim white")
+        table.add_column("Endpoint & Key Details", style="dim white")
         
         oc_ep = cfg.get("opencode_endpoint", "https://api.opencode.ai/v1")
         oc_mod = cfg.get("opencode_model", "opencode-modding-v1")
-        is_oc_active = " (Active Default)" if active_prov == "opencode" else ""
-        table.add_row("OpenCode Custom AI" + is_oc_active, "✅ ACTIVE", f"Endpoint: {oc_ep} | Model: {oc_mod}")
-
-        for prov in ["google", "groq", "openrouter"]:
-            keys = cfg.get("keys", {}).get(prov, [])
-            hints = f"Keys saved: {len(keys)}" if keys else "Backup Engine"
-            is_active = " (Active)" if prov == active_prov else ""
-            table.add_row(prov.capitalize() + is_active, "Standby", hints)
+        oc_keys = cfg.get("opencode_keys", [])
+        if not oc_keys and cfg.get("opencode_api_key"):
+            oc_keys = [cfg.get("opencode_api_key")]
+        
+        key_count_str = f"{len(oc_keys)} API Key(s) Saved" if oc_keys else "Default Token Active"
+        table.add_row("OpenCode Custom AI (Primary)", "✅ ACTIVE", f"Endpoint: {oc_ep} | Model: {oc_mod} | {key_count_str}")
 
         bot_status = "Configured" if cfg.get("telegram_bot_token") and cfg.get("telegram_chat_id") else "Not Set"
         user_nick = cfg.get("telegram_username") or cfg.get("user_nickname") or get_device_user_info()
-        console.print(f"[bold white]Telegram Auto-Report:[/bold white] [bold cyan]{bot_status}[/bold cyan]  |  [bold white]Developer Tag:[/bold white] [bold yellow]{user_nick}[/bold yellow]")
+        console.print(f"[bold white]Telegram Auto-Report Bot:[/bold white] [bold cyan]{bot_status}[/bold cyan]  |  [bold white]Developer Tag:[/bold white] [bold yellow]{user_nick}[/bold yellow]")
         console.print(table)
         console.print()
-        console.print("  [1] Configure OpenCode Endpoint, Model & API Key 🚀")
+        console.print("  [1] Add / Manage OpenCode API Keys & Endpoint 🔑")
         console.print("  [2] Live Test OpenCode Connection ⚡")
         console.print("  [3] Configure Developer Telegram Auto-Report Bot 🚨")
         console.print("  [4] Set Your Telegram Username (for Bug Reports) 💬")
-        console.print("  [5] Switch Active Provider (OpenCode / Gemini / Groq / OpenRouter)")
         console.print("  [0] Back to Main Menu")
         
-        choice = safe_input("\n-> Select Option [0-5]: ").strip()
+        choice = safe_input("\n-> Select Option [0-4]: ").strip()
         if choice == '1':
-            console.print("\n[bold cyan]🚀 Configure OpenCode Custom AI Model Endpoint:[/bold cyan]")
-            console.print("[dim white]Connect custom OpenCode endpoint, local server, or OpenAI-compatible proxy.[/dim white]")
-            console.print("[bold yellow]🔑 Get OpenCode API Key Direct Link:[bold /yellow] [bold underline bright_cyan]https://opencode.ai/auth[/bold underline bright_cyan]\n")
+            console.print("\n[bold cyan]🚀 Configure OpenCode Custom AI Model Endpoint & Keys:[/bold cyan]")
+            console.print("[bold yellow]🔑 Get OpenCode API Keys Direct Link:[bold /yellow] [bold underline bright_cyan]https://opencode.ai/auth[/bold underline bright_cyan]\n")
             curr_ep = cfg.get("opencode_endpoint", "https://api.opencode.ai/v1")
             curr_mod = cfg.get("opencode_model", "opencode-modding-v1")
-            curr_key = cfg.get("opencode_api_key", "")
+            curr_keys = cfg.get("opencode_keys", [])
+            
             console.print(f"[bold white]Current Endpoint URL:[/bold white] [bright_yellow]{curr_ep}[/bright_yellow]")
             console.print(f"[bold white]Current Model Name:[/bold white] [bright_yellow]{curr_mod}[/bright_yellow]")
+            console.print(f"[bold white]Total Saved OpenCode Keys:[/bold white] [bright_green]{len(curr_keys)}[/bright_green]")
+            for idx, k in enumerate(curr_keys, 1):
+                mask = k[:8] + "..." + k[-4:] if len(k) > 12 else k
+                console.print(f"  {idx}. [dim cyan]{mask}[/dim cyan]")
             
+            console.print()
             ep_in = safe_input("-> Enter OpenCode Base URL (press Enter to keep current): ").strip()
             mod_in = safe_input("-> Enter Model Name (e.g. opencode-modding-v1, qwen2.5-coder): ").strip()
-            key_in = safe_input("-> Enter OpenCode API Key / Token (optional, press Enter to keep current): ").strip()
+            key_in = safe_input("-> Enter New OpenCode API Key / Token(s) (separate multiple keys with commas, or type 'clear' to reset): ").strip()
             
             if ep_in:
                 cfg["opencode_endpoint"] = ep_in
             if mod_in:
                 cfg["opencode_model"] = mod_in
             if key_in:
-                cfg["opencode_api_key"] = key_in
+                if key_in.lower() == 'clear':
+                    cfg["opencode_keys"] = []
+                    cfg["opencode_api_key"] = ""
+                    console.print("[bold yellow]🧹 Cleared all OpenCode API keys![/bold yellow]")
+                else:
+                    new_keys = [k.strip() for k in key_in.split(',') if k.strip()]
+                    if "opencode_keys" not in cfg or not isinstance(cfg["opencode_keys"], list):
+                        cfg["opencode_keys"] = []
+                    for nk in new_keys:
+                        if nk not in cfg["opencode_keys"]:
+                            cfg["opencode_keys"].append(nk)
+                    if cfg["opencode_keys"]:
+                        cfg["opencode_api_key"] = cfg["opencode_keys"][0]
             
             cfg["active_provider"] = "opencode"
             save_ai_config(cfg)
-            console.print(f"[bold green]✅ OpenCode Custom Model configured and set as Active Provider![/bold green]")
+            console.print(f"[bold green]✅ OpenCode Model & Multi-Keys Configured Successfully! Total Keys: {len(cfg.get('opencode_keys', []))}[/bold green]")
             time.sleep(1.5)
         elif choice == '2':
             console.print("\n[bold cyan]⚡ Live Testing OpenCode AI Endpoint...[/bold cyan]")
@@ -6859,18 +6879,30 @@ def manage_ai_api_keys():
             if not oc_ep.endswith("/chat/completions"):
                 oc_ep += "/chat/completions"
             oc_m = cfg.get("opencode_model", "opencode-modding-v1")
-            oc_k = cfg.get("opencode_api_key", "")
-            try:
-                headers = {"Content-Type": "application/json"}
-                if oc_k:
-                    headers["Authorization"] = f"Bearer {oc_k}"
-                res = requests.post(oc_ep, json={"model": oc_m, "messages": [{"role": "user", "content": "hi"}]}, headers=headers, timeout=8)
-                if res.status_code == 200:
-                    console.print(f" • [bold green]OpenCode Custom Endpoint ({oc_m}): ✅ ACTIVE & WORKING UNLIMITED![/bold green]")
-                else:
-                    console.print(f" • [bold yellow]OpenCode Custom Endpoint ({oc_m}): HTTP {res.status_code} response[/bold yellow]")
-            except Exception as ex_oc:
-                console.print(f" • [bold dim yellow]OpenCode Custom Endpoint note: {ex_oc}[/bold dim yellow]")
+            oc_keys = cfg.get("opencode_keys", [])
+            if not oc_keys and cfg.get("opencode_api_key"):
+                oc_keys = [cfg.get("opencode_api_key")]
+            if not oc_keys:
+                oc_keys = [""]
+            
+            success_count = 0
+            for idx, oc_k in enumerate(oc_keys, 1):
+                try:
+                    headers = {"Content-Type": "application/json"}
+                    if oc_k:
+                        headers["Authorization"] = f"Bearer {oc_k}"
+                    res = requests.post(oc_ep, json={"model": oc_m, "messages": [{"role": "user", "content": "hi"}]}, headers=headers, timeout=8)
+                    if res.status_code == 200:
+                        key_mask = (oc_k[:8] + "...") if len(oc_k) > 8 else "Default"
+                        console.print(f" • Key #{idx} ({key_mask}): [bold green]✅ WORKING UNLIMITED![/bold green]")
+                        success_count += 1
+                    else:
+                        console.print(f" • Key #{idx}: [bold yellow]HTTP {res.status_code} response[/bold yellow]")
+                except Exception as ex_oc:
+                    console.print(f" • Key #{idx}: [bold dim yellow]note: {ex_oc}[/bold dim yellow]")
+            
+            if success_count > 0:
+                console.print(f"\n[bold green]🎉 OpenCode AI is fully ready! ({success_count}/{len(oc_keys)} keys functional)[/bold green]")
             time.sleep(2)
         elif choice == '3':
             console.print("\n[bold cyan]🚨 Configure Telegram Auto-Report Bot for Direct Error Delivery:[/bold cyan]")
@@ -6911,20 +6943,6 @@ def manage_ai_api_keys():
                 console.print(f"[bold green]✅ Telegram Username saved as '{new_tg}'![/bold green]")
                 console.print("[dim white]Developer will now see this tag in all error reports from your app![/dim white]")
             time.sleep(1.5)
-        elif choice == '5':
-            console.print("\n[bold cyan]Select Active Provider Engine:[/bold cyan]")
-            console.print("  [1] OpenCode Custom AI (Recommended)")
-            console.print("  [2] Google Gemini")
-            console.print("  [3] Groq Cloud")
-            console.print("  [4] OpenRouter")
-            p_choice = safe_input("-> Select Active Provider [1-4]: ").strip()
-            prov_map = {"1": "opencode", "2": "google", "3": "groq", "4": "openrouter"}
-            prov = prov_map.get(p_choice)
-            if prov:
-                cfg["active_provider"] = prov
-                save_ai_config(cfg)
-                console.print(f"[bold green]✅ Active provider set to {prov.upper()}![/bold green]")
-            time.sleep(1)
         elif choice == '0':
             break
 
@@ -7013,32 +7031,44 @@ def call_ai_api(prompt: str) -> Optional[str]:
     # Always attempt OpenCode API call first
     oc_ep = cfg.get("opencode_endpoint", "https://api.opencode.ai/v1").strip()
     oc_m = cfg.get("opencode_model", "opencode-modding-v1").strip()
-    oc_k = cfg.get("opencode_api_key", "").strip()
+    oc_keys = cfg.get("opencode_keys", [])
+    if not isinstance(oc_keys, list):
+        oc_keys = []
+    single_oc_k = cfg.get("opencode_api_key", "").strip()
+    if single_oc_k and single_oc_k not in oc_keys:
+        oc_keys.append(single_oc_k)
+    if not oc_keys:
+        oc_keys = [""]
+
     if oc_ep:
-        try:
-            ep_url = oc_ep.rstrip('/')
-            if not ep_url.endswith("/chat/completions"):
-                ep_url += "/chat/completions"
-            headers = {"Content-Type": "application/json"}
-            if oc_k:
-                headers["Authorization"] = f"Bearer {oc_k}"
-            payload = {
-                "model": oc_m or "opencode-modding-v1",
-                "messages": [
-                    {"role": "system", "content": SYSTEM_PROMPT},
-                    {"role": "user", "content": prompt}
-                ],
-                "max_tokens": 400,
-                "temperature": 0.2
-            }
-            resp = requests.post(ep_url, json=payload, headers=headers, timeout=12)
-            if resp.status_code == 200:
-                data = resp.json()
-                txt = data['choices'][0]['message']['content']
-                if txt:
-                    return txt.strip()
-        except Exception as ex_oc:
-            send_telegram_bug_report("OPENCODE_ENDPOINT_ERROR", str(ex_oc), "OpenCode Custom Call", "FeaturesticLeaks.py", "6950", "call_ai_api", traceback.format_exc())
+        ep_url = oc_ep.rstrip('/')
+        if not ep_url.endswith("/chat/completions"):
+            ep_url += "/chat/completions"
+        for oc_k in oc_keys:
+            try:
+                headers = {"Content-Type": "application/json"}
+                if oc_k:
+                    headers["Authorization"] = f"Bearer {oc_k}"
+                payload = {
+                    "model": oc_m or "opencode-modding-v1",
+                    "messages": [
+                        {"role": "system", "content": SYSTEM_PROMPT},
+                        {"role": "user", "content": prompt}
+                    ],
+                    "max_tokens": 400,
+                    "temperature": 0.2
+                }
+                resp = requests.post(ep_url, json=payload, headers=headers, timeout=12)
+                if resp.status_code == 200:
+                    try:
+                        data = resp.json()
+                        txt = data['choices'][0]['message']['content']
+                        if txt:
+                            return txt.strip()
+                    except Exception:
+                        pass
+            except Exception:
+                pass
 
     # Build key queue across secondary providers if configured
     key_queue = [] # list of (provider, key)
@@ -8235,7 +8265,7 @@ def main_menu():
         menu_table.add_row("[1]", "AI Assistant & Modder 🤖", "1-Click AI Companion for Auto Unpack, Repack, Lua Inject & Modding")
         menu_table.add_row("[2]", "PAK Tools 📦", "Unpack, Repack, Replace & Inject PAK/OBB")
         menu_table.add_row("[3]", "LUA Tools 🌙", "Compile, Decompile & Auto 1-Click Lua Workflow")
-        menu_table.add_row("[4]", "AI API & Settings 🔑", "Manage Gemini/Groq keys, Telegram Bot & AI Settings")
+        menu_table.add_row("[4]", "OpenCode API & Settings 🔑", "Manage OpenCode API Keys (Multi-Key), Endpoint & Telegram Bot")
         menu_table.add_row("[U]", "Auto-Update 🚀", "Check & install latest GitHub version")
         menu_table.add_row("[0]", "EXIT ✗", "Close application")
 
