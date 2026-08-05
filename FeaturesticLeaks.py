@@ -1824,19 +1824,23 @@ def _repack_compressed_with_display(outfh, pak_file, entry, pak_relative_path, n
             display.add_block(0, target_size, True, ratio)
 
 def smart_resolve_by_fingerprint(filename: str, repack_file: Path, candidates: list):
+    if not candidates:
+        return None
+    if len(candidates) == 1:
+        return candidates[0]
+    
     repack_size = repack_file.stat().st_size
     size_matches = [(path, entry) for path, entry in candidates if entry.uncompressed_size == repack_size]
     if len(size_matches) == 1:
         return size_matches[0]
-    if not size_matches:
-        return None
-    def fingerprint(e):
-        return (e.uncompressed_size, e.size, e.compression_method, len(e.compressed_blocks), e.compression_block_size)
-    base_fp = fingerprint(size_matches[0][1])
-    final_matches = [(path, entry) for path, entry in size_matches if fingerprint(entry) == base_fp]
-    if len(final_matches) == 1:
-        return final_matches[0]
-    return None
+    if size_matches:
+        def fingerprint(e):
+            return (e.uncompressed_size, e.size, e.compression_method, len(e.compressed_blocks), e.compression_block_size)
+        base_fp = fingerprint(size_matches[0][1])
+        final_matches = [(path, entry) for path, entry in size_matches if fingerprint(entry) == base_fp]
+        if len(final_matches) == 1:
+            return final_matches[0]
+    return candidates[0]
 
 def repack_pak_file_with_block_display(pak_file, edited_root: Path, output_path: Path):
     """Original repack with simple block display"""
@@ -1847,53 +1851,92 @@ def repack_pak_file_with_block_display(pak_file, edited_root: Path, output_path:
             pass
     
     pak_name_map = {}
+    all_pak_entries = []
     for dir_path, files in pak_file._index.items():
         for name, entry in files.items():
             full_path = str(PurePath(dir_path) / name).replace('\\', '/')
             key = name.lower()
             pak_name_map.setdefault(key, []).append((full_path, entry))
+            all_pak_entries.append((full_path, entry))
     
     edited = {}
+    ignored_names = {'.ds_store', 'thumbs.db', 'metadata.json', 'desktop.ini'}
+
     for p in edited_root.rglob('*'):
         if not p.is_file():
             continue
+        if p.name.lower() in ignored_names or p.name.startswith('.'):
+            continue
+
         fname_lower = p.name.lower()
+        rel_path = p.relative_to(edited_root).as_posix().lower()
+
         if fname_lower in pak_name_map:
             candidates = pak_name_map[fname_lower]
             if len(candidates) == 1:
                 full_path, entry = candidates[0]
                 edited[full_path] = (p, entry)
             else:
-                resolved = smart_resolve_by_fingerprint(filename=p.name, repack_file=p, candidates=candidates)
-                if resolved:
-                    full_path, entry = resolved
-                    edited[full_path] = (p, entry)
+                rel_matched = None
+                for full_path, entry in candidates:
+                    fp_lower = full_path.lower()
+                    if fp_lower.endswith(rel_path) or rel_path.endswith(fp_lower):
+                        rel_matched = (full_path, entry)
+                        break
+                if rel_matched:
+                    edited[rel_matched[0]] = (p, rel_matched[1])
+                else:
+                    resolved = smart_resolve_by_fingerprint(filename=p.name, repack_file=p, candidates=candidates)
+                    if resolved:
+                        full_path, entry = resolved
+                        edited[full_path] = (p, entry)
+                    else:
+                        full_path, entry = candidates[0]
+                        edited[full_path] = (p, entry)
         else:
+            rel_matched = None
+            for full_path, entry in all_pak_entries:
+                fp_lower = full_path.lower()
+                if fp_lower.endswith(rel_path) or rel_path.endswith(fp_lower):
+                    rel_matched = (full_path, entry)
+                    break
+            if rel_matched:
+                edited[rel_matched[0]] = (p, rel_matched[1])
+                continue
+
             stem = p.stem.lower()
             ext = p.suffix.lower()
             found = False
+            
             # Pass 1: exact stem and ext
-            for dir_path, files in pak_file._index.items():
-                for name, entry in files.items():
-                    if Path(name).stem.lower() == stem and Path(name).suffix.lower() == ext:
-                        full_path = str(PurePath(dir_path) / name).replace('\\', '/')
-                        edited[full_path] = (p, entry)
-                        found = True
-                        break
-                if found:
+            for full_path, entry in all_pak_entries:
+                epath = Path(full_path)
+                if epath.stem.lower() == stem and epath.suffix.lower() == ext:
+                    edited[full_path] = (p, entry)
+                    found = True
                     break
             
             # Pass 2: flexible stem match (e.g. .luac replacing .lua or no extension)
             if not found:
-                for dir_path, files in pak_file._index.items():
-                    for name, entry in files.items():
-                        if Path(name).stem.lower() == stem:
-                            full_path = str(PurePath(dir_path) / name).replace('\\', '/')
-                            edited[full_path] = (p, entry)
-                            found = True
-                            break
-                    if found:
+                for full_path, entry in all_pak_entries:
+                    epath = Path(full_path)
+                    if epath.stem.lower() == stem:
+                        edited[full_path] = (p, entry)
+                        found = True
                         break
+
+            # Pass 3: Fallback for newly injected/custom files
+            if not found and all_pak_entries:
+                ext_match = None
+                for full_path, entry in all_pak_entries:
+                    if Path(full_path).suffix.lower() == ext:
+                        ext_match = (full_path, entry)
+                        break
+                if ext_match:
+                    edited[ext_match[0]] = (p, ext_match[1])
+                else:
+                    full_path, entry = all_pak_entries[0]
+                    edited[full_path] = (p, entry)
 
     if not edited:
         console.print('[bold red][X] No files to repack![/bold red]')
@@ -5930,6 +5973,8 @@ def run_pak_compare_dumper(data_path: Path) -> None:
                     rel_path = (pak._mount_point / dir_p / fname).as_posix()
                     enc_m = pak._get_method_str(entry.encryption_method, True)
                     comp_m = pak._get_method_str(entry.compression_method, False)
+                    entry_hash = getattr(entry, 'content_hash', getattr(entry, 'hash', b''))
+                    hash_str = entry_hash.hex() if isinstance(entry_hash, bytes) else str(entry_hash)
                     entries.append({
                         "file_path": rel_path,
                         "size": entry.size,
@@ -5938,7 +5983,7 @@ def run_pak_compare_dumper(data_path: Path) -> None:
                         "encrypted": entry.encrypted,
                         "encryption_method": enc_m,
                         "compression_method": comp_m,
-                        "hash": entry.hash.hex() if hasattr(entry.hash, 'hex') else str(entry.hash)
+                        "hash": hash_str
                     })
 
             dump_dir = data_path / "DUMP_LOGS"
