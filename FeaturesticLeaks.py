@@ -6474,7 +6474,7 @@ def pak_obb_tools_menu(data_path: Path):
                         " 📂 [bold bright_yellow]/sdcard/FeaturesticLeaks/INJECT/[/bold bright_yellow]\n"
                         " 📂 [bold bright_yellow]/sdcard/FeaturesticLeaks/PAK_WORKSPACE/4_INJECT/[/bold bright_yellow]\n\n"
                         "[dim white]Instructions:[/dim white]\n"
-                        "1. Open your File Manager and put your files inside [/dim white][bold yellow]/sdcard/FeaturesticLeaks/INJECT/[/bold yellow]\n"
+                        "1. Open your File Manager and put your files inside [bold yellow]/sdcard/FeaturesticLeaks/INJECT/[/bold yellow]\n"
                         "2. Or enter your custom folder path below:",
                         title="[bold yellow] 📂 INJECT FOLDER PATH GUIDE [/bold yellow]",
                         border_style="yellow",
