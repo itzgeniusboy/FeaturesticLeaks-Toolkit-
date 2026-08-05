@@ -7571,10 +7571,57 @@ def watch_mode_menu(data_path: Path):
             time.sleep(1)
 
 
+def get_live_workspace_context(data_path: Path) -> str:
+    """
+    Returns a live file status snapshot of the device & tool workspace for AI prompts.
+    """
+    sd_path = Path("/sdcard/FeaturesticLeaks")
+    lines = ["CURRENT LIVE WORKSPACE & DEVICE FILE SNAPSHOT:"]
+
+    # 1. PAK Folder
+    pak_files = []
+    for p in [data_path / "PAK", data_path / "INPUT", sd_path / "PAK", sd_path / "INPUT"]:
+        if p.exists():
+            for f in p.glob("*"):
+                if f.is_file() and f.suffix.lower() in ['.pak', '.obb']:
+                    pak_files.append(f"{f.name} ({human_size(f.stat().st_size)})")
+    lines.append(f"• PAK/OBB Input Files: {', '.join(pak_files) if pak_files else 'None (Folder empty)'}")
+
+    # 2. LUA Folder
+    lua_files = []
+    for p in [data_path / "LUA", data_path / "INPUT", sd_path / "LUA", sd_path / "INPUT"]:
+        if p.exists():
+            for f in p.glob("*"):
+                if f.is_file() and f.suffix.lower() in ['.lua', '.luac', '.txt']:
+                    lua_files.append(f"{f.name} ({human_size(f.stat().st_size)})")
+    lines.append(f"• LUA Script Files: {', '.join(lua_files) if lua_files else 'None (Folder empty)'}")
+
+    # 3. UNPACK / RESULT Folders
+    res_items = []
+    for p in [data_path / "RESULT", data_path / "UNPACK", sd_path / "RESULT", sd_path / "UNPACK"]:
+        if p.exists():
+            for item in p.iterdir():
+                if not item.name.startswith("."):
+                    res_items.append(f"{item.name} ({'Folder' if item.is_dir() else human_size(item.stat().st_size)})")
+    lines.append(f"• RESULT/UNPACK Files & Folders: {', '.join(res_items) if res_items else 'None (Folder empty)'}")
+
+    # 4. SD Card Download files
+    dl_files = []
+    for p in [Path("/sdcard/Download"), Path("/sdcard/Telegram")]:
+        if p.exists():
+            for f in p.glob("*"):
+                if f.is_file() and f.suffix.lower() in ['.pak', '.obb', '.lua', '.luac', '.txt']:
+                    dl_files.append(f"{f.name} ({human_size(f.stat().st_size)})")
+    if dl_files:
+        lines.append(f"• Download/Telegram Mod Files: {', '.join(dl_files[:5])}")
+
+    return "\n".join(lines)
+
+
 def process_ai_smart_command(user_msg: str, data_path: Path) -> bool:
     """
     AUTONOMOUS INTENT & FILE-AWARE AI AGENT ENGINE
-    Directly executes modding tasks (unpack, compile, inject, repair, repack) on workspace files.
+    Directly executes modding tasks (unpack, compile, inject, repair, repack, clean, move) on workspace files.
     """
     low_um = user_msg.lower().strip()
     if not low_um:
@@ -7586,8 +7633,16 @@ def process_ai_smart_command(user_msg: str, data_path: Path) -> bool:
         console.print("\n[bold bright_cyan]🤖 AI Assistant:[/bold bright_cyan] [bold bright_yellow]Ha bhai! Kya krna h? PAK bnana h, unpack krna h, lua compile krna h ya fix krna h? Kuch bhi bolo, main direct karke dunga! 🚀[/bold bright_yellow]\n")
         return True
 
-    # 2. Lua PAK Inject Command (DIRECT EXECUTION)
-    if any(kw in low_um for kw in ['inject', 'lua pak inject', 'pak inject', 'lua inject', 'inject lua', 'script inject', 'lua pack inject', 'pak me inject']):
+    # 2. Workspace File Inspection / Scan Command (DIRECT EXECUTION)
+    elif any(kw in low_um for kw in ['scan', 'check', 'status', 'files', 'file status', 'kya files', 'show files', 'list files', 'folder status', 'workspace status', 'folder me kya']):
+        console.print("\n[bold bright_cyan]📊 LIVE WORKSPACE & DEVICE FILE SNAPSHOT:[/bold bright_cyan]")
+        snapshot = get_live_workspace_context(data_path)
+        console.print(Panel(f"[bold bright_white]{snapshot}[/bold bright_white]", border_style="bright_cyan", box=ROUNDED))
+        display_workspace_summary(data_path)
+        return True
+
+    # 3. Lua PAK Inject Command (DIRECT EXECUTION)
+    elif any(kw in low_um for kw in ['inject', 'lua pak inject', 'pak inject', 'lua inject', 'inject lua', 'script inject', 'lua pack inject', 'pak me inject']):
         console.print("[bold cyan]🤖 AI Assistant: Lua PAK Inject request detect hua! Scanning PAK and LUA folders...[/bold cyan]")
         scan_paks = [data_path / "PAK", data_path / "INPUT", Path("/sdcard/FeaturesticLeaks/PAK"), Path("/sdcard/FeaturesticLeaks/INPUT")]
         scan_luas = [data_path / "LUA", data_path / "INPUT", Path("/sdcard/FeaturesticLeaks/LUA"), Path("/sdcard/FeaturesticLeaks/INPUT")]
@@ -7661,7 +7716,7 @@ def process_ai_smart_command(user_msg: str, data_path: Path) -> bool:
             console.print("\n[bold bright_yellow]🤖 AI Assistant: Bhai LUA folder me pehle Lua script daalo tabhi PAK me inject karunga! Abhi LUA folder me script nahi hai. Pehle script daalo fir batao! 📜[/bold bright_yellow]\n")
         return True
 
-    # 3. Unpack Command (DIRECT EXECUTION)
+    # 4. Unpack Command (DIRECT EXECUTION)
     elif any(kw in low_um for kw in ['unpack', 'unpak', 'extract', 'pak kholo', 'pak unpack', 'pak unpak', 'obb unpack', 'pak se file nikalo', 'unpack karo', 'unpack kr do', 'pak nikalo']):
         console.print("[bold cyan]🤖 AI Assistant: Unpack request detect hua! Scanning PAK folder...[/bold cyan]")
         scan_dirs = [data_path / "PAK", data_path / "INPUT", Path("/sdcard/FeaturesticLeaks/PAK"), Path("/sdcard/FeaturesticLeaks/INPUT")]
@@ -7690,7 +7745,7 @@ def process_ai_smart_command(user_msg: str, data_path: Path) -> bool:
             console.print("\n[bold bright_yellow]🤖 AI Assistant: Bhai PAK folder me pehle PAK / OBB file daalo tabhi to unpack karunga! Abhi PAK folder khali hai. File daalte hi bolna! 📦[/bold bright_yellow]\n")
         return True
 
-    # 4. Lua Compile / Pack Command (DIRECT EXECUTION)
+    # 5. Lua Compile / Pack Command (DIRECT EXECUTION)
     elif any(kw in low_um for kw in ['compile', 'lua pack', 'pack lua', 'lua compile', 'compile lua', 'luac', 'lua ko pack', 'lua ko compile', 'script compile', 'lua pack karo', 'lua pack kr do', 'lua compile kr do']):
         console.print("[bold cyan]🤖 AI Assistant: Lua Compile request detect hua! Scanning LUA folder...[/bold cyan]")
         scan_dirs = [data_path / "LUA", data_path / "INPUT", Path("/sdcard/FeaturesticLeaks/LUA"), Path("/sdcard/FeaturesticLeaks/INPUT")]
@@ -7736,7 +7791,7 @@ def process_ai_smart_command(user_msg: str, data_path: Path) -> bool:
             console.print("\n[bold bright_yellow]🤖 AI Assistant: Bhai LUA folder me pehle Lua script daalo tabhi compile karunga! Abhi LUA folder khali hai. Script daal kar bolo! 📜[/bold bright_yellow]\n")
         return True
 
-    # 5. Fix / Repair Lua Syntax Command (DIRECT EXECUTION)
+    # 6. Fix / Repair Lua Syntax Command (DIRECT EXECUTION)
     elif any(kw in low_um for kw in ['fix', 'repair', 'syntax', 'lua fix', 'fix lua', 'repair lua', 'lua repair', 'syntax fix', 'fix syntax', 'script repair', 'error fix', 'lua fix kr do', 'lua repair kr do']):
         console.print("[bold cyan]🤖 AI Assistant: Lua Repair request detect hua! Scanning LUA folder...[/bold cyan]")
         scan_dirs = [data_path / "LUA", data_path / "INPUT", Path("/sdcard/FeaturesticLeaks/LUA"), Path("/sdcard/FeaturesticLeaks/INPUT")]
@@ -7765,7 +7820,7 @@ def process_ai_smart_command(user_msg: str, data_path: Path) -> bool:
             console.print("\n[bold bright_yellow]🤖 AI Assistant: Bhai LUA folder me pehle broken Lua file daalo tabhi repair karunga! Abhi LUA folder khali hai. 🛠️[/bold bright_yellow]\n")
         return True
 
-    # 6. Repack PAK Command (DIRECT EXECUTION)
+    # 7. Repack PAK Command (DIRECT EXECUTION)
     elif any(kw in low_um for kw in ['repack', 'pak repack', 'repack pak', 'pak banao', 'pak banado', 'pak pack', 'repack kr do', 'pak bnana']):
         console.print("[bold cyan]🤖 AI Assistant: Repack request detect hua! Scanning RESULT & UNPACK folders...[/bold cyan]")
         scan_dirs = [data_path / "RESULT", data_path / "UNPACK", Path("/sdcard/FeaturesticLeaks/RESULT"), Path("/sdcard/FeaturesticLeaks/UNPACK")]
@@ -7802,9 +7857,70 @@ def process_ai_smart_command(user_msg: str, data_path: Path) -> bool:
             console.print("\n[bold bright_yellow]🤖 AI Assistant: Bhai pehle RESULT ya UNPACK folder me unpacked folder toh hone do! Unpack karne ke baad repack bolna! 📦[/bold bright_yellow]\n")
         return True
 
-    # 7. Workspace status / Scan
-    elif any(kw in low_um for kw in ['scan', 'check', 'status', 'folder', 'workspace']):
-        display_workspace_summary(data_path)
+    # 8. Clean / Delete Workspace Files Command (DIRECT EXECUTION)
+    elif any(kw in low_um for kw in ['clean', 'delete', 'htaa do', 'hata do', 'khali karo', 'khali kr', 'saaf karo', 'clear', 'remove all', 'sab htaa', 'sab delete', 'files delete', 'saaf kr']):
+        console.print("[bold cyan]🤖 AI Assistant: Cleaning request detect hua! Workspace folders clear kar raha hu...[/bold cyan]")
+        deleted_count = 0
+        clean_dirs = [
+            data_path / "INPUT", data_path / "OUTPUT", data_path / "UNPACK", data_path / "REPACK", data_path / "RESULT", data_path / "TEMP_INJECT", data_path / "PAK", data_path / "LUA", data_path / "INJECT",
+            Path("/sdcard/FeaturesticLeaks/INPUT"), Path("/sdcard/FeaturesticLeaks/OUTPUT"), Path("/sdcard/FeaturesticLeaks/UNPACK"),
+            Path("/sdcard/FeaturesticLeaks/REPACK"), Path("/sdcard/FeaturesticLeaks/RESULT"), Path("/sdcard/FeaturesticLeaks/INJECT"),
+            Path("/sdcard/FeaturesticLeaks/PAK"), Path("/sdcard/FeaturesticLeaks/LUA")
+        ]
+        for cd in clean_dirs:
+            if cd.exists():
+                for item in cd.iterdir():
+                    try:
+                        if item.is_dir():
+                            shutil.rmtree(item, ignore_errors=True)
+                        else:
+                            item.unlink(missing_ok=True)
+                        deleted_count += 1
+                    except Exception:
+                        pass
+        console.print(f"\n[bold green]🤖 AI Assistant: Bhai saare workspace folders me se Total {deleted_count} files/folders clean kar diye hain! Total khali kar diya! 🧹✨[/bold green]\n")
+        return True
+
+    # 9. Copy / Move Custom Files to Workspace Command (DIRECT EXECUTION)
+    elif any(kw in low_um for kw in ['copy', 'move', 'daalo', 'dal do', 'move karo', 'copy karo', 'le aao', 'import', 'transfer', 'dalo']):
+        console.print("[bold cyan]🤖 AI Assistant: File Move/Copy request detect hua! Scanned custom directories...[/bold cyan]")
+        # Extract path if provided in quotes or after keywords
+        src_path = None
+        for word in user_msg.split():
+            clean_word = word.strip('"\'')
+            if "/" in clean_word and (os.path.exists(clean_word) or os.path.exists(f"/sdcard/{clean_word}")):
+                src_path = Path(clean_word) if os.path.exists(clean_word) else Path(f"/sdcard/{clean_word}")
+                break
+        
+        if not src_path:
+            # Check default Download / Telegram folders
+            downloads = [Path("/sdcard/Download"), Path("/sdcard/Telegram")]
+            candidates = []
+            for d in downloads:
+                if d.exists():
+                    candidates.extend([f for f in d.glob("*") if f.is_file() and f.suffix.lower() in ['.pak', '.obb', '.lua', '.luac', '.txt', '.uasset', '.uexp']])
+            if candidates:
+                src_path = candidates[0]
+
+        if src_path:
+            target_dir = data_path / "INPUT"
+            if src_path.suffix.lower() in ['.lua', '.luac']:
+                target_dir = data_path / "LUA"
+            elif src_path.suffix.lower() in ['.pak', '.obb']:
+                target_dir = data_path / "PAK"
+            
+            target_dir.mkdir(parents=True, exist_ok=True)
+            dest_file = target_dir / src_path.name
+            try:
+                shutil.copy2(src_path, dest_file)
+                sd_dest = Path("/sdcard/FeaturesticLeaks") / target_dir.name / src_path.name
+                if sd_dest.parent.exists() and sd_dest.resolve() != dest_file.resolve():
+                    shutil.copy2(src_path, sd_dest)
+                console.print(f"\n[bold green]🤖 AI Assistant: Bhai file `{src_path.name}` ko copy kar ke tool ke `{target_dir.name}` folder me daal diya hai! 📁✅[/bold green]\n")
+            except Exception as ex:
+                console.print(f"[bold red]❌ Copy Error: {ex}[/bold red]")
+        else:
+            console.print("\n[bold yellow]🤖 AI Assistant: Bhai source file path nahi mil saki. Aap file ka full path type karein (jaise: `/sdcard/Download/myfile.lua`).[/bold yellow]\n")
         return True
 
     return False
@@ -8035,10 +8151,12 @@ def run_ai_watch_assistant(data_path: Path):
 
                     if not handled:
                         console.print("[dim cyan]🤖 AI Assistant is thinking...[/dim cyan]")
+                        live_ctx = get_live_workspace_context(data_path)
                         sys_prompt = (
                             "You are Featurestic Leaks AI, a highly intelligent, polite, friendly PUBG/BGMI PAK & Lua modding expert AI assistant. "
                             "When asked what to do or greeted, always answer: 'Ha bhai! Kya krna h? PAK bnana h, unpack krna h, lua compile krna h ya fix krna h? Batao kya krna h!' "
-                            "Respond in friendly, natural Hinglish with appropriate formatting and emojis."
+                            "Respond in friendly, natural Hinglish with appropriate formatting and emojis.\n\n"
+                            f"{live_ctx}"
                         )
                         resp = call_ai_api(f"{sys_prompt}\nUser typed: '{user_msg}'")
                         if resp:
@@ -8093,7 +8211,8 @@ def run_ai_chat_mode(data_path: Path):
             handled = process_ai_smart_command(user_msg, data_path)
 
             if not handled:
-                prompt = f"{system_context}\n"
+                live_ctx = get_live_workspace_context(data_path)
+                prompt = f"{system_context}\n\n{live_ctx}\n"
                 if history:
                     prompt += "Recent Chat History:\n" + "\n".join(history[-6:]) + "\n"
                 prompt += f"User: {user_msg}\nAI Assistant:"
