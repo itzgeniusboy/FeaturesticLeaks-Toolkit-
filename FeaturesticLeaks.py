@@ -1860,14 +1860,24 @@ def repack_pak_file_with_block_display(pak_file, edited_root: Path, output_path:
             all_pak_entries.append((full_path, entry))
     
     edited = {}
-    ignored_names = {'.ds_store', 'thumbs.db', 'metadata.json', 'desktop.ini'}
+    ignored_names = {'.ds_store', 'thumbs.db', 'metadata.json', 'desktop.ini', '.gitkeep'}
 
-    for p in edited_root.rglob('*'):
-        if not p.is_file():
-            continue
-        if p.name.lower() in ignored_names or p.name.startswith('.'):
-            continue
+    # Candidates for source files if edited_root is empty or subfolder is empty
+    sources_to_check = [edited_root]
+    sd_repack = Path("/sdcard/FeaturesticLeaks/REPACK") / edited_root.name
+    if sd_repack.exists() and sd_repack.resolve() != edited_root.resolve():
+        sources_to_check.append(sd_repack)
 
+    valid_files = []
+    for src in sources_to_check:
+        if src.exists():
+            v_files = [p for p in src.rglob('*') if p.is_file() and p.name.lower() not in ignored_names and not p.name.startswith('.')]
+            if v_files:
+                valid_files = v_files
+                edited_root = src
+                break
+
+    for p in valid_files:
         fname_lower = p.name.lower()
         rel_path = p.relative_to(edited_root).as_posix().lower()
 
@@ -1938,9 +1948,20 @@ def repack_pak_file_with_block_display(pak_file, edited_root: Path, output_path:
                     full_path, entry = all_pak_entries[0]
                     edited[full_path] = (p, entry)
 
+    if not edited and all_pak_entries:
+        # Fallback if no files found in repack_root: map unpack root or default entry to allow repacking
+        unpack_cand = data_path / "UNPACK" / pak_file._file_path.stem
+        if unpack_cand.exists():
+            v_unpack = [p for p in unpack_cand.rglob('*') if p.is_file() and p.name.lower() not in ignored_names and not p.name.startswith('.')]
+            for p in v_unpack:
+                fname_lower = p.name.lower()
+                if fname_lower in pak_name_map:
+                    edited[pak_name_map[fname_lower][0][0]] = (p, pak_name_map[fname_lower][0][1])
+
     if not edited:
-        console.print('[bold red][X] No files to repack![/bold red]')
-        raise RuntimeError(f"No matching file found in PAK ({pak_file._file_path.name}) for injected files in '{edited_root.name}'")
+        console.print('[bold red][X] No valid files found to repack in source folder![/bold red]')
+        console.print(f'[yellow][!] Please ensure your modified or unpacked files are placed in: {edited_root}[/yellow]')
+        raise RuntimeError(f"No files found in source folder '{edited_root.name}' to repack into '{pak_file._file_path.name}'. Please check the folder contents.")
     
     total_files = len(edited)
     display = SimpleBlockDisplay(total_files, pak_file._file_path.name)
