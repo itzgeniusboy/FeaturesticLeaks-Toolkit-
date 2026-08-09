@@ -72,8 +72,8 @@ export default function App() {
       } else if (low === '3' || low.includes('lua')) {
         responses = [
           '🌙 LUA TOOLS MENU 🌙',
-          '[1] Compile Lua to Bytecode',
-          '[2] Auto-Fix Lua Syntax Errors (OpenCode AI)',
+          '[1] Decompile Lua (.luac)',
+          '[2] Compile & Protect Lua (.lua)',
           '[3] 1-Click Auto Lua Workflow',
           '[0] Back to Main Menu'
         ];
@@ -88,7 +88,8 @@ export default function App() {
       } else if (low.includes('inject')) {
         responses = [
           '🤖 OpenCode AI: Scanning PAK and LUA folders...',
-          '💉 Injecting Lua script into ShadowTrackerExtra/Content/Lua...',
+          '🛡️ Auto-applying XOR Encryption & Security Layer to Lua payload...',
+          '💉 Injecting Protected Lua script into ShadowTrackerExtra/Content/Lua...',
           '✅ SUCCESS: Injected PAK saved to /sdcard/FeaturesticLeaks/RESULT/injected_patch.pak! 🚀',
           '(Note: If any bug occurs, OpenCode AI silently fixes it & sends solution report to Telegram!)'
         ];
@@ -104,7 +105,8 @@ export default function App() {
         ];
       } else if (low.includes('compile') || low.includes('fix')) {
         responses = [
-          '🤖 OpenCode AI: Repairing and compiling Lua 5.1 bytecode...',
+          '🛡️ OpenCode AI: Auto-protecting script with XOR Obfuscation (Key: 0x5A)...',
+          '🤖 Repairing and compiling Lua 5.1 bytecode...',
           '📜 Complete! Output file written to /sdcard/FeaturesticLeaks/RESULT/ 🚀'
         ];
       } else if (low === 'clear' || low === 'cls') {
