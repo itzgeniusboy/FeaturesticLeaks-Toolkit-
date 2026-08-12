@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 24/7 FeaturesticLeaks Telegram Bot Engine & Continuous Workflow Runner
-Runs long polling for Telegram Bot commands, Inline Keyboard Buttons, & automated workspace processing.
+Runs long polling for Telegram Bot commands, Persistent Reply Keyboard & Inline Buttons.
 Supports per-user OpenCode API Key storage (/setkey) so every user can use their own API key!
 """
 
@@ -85,6 +85,42 @@ def get_bot_credentials():
 BOT_TOKEN, TARGET_CHAT_ID = get_bot_credentials()
 TELEGRAM_API_URL = f"https://api.telegram.org/bot{BOT_TOKEN}"
 
+def get_reply_keyboard_markup():
+    """Persistent Telegram Bottom Keyboard - Always visible above message input!"""
+    return {
+        "keyboard": [
+            [{"text": "📊 Workspace Status"}, {"text": "📦 Unpack PAK/OBB"}],
+            [{"text": "📦 Repack PAK"}, {"text": "📜 Compile Lua"}],
+            [{"text": "🔑 Set API Key"}, {"text": "🧹 Clean Workspace"}],
+            [{"text": "🤖 AI Help"}, {"text": "🔄 Restart Bot"}]
+        ],
+        "resize_keyboard": True,
+        "is_persistent": True
+    }
+
+def get_inline_keyboard_markup():
+    """Inline Keyboard Buttons attached directly to messages"""
+    return {
+        "inline_keyboard": [
+            [
+                {"text": "📊 Workspace Status", "callback_data": "btn_status"},
+                {"text": "📦 Unpack PAK/OBB", "callback_data": "btn_unpack"}
+            ],
+            [
+                {"text": "📦 Repack PAK", "callback_data": "btn_repack"},
+                {"text": "📜 Compile Lua", "callback_data": "btn_compile"}
+            ],
+            [
+                {"text": "🔑 Set API Key", "callback_data": "btn_setkey"},
+                {"text": "🧹 Clean Workspace", "callback_data": "btn_clean"}
+            ],
+            [
+                {"text": "🤖 AI Help", "callback_data": "btn_ai_help"},
+                {"text": "🔄 Restart Bot", "callback_data": "btn_restart"}
+            ]
+        ]
+    }
+
 def send_telegram_msg(text, chat_id=None, reply_markup=None, parse_mode="HTML"):
     if not chat_id:
         chat_id = TARGET_CHAT_ID
@@ -92,10 +128,12 @@ def send_telegram_msg(text, chat_id=None, reply_markup=None, parse_mode="HTML"):
         print("[Warning] Cannot send msg: BOT_TOKEN or chat_id is missing.")
         return None
 
+    # Default to persistent bottom keyboard if no reply_markup provided
+    if reply_markup is None:
+        reply_markup = get_reply_keyboard_markup()
+
     url = f"{TELEGRAM_API_URL}/sendMessage"
-    payload_dict = {"chat_id": chat_id, "text": text, "parse_mode": parse_mode}
-    if reply_markup:
-        payload_dict["reply_markup"] = reply_markup
+    payload_dict = {"chat_id": chat_id, "text": text, "parse_mode": parse_mode, "reply_markup": reply_markup}
 
     payload = json.dumps(payload_dict).encode('utf-8')
     headers = {"Content-Type": "application/json"}
@@ -202,31 +240,96 @@ def download_telegram_file(file_id: str, dest_path: Path):
         print(f"Download Error: {e}")
         return False, str(e)
 
-def get_main_keyboard_markup():
-    return {
-        "inline_keyboard": [
-            [
-                {"text": "📊 Workspace Status", "callback_data": "btn_status"},
-                {"text": "📦 Unpack PAK/OBB", "callback_data": "btn_unpack"}
-            ],
-            [
-                {"text": "📦 Repack PAK", "callback_data": "btn_repack"},
-                {"text": "📜 Compile Lua", "callback_data": "btn_compile"}
-            ],
-            [
-                {"text": "🔑 Set My OpenCode Key", "callback_data": "btn_setkey"},
-                {"text": "🧹 Clean Workspace", "callback_data": "btn_clean"}
-            ],
-            [
-                {"text": "🤖 AI Help / Query", "callback_data": "btn_ai_help"},
-                {"text": "🔄 Restart Bot", "callback_data": "btn_restart"}
-            ]
-        ]
-    }
+# Action Executors
+def do_status(chat_id):
+    try:
+        snapshot = get_live_workspace_context(data_path)
+        send_telegram_msg(f"📊 <b>WORKSPACE LIVE SNAPSHOT:</b>\n<pre>{html.escape(snapshot)}</pre>", chat_id=chat_id)
+    except Exception as e:
+        send_telegram_msg(f"Error fetching status: {html.escape(str(e))}", chat_id=chat_id)
+
+def do_unpack(chat_id):
+    pak_files = [f for f in (data_path / "PAK").glob("*.*") if f.suffix.lower() in [".pak", ".obb"]]
+    if not pak_files:
+        send_telegram_msg("📦 <b>No PAK/OBB files found in PAK/ folder.</b>\nPlease upload a <code>.pak</code> or <code>.obb</code> file first!", chat_id=chat_id)
+    else:
+        for pf in pak_files:
+            send_telegram_msg(f"⏳ Unpacking <code>{html.escape(pf.name)}</code>...", chat_id=chat_id)
+            unpack_out = data_path / "UNPACK" / pf.stem
+            try:
+                repack_pak_file_full(pf, unpack_out, None)
+                send_telegram_msg(f"🎉 <b>Unpack Successful!</b>\nFolder: <code>UNPACK/{html.escape(pf.stem)}</code>", chat_id=chat_id)
+            except Exception as ex:
+                send_telegram_msg(f"❌ Unpack error on {html.escape(pf.name)}: {html.escape(str(ex))}", chat_id=chat_id)
+
+def do_repack(chat_id):
+    unpack_dirs = [d for d in (data_path / "UNPACK").iterdir() if d.is_dir()]
+    if not unpack_dirs:
+        send_telegram_msg("📦 <b>No unpacked folders found in UNPACK/!</b>\nPlease upload or unpack a PAK file first.", chat_id=chat_id)
+    else:
+        for ud in unpack_dirs:
+            out_pak = data_path / "RESULT" / f"repacked_{ud.name}.pak"
+            send_telegram_msg(f"⏳ Repacking folder <code>UNPACK/{html.escape(ud.name)}</code>...", chat_id=chat_id)
+            try:
+                repack_pak_file_full(None, ud, out_pak)
+                if out_pak.exists():
+                    send_telegram_document(out_pak, caption=f"✅ <b>Repacked PAK File Ready!</b>\n{out_pak.name}", chat_id=chat_id)
+                else:
+                    send_telegram_msg(f"❌ Repack failed for {html.escape(ud.name)}.", chat_id=chat_id)
+            except Exception as ex:
+                send_telegram_msg(f"❌ Repack error on {html.escape(ud.name)}: {html.escape(str(ex))}", chat_id=chat_id)
+
+def do_compile(chat_id):
+    lua_files = [f for f in (data_path / "LUA").glob("*.*") if f.suffix.lower() in [".lua", ".txt"]]
+    if not lua_files:
+        send_telegram_msg("📜 <b>No Lua files found in LUA/ folder.</b>\nPlease upload a <code>.lua</code> script first!", chat_id=chat_id)
+    else:
+        for lf in lua_files:
+            send_telegram_msg(f"⏳ Compiling <code>{html.escape(lf.name)}</code>...", chat_id=chat_id)
+            try:
+                raw_code = lf.read_text(encoding="utf-8", errors="ignore")
+                fixed = fix_lua_syntax_for_lua51(raw_code)
+                out_luac = data_path / "RESULT" / (lf.stem + ".luac")
+                comp_ok, comp_msg = run_lua_compiler(lf, out_luac)
+                if comp_ok and out_luac.exists():
+                    send_telegram_document(out_luac, caption=f"✅ <b>Lua Auto-Compile Complete!</b>\n{out_luac.name}", chat_id=chat_id)
+                else:
+                    send_telegram_msg(f"⚠️ <b>Compile Error:</b>\n<code>{html.escape(comp_msg[:500])}</code>", chat_id=chat_id)
+            except Exception as ex:
+                send_telegram_msg(f"❌ Compile error on {html.escape(lf.name)}: {html.escape(str(ex))}", chat_id=chat_id)
+
+def do_setkey_info(chat_id, user_id):
+    user_key = get_user_key(user_id)
+    status_txt = f"<code>{user_key[:8]}...{user_key[-4:]}</code>" if user_key else "<i>Not Set</i>"
+    msg_txt = (
+        f"🔑 <b>API Key Status:</b> {status_txt}\n\n"
+        "To set your key, send:\n<code>/setkey YOUR_OPENCODE_API_KEY</code>"
+    )
+    send_telegram_msg(msg_txt, chat_id=chat_id)
+
+def do_clean(chat_id):
+    deleted = 0
+    for d in [data_path / "INPUT", data_path / "OUTPUT", data_path / "UNPACK", data_path / "REPACK", data_path / "RESULT", data_path / "TEMP_INJECT"]:
+        if d.exists():
+            for f in d.iterdir():
+                try:
+                    if f.is_file(): f.unlink()
+                    elif f.is_dir(): shutil.rmtree(f, ignore_errors=True)
+                    deleted += 1
+                except Exception: pass
+    send_telegram_msg(f"🧹 Workspace Cleaned! Removed {deleted} item(s).", chat_id=chat_id)
+
+def do_ai_help(chat_id):
+    send_telegram_msg("💡 <b>OpenCode AI Assistant:</b>\nSend <code>/ai &lt;question&gt;</code> or type any message directly to get AI answers!", chat_id=chat_id)
+
+def do_restart(chat_id):
+    send_telegram_msg("🔄 Restarting Bot Runner Instance...", chat_id=chat_id)
+    trigger_github_restart()
+    sys.exit(0)
 
 def handle_incoming_update(update):
     try:
-        # 1. Handle Inline Button Click (callback_query)
+        # 1. Handle Inline Button Clicks (callback_query)
         if "callback_query" in update:
             cq = update["callback_query"]
             cq_id = cq["id"]
@@ -236,93 +339,16 @@ def handle_incoming_update(update):
             from_user = cq.get("from", {})
             user_id = from_user.get("id", chat_id)
 
-            answer_callback_query(cq_id, text="Processing command...")
+            answer_callback_query(cq_id, text="Processing...")
 
-            if data == "btn_status":
-                try:
-                    snapshot = get_live_workspace_context(data_path)
-                    send_telegram_msg(f"📊 <b>WORKSPACE LIVE SNAPSHOT:</b>\n<pre>{html.escape(snapshot)}</pre>", chat_id=chat_id, reply_markup=get_main_keyboard_markup())
-                except Exception as e:
-                    send_telegram_msg(f"Error fetching status: {html.escape(str(e))}", chat_id=chat_id)
-
-            elif data == "btn_unpack":
-                pak_files = [f for f in (data_path / "PAK").glob("*.*") if f.suffix.lower() in [".pak", ".obb"]]
-                if not pak_files:
-                    send_telegram_msg("📦 <b>No PAK/OBB files found in PAK/ folder.</b>\nPlease upload a <code>.pak</code> or <code>.obb</code> file first!", chat_id=chat_id, reply_markup=get_main_keyboard_markup())
-                else:
-                    for pf in pak_files:
-                        send_telegram_msg(f"⏳ Unpacking <code>{html.escape(pf.name)}</code>...", chat_id=chat_id)
-                        unpack_out = data_path / "UNPACK" / pf.stem
-                        try:
-                            repack_pak_file_full(pf, unpack_out, None)
-                            send_telegram_msg(f"🎉 <b>Unpack Successful!</b>\nFolder: <code>UNPACK/{html.escape(pf.stem)}</code>", chat_id=chat_id, reply_markup=get_main_keyboard_markup())
-                        except Exception as ex:
-                            send_telegram_msg(f"❌ Unpack error on {html.escape(pf.name)}: {html.escape(str(ex))}", chat_id=chat_id)
-
-            elif data == "btn_repack":
-                unpack_dirs = [d for d in (data_path / "UNPACK").iterdir() if d.is_dir()]
-                if not unpack_dirs:
-                    send_telegram_msg("📦 <b>No unpacked folders found in UNPACK/!</b>\nPlease upload or unpack a PAK file first.", chat_id=chat_id, reply_markup=get_main_keyboard_markup())
-                else:
-                    for ud in unpack_dirs:
-                        out_pak = data_path / "RESULT" / f"repacked_{ud.name}.pak"
-                        send_telegram_msg(f"⏳ Repacking folder <code>UNPACK/{html.escape(ud.name)}</code>...", chat_id=chat_id)
-                        try:
-                            repack_pak_file_full(None, ud, out_pak)
-                            if out_pak.exists():
-                                send_telegram_document(out_pak, caption=f"✅ <b>Repacked PAK File Ready!</b>\n{out_pak.name}", chat_id=chat_id)
-                            else:
-                                send_telegram_msg(f"❌ Repack failed for {html.escape(ud.name)}.", chat_id=chat_id)
-                        except Exception as ex:
-                            send_telegram_msg(f"❌ Repack error on {html.escape(ud.name)}: {html.escape(str(ex))}", chat_id=chat_id)
-
-            elif data == "btn_compile":
-                lua_files = [f for f in (data_path / "LUA").glob("*.*") if f.suffix.lower() in [".lua", ".txt"]]
-                if not lua_files:
-                    send_telegram_msg("📜 <b>No Lua files found in LUA/ folder.</b>\nPlease upload a <code>.lua</code> script first!", chat_id=chat_id, reply_markup=get_main_keyboard_markup())
-                else:
-                    for lf in lua_files:
-                        send_telegram_msg(f"⏳ Compiling <code>{html.escape(lf.name)}</code>...", chat_id=chat_id)
-                        try:
-                            raw_code = lf.read_text(encoding="utf-8", errors="ignore")
-                            fixed = fix_lua_syntax_for_lua51(raw_code)
-                            out_luac = data_path / "RESULT" / (lf.stem + ".luac")
-                            comp_ok, comp_msg = run_lua_compiler(lf, out_luac)
-                            if comp_ok and out_luac.exists():
-                                send_telegram_document(out_luac, caption=f"✅ <b>Lua Auto-Compile Complete!</b>\n{out_luac.name}", chat_id=chat_id)
-                            else:
-                                send_telegram_msg(f"⚠️ <b>Compile Error:</b>\n<code>{html.escape(comp_msg[:500])}</code>", chat_id=chat_id)
-                        except Exception as ex:
-                            send_telegram_msg(f"❌ Compile error on {html.escape(lf.name)}: {html.escape(str(ex))}", chat_id=chat_id)
-
-            elif data == "btn_setkey":
-                user_key = get_user_key(user_id)
-                status_txt = f"<code>{user_key[:8]}...{user_key[-4:]}</code>" if user_key else "<i>Not Set</i>"
-                msg_txt = (
-                    f"🔑 <b>API Key:</b> {status_txt}\n\n"
-                    "Set Key: Send <code>/setkey YOUR_KEY</code>"
-                )
-                send_telegram_msg(msg_txt, chat_id=chat_id, reply_markup=get_main_keyboard_markup())
-
-            elif data == "btn_clean":
-                deleted = 0
-                for d in [data_path / "INPUT", data_path / "OUTPUT", data_path / "UNPACK", data_path / "REPACK", data_path / "RESULT", data_path / "TEMP_INJECT"]:
-                    if d.exists():
-                        for f in d.iterdir():
-                            try:
-                                if f.is_file(): f.unlink()
-                                elif f.is_dir(): shutil.rmtree(f, ignore_errors=True)
-                                deleted += 1
-                            except Exception: pass
-                send_telegram_msg(f"🧹 Workspace Cleaned! Removed {deleted} items.", chat_id=chat_id, reply_markup=get_main_keyboard_markup())
-
-            elif data == "btn_ai_help":
-                send_telegram_msg("💡 Send: <code>/ai your question</code> or type directly!", chat_id=chat_id, reply_markup=get_main_keyboard_markup())
-
-            elif data == "btn_restart":
-                send_telegram_msg("🔄 Restarting Bot...", chat_id=chat_id)
-                trigger_github_restart()
-                sys.exit(0)
+            if data == "btn_status": do_status(chat_id)
+            elif data == "btn_unpack": do_unpack(chat_id)
+            elif data == "btn_repack": do_repack(chat_id)
+            elif data == "btn_compile": do_compile(chat_id)
+            elif data == "btn_setkey": do_setkey_info(chat_id, user_id)
+            elif data == "btn_clean": do_clean(chat_id)
+            elif data == "btn_ai_help": do_ai_help(chat_id)
+            elif data == "btn_restart": do_restart(chat_id)
             return
 
         # 2. Handle Messages / Direct Files / Commands
@@ -346,17 +372,17 @@ def handle_incoming_update(update):
             file_id = doc.get("file_id")
             ext = Path(file_name).suffix.lower()
 
-            send_telegram_msg(f"📥 <b>Received:</b> <code>{html.escape(file_name)}</code>\nProcessing...", chat_id=chat_id)
+            send_telegram_msg(f"📥 <b>Received:</b> <code>{html.escape(file_name)}</code>\nProcessing file...", chat_id=chat_id)
 
             if ext in [".pak", ".obb"]:
                 save_path = data_path / "PAK" / file_name
                 dl_ok, dl_err = download_telegram_file(file_id, save_path)
                 if dl_ok:
-                    send_telegram_msg(f"✅ Saved to <b>PAK/</b>. Unpacking...", chat_id=chat_id)
+                    send_telegram_msg(f"✅ Saved <code>{html.escape(file_name)}</code> to <b>PAK/</b>.\nAttempting auto-unpack...", chat_id=chat_id)
                     unpack_out = data_path / "UNPACK" / save_path.stem
                     try:
                         repack_pak_file_full(save_path, unpack_out, None)
-                        send_telegram_msg(f"🎉 <b>Unpack Done!</b> Folder: <code>UNPACK/{html.escape(save_path.stem)}</code>", chat_id=chat_id, reply_markup=get_main_keyboard_markup())
+                        send_telegram_msg(f"🎉 <b>Unpack Done!</b> Folder: <code>UNPACK/{html.escape(save_path.stem)}</code>", chat_id=chat_id)
                     except Exception as ex:
                         send_telegram_msg(f"❌ <b>Unpack Error:</b> {html.escape(str(ex))}", chat_id=chat_id)
                 else:
@@ -365,7 +391,7 @@ def handle_incoming_update(update):
                 save_path = data_path / "LUA" / file_name
                 dl_ok, dl_err = download_telegram_file(file_id, save_path)
                 if dl_ok:
-                    send_telegram_msg(f"✅ Saved to <b>LUA/</b>. Compiling...", chat_id=chat_id)
+                    send_telegram_msg(f"✅ Saved <code>{html.escape(file_name)}</code> to <b>LUA/</b>.\nAuto-compiling...", chat_id=chat_id)
                     try:
                         raw_code = save_path.read_text(encoding="utf-8", errors="ignore")
                         fixed = fix_lua_syntax_for_lua51(raw_code)
@@ -391,117 +417,66 @@ def handle_incoming_update(update):
         if not text:
             return
 
-        # Clean command and handle group mentions
+        text_lower = text.lower().strip()
         first_word = text.split()[0].lower() if text else ""
         cmd_clean = first_word.split('@')[0] if '@' in first_word else first_word
 
+        # Route buttons (both text button taps & slash commands)
         if cmd_clean in ["/start", "/help"]:
-            welcome_msg = "⚡ <b>FEATURESTIC LEAKS BOT</b> ⚡\nChoose an option below:"
-            send_telegram_msg(welcome_msg, chat_id=chat_id, reply_markup=get_main_keyboard_markup())
+            welcome_msg = "⚡ <b>FEATURESTIC LEAKS BOT</b> ⚡\nSelect an option using the buttons below:"
+            send_telegram_msg(welcome_msg, chat_id=chat_id, reply_markup=get_reply_keyboard_markup())
 
-        elif cmd_clean == "/setkey" or cmd_clean == "/key":
-            parts = text.split(maxsplit=1)
-            if len(parts) < 2 or not parts[1].strip():
-                send_telegram_msg("⚠️ Usage: <code>/setkey YOUR_API_KEY</code>", chat_id=chat_id, reply_markup=get_main_keyboard_markup())
-            else:
+        elif "status" in text_lower or "workspace" in text_lower or cmd_clean in ["/status", "/workspace"]:
+            do_status(chat_id)
+
+        elif "unpack" in text_lower or cmd_clean == "/unpack":
+            do_unpack(chat_id)
+
+        elif "repack" in text_lower or cmd_clean == "/repack":
+            do_repack(chat_id)
+
+        elif "compile" in text_lower or cmd_clean == "/compile":
+            do_compile(chat_id)
+
+        elif ("key" in text_lower and "set" in text_lower) or cmd_clean in ["/setkey", "/key"]:
+            if cmd_clean in ["/setkey", "/key"] and len(text.split()) > 1:
+                parts = text.split(maxsplit=1)
                 new_key = parts[1].strip()
                 save_user_key(user_id, new_key)
                 masked_key = f"{new_key[:8]}...{new_key[-4:]}"
-                send_telegram_msg(f"✅ <b>Key Saved:</b> <code>{masked_key}</code>", chat_id=chat_id, reply_markup=get_main_keyboard_markup())
-
-        elif cmd_clean in ["/status", "/workspace"]:
-            try:
-                snapshot = get_live_workspace_context(data_path)
-                send_telegram_msg(f"📊 <b>WORKSPACE LIVE SNAPSHOT:</b>\n<pre>{html.escape(snapshot)}</pre>", chat_id=chat_id, reply_markup=get_main_keyboard_markup())
-            except Exception as e:
-                send_telegram_msg(f"Error fetching status: {html.escape(str(e))}", chat_id=chat_id)
-
-        elif cmd_clean == "/unpack":
-            pak_files = [f for f in (data_path / "PAK").glob("*.*") if f.suffix.lower() in [".pak", ".obb"]]
-            if not pak_files:
-                send_telegram_msg("📦 No PAK/OBB files found in PAK/ folder.", chat_id=chat_id, reply_markup=get_main_keyboard_markup())
+                send_telegram_msg(f"✅ <b>API Key Saved:</b> <code>{masked_key}</code>", chat_id=chat_id)
             else:
-                for pf in pak_files:
-                    send_telegram_msg(f"⏳ Unpacking <code>{html.escape(pf.name)}</code>...", chat_id=chat_id)
-                    unpack_out = data_path / "UNPACK" / pf.stem
-                    try:
-                        repack_pak_file_full(pf, unpack_out, None)
-                        send_telegram_msg(f"🎉 <b>Unpack Successful!</b>\nFolder: <code>UNPACK/{html.escape(pf.stem)}</code>", chat_id=chat_id, reply_markup=get_main_keyboard_markup())
-                    except Exception as ex:
-                        send_telegram_msg(f"❌ Unpack error on {html.escape(pf.name)}: {html.escape(str(ex))}", chat_id=chat_id)
+                do_setkey_info(chat_id, user_id)
 
-        elif cmd_clean == "/repack":
-            unpack_dirs = [d for d in (data_path / "UNPACK").iterdir() if d.is_dir()]
-            if not unpack_dirs:
-                send_telegram_msg("📦 No unpacked folders found in UNPACK/!", chat_id=chat_id, reply_markup=get_main_keyboard_markup())
-            else:
-                for ud in unpack_dirs:
-                    out_pak = data_path / "RESULT" / f"repacked_{ud.name}.pak"
-                    send_telegram_msg(f"⏳ Repacking folder <code>UNPACK/{html.escape(ud.name)}</code>...", chat_id=chat_id)
-                    try:
-                        repack_pak_file_full(None, ud, out_pak)
-                        if out_pak.exists():
-                            send_telegram_document(out_pak, caption=f"✅ <b>Repacked PAK File Ready!</b>\n{out_pak.name}", chat_id=chat_id)
-                        else:
-                            send_telegram_msg(f"❌ Repack failed for {html.escape(ud.name)}.", chat_id=chat_id)
-                    except Exception as ex:
-                        send_telegram_msg(f"❌ Repack error on {html.escape(ud.name)}: {html.escape(str(ex))}", chat_id=chat_id)
+        elif "clean" in text_lower or cmd_clean == "/clean":
+            do_clean(chat_id)
 
-        elif cmd_clean == "/compile":
-            lua_files = [f for f in (data_path / "LUA").glob("*.*") if f.suffix.lower() in [".lua", ".txt"]]
-            if not lua_files:
-                send_telegram_msg("📜 No Lua files found in LUA/ folder.", chat_id=chat_id, reply_markup=get_main_keyboard_markup())
-            else:
-                for lf in lua_files:
-                    send_telegram_msg(f"⏳ Compiling <code>{html.escape(lf.name)}</code>...", chat_id=chat_id)
-                    try:
-                        raw_code = lf.read_text(encoding="utf-8", errors="ignore")
-                        fixed = fix_lua_syntax_for_lua51(raw_code)
-                        out_luac = data_path / "RESULT" / (lf.stem + ".luac")
-                        comp_ok, comp_msg = run_lua_compiler(lf, out_luac)
-                        if comp_ok and out_luac.exists():
-                            send_telegram_document(out_luac, caption=f"✅ <b>Lua Compile Complete!</b>\n{out_luac.name}", chat_id=chat_id)
-                        else:
-                            send_telegram_msg(f"⚠️ <b>Compile Error:</b>\n<code>{html.escape(comp_msg[:500])}</code>", chat_id=chat_id)
-                    except Exception as ex:
-                        send_telegram_msg(f"❌ Compile error on {html.escape(lf.name)}: {html.escape(str(ex))}", chat_id=chat_id)
+        elif "ai help" in text_lower or (cmd_clean == "/ai" and len(text.split()) == 1):
+            do_ai_help(chat_id)
 
-        elif cmd_clean == "/ai":
-            prompt = text[4:].strip() if len(text) > 3 else ""
+        elif "restart" in text_lower or cmd_clean == "/restart":
+            do_restart(chat_id)
+
+        elif cmd_clean == "/ai" or text_lower.startswith("/ai"):
+            prompt = text[3:].strip() if text_lower.startswith("/ai") else text
             if not prompt:
-                send_telegram_msg("💡 Usage: <code>/ai your question</code>", chat_id=chat_id, reply_markup=get_main_keyboard_markup())
+                do_ai_help(chat_id)
             else:
                 send_telegram_msg("🤖 <i>OpenCode AI thinking...</i>", chat_id=chat_id)
                 user_key = get_user_key(user_id)
                 try:
                     ans = call_ai_api(prompt, override_key=user_key)
-                    send_telegram_msg(f"🤖 <b>OpenCode AI Answer:</b>\n{html.escape(ans)}", chat_id=chat_id, reply_markup=get_main_keyboard_markup())
+                    send_telegram_msg(f"🤖 <b>OpenCode AI Answer:</b>\n{html.escape(ans)}", chat_id=chat_id)
                 except Exception as e:
                     send_telegram_msg(f"❌ AI Call Error: {html.escape(str(e))}", chat_id=chat_id)
 
-        elif cmd_clean == "/clean":
-            deleted = 0
-            for d in [data_path / "INPUT", data_path / "OUTPUT", data_path / "UNPACK", data_path / "REPACK", data_path / "RESULT", data_path / "TEMP_INJECT"]:
-                if d.exists():
-                    for f in d.iterdir():
-                        try:
-                            if f.is_file(): f.unlink()
-                            elif f.is_dir(): shutil.rmtree(f, ignore_errors=True)
-                            deleted += 1
-                        except Exception: pass
-            send_telegram_msg(f"🧹 Workspace Cleaned! Removed {deleted} items.", chat_id=chat_id, reply_markup=get_main_keyboard_markup())
-
-        elif cmd_clean == "/restart":
-            send_telegram_msg("🔄 Restarting Bot...", chat_id=chat_id)
-            trigger_github_restart()
-            sys.exit(0)
-
         else:
+            # General AI fallback
             send_telegram_msg("🤖 <i>OpenCode AI thinking...</i>", chat_id=chat_id)
             user_key = get_user_key(user_id)
             try:
                 ans = call_ai_api(text, override_key=user_key)
-                send_telegram_msg(f"🤖 <b>OpenCode AI Answer:</b>\n{html.escape(ans)}", chat_id=chat_id, reply_markup=get_main_keyboard_markup())
+                send_telegram_msg(f"🤖 <b>OpenCode AI Answer:</b>\n{html.escape(ans)}", chat_id=chat_id)
             except Exception as e:
                 send_telegram_msg(f"❌ AI Answer Error: {html.escape(str(e))}", chat_id=chat_id)
 
@@ -527,7 +502,7 @@ def main():
         f"⏱️ <b>Safety Timer:</b> 5 Hours 50 Minutes (21,000s)\n"
         "🟢 Status: Active Long-Polling Listener 24/7"
     )
-    send_telegram_msg(init_banner, reply_markup=get_main_keyboard_markup())
+    send_telegram_msg(init_banner, reply_markup=get_reply_keyboard_markup())
     print("FeaturesticLeaks Bot long-polling started successfully...")
 
     last_update_id = 0
