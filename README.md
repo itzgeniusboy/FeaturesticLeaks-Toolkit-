@@ -97,11 +97,12 @@ Tool visual layout is restructured into clean, high-performance category menus:
 
 ```text
 ⚡ MAIN CATEGORY MENU
-├── [1] 🤖 AI Assistant & Modder  --> 1-Click AI Companion for Auto Unpack, Repack, Lua Inject & Modding
-├── [2] 📦 PAK Tools             --> Unpack, Repack, Replace, Inject, Skin Swapper, OBB Manager
-├── [3] 🌙 LUA Tools             --> Compile, Decompile, Script Merger, Obfuscator, Universal Packer
-├── [4] 🔑 OpenCode API & Settings--> Manage OpenCode API Keys (Multi-Key Auto Rotation), Base URL & Telegram Bot
-└── [U] 🚀 Auto-Update           --> One-touch GitHub auto-update & auto-restart engine
+├── [1] 🤖 AI Watch Assistant Engine --> Real-time file watch & AI Companion
+├── [2] 📦 PAK Tools                 --> Unpack, Repack, Replace, Inject, Skin Swapper, OBB Manager
+├── [3] 🌙 LUA Tools                 --> Compile, Decompile, Script Merger, Obfuscator, Universal Packer
+├── [4] 🔑 OpenCode API & Settings   --> Manage OpenCode API Keys (Multi-Key Auto Rotation), Base URL & Telegram Bot
+├── [5] 🛠️ Utilities & Help          --> UE4 tools, File Resizer, Patcher, Shortcuts & Guides
+└── [U] 🚀 Auto-Update               --> One-touch GitHub auto-update & auto-restart engine
 ```
 
 ---
