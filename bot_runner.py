@@ -147,23 +147,24 @@ def trigger_github_restart():
         print(f"GitHub Dispatch Error: {e}")
         return False
 
-def download_telegram_file(file_id: str, dest_path: Path) -> bool:
+def download_telegram_file(file_id: str, dest_path: Path):
     try:
         get_file_url = f"{TELEGRAM_API_URL}/getFile?file_id={file_id}"
         req = urllib.request.Request(get_file_url)
         with urllib.request.urlopen(req, timeout=10) as resp:
             res_data = json.loads(resp.read().decode('utf-8'))
             if not res_data.get("ok"):
-                return False
+                desc = res_data.get("description", "Unknown Telegram API error")
+                return False, desc
             file_path_str = res_data["result"]["file_path"]
         
         dl_url = f"https://api.telegram.org/file/bot{BOT_TOKEN}/{file_path_str}"
         with urllib.request.urlopen(dl_url, timeout=60) as dl_resp:
             dest_path.write_bytes(dl_resp.read())
-        return True
+        return True, "Success"
     except Exception as e:
         print(f"Download Error: {e}")
-        return False
+        return False, str(e)
 
 def handle_incoming_update(update):
     try:
@@ -188,7 +189,8 @@ def handle_incoming_update(update):
 
             if ext in [".pak", ".obb"]:
                 save_path = data_path / "PAK" / file_name
-                if download_telegram_file(file_id, save_path):
+                dl_ok, dl_err = download_telegram_file(file_id, save_path)
+                if dl_ok:
                     send_telegram_msg(f"✅ Saved <code>{html.escape(file_name)}</code> to <b>PAK/</b> folder.\nAttempting automatic unpack...", chat_id=chat_id)
                     unpack_out = data_path / "UNPACK" / save_path.stem
                     try:
@@ -196,9 +198,12 @@ def handle_incoming_update(update):
                         send_telegram_msg(f"🎉 <b>Unpack Successful!</b>\nFolder: <code>UNPACK/{html.escape(save_path.stem)}</code>", chat_id=chat_id)
                     except Exception as ex:
                         send_telegram_msg(f"❌ <b>Unpack Error:</b> {html.escape(str(ex))}", chat_id=chat_id)
+                else:
+                    send_telegram_msg(f"❌ <b>Download Failed:</b> {html.escape(dl_err)}", chat_id=chat_id)
             elif ext in [".lua", ".luac"]:
                 save_path = data_path / "LUA" / file_name
-                if download_telegram_file(file_id, save_path):
+                dl_ok, dl_err = download_telegram_file(file_id, save_path)
+                if dl_ok:
                     send_telegram_msg(f"✅ Saved <code>{html.escape(file_name)}</code> to <b>LUA/</b> folder.\nAuto-fixing & compiling script...", chat_id=chat_id)
                     try:
                         raw_code = save_path.read_text(encoding="utf-8", errors="ignore")
@@ -211,10 +216,15 @@ def handle_incoming_update(update):
                             send_telegram_msg(f"⚠️ <b>Compile Warning/Error:</b>\n<code>{html.escape(comp_msg[:500])}</code>", chat_id=chat_id)
                     except Exception as ex:
                         send_telegram_msg(f"❌ <b>Process Error:</b> {html.escape(str(ex))}", chat_id=chat_id)
+                else:
+                    send_telegram_msg(f"❌ <b>Download Failed:</b> {html.escape(dl_err)}", chat_id=chat_id)
             else:
                 save_path = data_path / "INPUT" / file_name
-                if download_telegram_file(file_id, save_path):
+                dl_ok, dl_err = download_telegram_file(file_id, save_path)
+                if dl_ok:
                     send_telegram_msg(f"✅ Saved file to <b>INPUT/</b> folder: <code>{html.escape(file_name)}</code>", chat_id=chat_id)
+                else:
+                    send_telegram_msg(f"❌ <b>Download Failed:</b> {html.escape(dl_err)}", chat_id=chat_id)
             return
 
         if not text:
