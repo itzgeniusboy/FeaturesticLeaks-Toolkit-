@@ -195,6 +195,19 @@ Option `2` chunte hi aapko 3 Modes milenge:
 
 ---
 
+### 🤖 CATEGORY 4: 24/7 GITHUB ACTIONS TELEGRAM BOT SERVICE
+
+Tool me automated 24/7 Telegram Bot system integrate kiya gaya hai jo GitHub Actions par bina ruke chalta rehta hai:
+- **5h 50m Auto-Restart Loop**: GitHub Actions me max 6 hours job limit hoti hai. Script 5 hours 50 minutes (21,000s) par automatically state save karke next workflow run dispatch trigger kar deti hai, jisse bot continuous 24/7 active rehta hai.
+- **Auto File Processor**: Telegram bot ko `.pak`, `.obb`, `.lua`, ya `.luac` file bhejte hi tool usko receive karke automatic unpack, fix, aur compile kar deta hai.
+- **Bot Commands**:
+  - `/status` -> Live workspace status
+  - `/ai <query>` -> OpenCode AI engine query
+  - `/clean` -> Clean temporary files
+  - `/restart` -> Manual runner restart
+
+---
+
 ## ❓ Common FAQs & Troubleshooting
 
 ### **Q1: Tool ko update kaise karein?**

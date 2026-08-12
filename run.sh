@@ -15,10 +15,14 @@ PYTHON_SCRIPT="$SCRIPT_DIR/FeaturesticLeaks.py"
 CLI_MODE=0
 
 # ==================== CLI / ARGUMENT PARSING ====================
-# Check for --cli flag to force standard text menu
+# Check for --cli or --bot flags
 for arg in "$@"; do
     if [ "$arg" = "--cli" ] || [ "$arg" = "-c" ]; then
         CLI_MODE=1
+    elif [ "$arg" = "--bot" ] || [ "$arg" = "-b" ] || [ "$arg" = "bot" ]; then
+        echo -e "\e[1;36m[🤖] Launching FeaturesticLeaks Telegram Bot Service...\e[0m"
+        python3 "$SCRIPT_DIR/bot_runner.py"
+        exit 0
     fi
 done
 

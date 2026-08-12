@@ -176,6 +176,42 @@ Tool launch hote hi SDCard (`/sdcard/FeaturesticLeaks/`) me structured workspace
 
 ---
 
+## 🤖 24/7 GitHub Actions Telegram Bot Service
+
+FeaturesticLeaks includes a built-in continuous 24/7 Telegram Bot engine (`bot_runner.py` & `.github/workflows/bot_247.yml`):
+
+### 🚀 Features:
+- **Continuous 24/7 Uptime**: Automatically runs via GitHub Actions.
+- **5h 50m Auto-Restart Loop**: Automatically triggers a repository dispatch at 5 hours 50 minutes to bypass GitHub's 6-hour execution limit without any downtime!
+- **Auto File Processing**: Direct send any `.pak`, `.obb`, `.lua`, or `.luac` file to your Telegram Bot to auto-unpack, compile, or process!
+- **Interactive Bot Commands**:
+  - `/status` - View live workspace summary & file snapshot
+  - `/ai <query>` - Ask OpenCode AI assistant questions
+  - `/unpack` - Unpack files in PAK folder
+  - `/repack` - Repack files in UNPACK/RESULT folder
+  - `/clean` - Clear temporary workspace files
+  - `/restart` - Trigger runner loop restart
+
+### 🔧 Setup on GitHub Actions:
+1. Go to your GitHub Repository **Settings** -> **Secrets and variables** -> **Actions**.
+2. Add the following secrets:
+   - `TELEGRAM_BOT_TOKEN`: Your Telegram Bot Token from @BotFather
+   - `TELEGRAM_CHAT_ID`: Your Telegram User / Group ID
+   - `GH_PAT_TOKEN`: Your GitHub Personal Access Token (with `repo` & `workflow` permissions) for continuous restart loop
+3. The workflow `.github/workflows/bot_247.yml` will automatically start and run continuously!
+
+### 📱 Running Bot Mode in Termux:
+Run bot mode locally in Termux or Linux using:
+```bash
+leak bot
+# OR
+bash run.sh --bot
+# OR
+python3 bot_runner.py
+```
+
+---
+
 ## 👤 Developer Contact & Official Credits
 
 * **Main Developer**: **[@L359D](https://t.me/L359D)**
