@@ -3784,51 +3784,6 @@ def ai_tools_menu(data_path: Path):
 _BOOTED = False
 
 
-def utilities_menu(data_path: Path):
-    while True:
-        print_banner()
-        menu_table = Table(
-            title="[bold bright_cyan]🛠️ UTILITIES & HELP 🛠️[/bold bright_cyan]",
-            show_header=True,
-            header_style="bold bright_cyan",
-            box=ROUNDED,
-            border_style="bright_cyan",
-            expand=True
-        )
-        menu_table.add_column("OPT", justify="center", width=8, style="bold bright_yellow")
-        menu_table.add_column("COMMAND", justify="left", width=24, style="bold bright_white")
-        menu_table.add_column("DESCRIPTION", justify="left", style="bright_cyan")
-
-        menu_table.add_row("[1]", "Workspace Summary", "Folder guide & live file count summary")
-        menu_table.add_row("[2]", "Beginner Guide & FAQ 🔰", "Beginner Quick Start & Modding Help")
-        menu_table.add_row("[3]", "Refresh Shortcuts & SDCard", "Refresh Termux 'leak' command & workspace folders")
-        menu_table.add_row("[4]", "Cleanup Workspace", "Delete workspace output folders")
-        menu_table.add_row("[0]", "EXIT ✗", "Return to Main Menu")
-
-        console.print(menu_table)
-        console.print()
-        choice = safe_input('\033[1;36mSELECT OPTION [1-4] [0]: \033[0m').strip()
-
-        if choice == '1':
-            print_banner()
-            display_workspace_summary(data_path)
-            show_workflow_guide()
-            safe_input('\nPress Enter to continue...')
-        elif choice == '2':
-            run_beginner_guide(data_path)
-        elif choice == '3':
-            install_termux_shortcut_and_sdcard(data_path)
-            safe_input('\nPress Enter to continue...')
-        elif choice == '4':
-            delete_folder(data_path)
-            safe_input('\nPress Enter to continue...')
-        elif choice == '0':
-            break
-        else:
-            console.print('[bold red][X] Invalid choice.[/bold red]')
-            time.sleep(1)
-
-
 def run_beginner_guide(data_path: Path):
     print_banner()
     guide_table = Table(
@@ -3947,12 +3902,13 @@ def main_menu():
         menu_table.add_row("[2]", "PAK Tools 📦", "Unpack, Repack, Replace & Inject PAK/OBB")
         menu_table.add_row("[3]", "LUA Tools 🌙", "Compile, Decompile & Auto 1-Click Lua Workflow")
         menu_table.add_row("[4]", "OpenCode API & Settings 🔑", "Manage OpenCode API Keys (Multi-Key), Endpoint & Telegram Bot")
+        menu_table.add_row("[5]", "Utilities & Help 🛠️", "UE4 tools, File Resizer, Patcher, Shortcuts & Guides")
         menu_table.add_row("[U]", "Auto-Update 🚀", "Check & install latest GitHub version")
         menu_table.add_row("[0]", "EXIT ✗", "Close application")
 
         console.print(menu_table)
         console.print()
-        choice = safe_input('\033[1;36mSELECT OPTION [1-4 / U] [0]: \033[0m').strip()
+        choice = safe_input('\033[1;36mSELECT OPTION [1-5 / U] [0]: \033[0m').strip()
 
         if choice == '1':
             run_ai_watch_assistant(data_path)
@@ -3963,6 +3919,8 @@ def main_menu():
             lua_tools_menu(data_path)
         elif choice == '4':
             manage_ai_api_keys()
+        elif choice == '5' or choice.lower() in ['util', 'utils', 'utilities', 'help']:
+            utilities_menu(data_path)
         elif choice.lower() in ['u', 'update', 'autoupdate', 'auto-update']:
             check_and_auto_update(interactive=True)
             safe_input('\nPress Enter to continue...')
