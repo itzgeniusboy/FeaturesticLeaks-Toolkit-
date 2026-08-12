@@ -10,9 +10,22 @@ from dataclasses import dataclass
 from pathlib import Path, PurePath
 from typing import List
 
-from rich.console import Console
-from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TaskProgressColumn, TimeElapsedColumn
-from Crypto.Hash import SHA1
+try:
+    from rich.console import Console
+    from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TaskProgressColumn, TimeElapsedColumn
+    console = Console()
+except ImportError:
+    class DummyConsole:
+        def print(self, *args, **kwargs):
+            if args:
+                print(*args)
+    console = DummyConsole()
+    Progress = None
+
+try:
+    from Crypto.Hash import SHA1
+except ImportError:
+    SHA1 = None
 
 from pak.crypto import (
     PakCrypto, SM4, RSA_MOD_2,
@@ -20,8 +33,6 @@ from pak.crypto import (
     CM_NONE, CM_ZLIB, CM_ZSTD, CM_ZSTD_DICT, CM_MASK
 )
 from pak.compression import PakCompression
-
-console = Console()
 
 class Misc:
     @staticmethod
@@ -419,3 +430,7 @@ class TencentPakFile:
 
         clear_checkpoint(checkpoint_file)
         gc.collect()
+
+pad_to_n = Misc.pad_to_n
+align_up = Misc.align_up
+

@@ -11,12 +11,26 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
-from rich.console import Console
-from rich.panel import Panel
-from rich.box import ROUNDED
-from rich.markup import escape
-
-console = Console()
+try:
+    from rich.console import Console
+    from rich.panel import Panel
+    from rich.box import ROUNDED
+    from rich.markup import escape
+    console = Console()
+except ImportError:
+    class DummyConsole:
+        def print(self, *args, **kwargs):
+            if args:
+                print(args[0])
+    class DummyPanel:
+        def __init__(self, content, *args, **kwargs):
+            self.content = content
+        def __str__(self):
+            return str(self.content)
+    console = DummyConsole()
+    Panel = DummyPanel
+    ROUNDED = ""
+    def escape(s): return str(s)
 
 def get_device_user_info() -> str:
     try:

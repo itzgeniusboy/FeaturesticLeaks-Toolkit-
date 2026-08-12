@@ -1,4 +1,4 @@
-import it
+import itertools as it
 import math
 import struct
 import os
@@ -6,10 +6,19 @@ from functools import lru_cache
 from pathlib import PurePath
 from typing import List
 
-import gmalg
-from Crypto.Cipher import AES
-from Crypto.Hash import SHA1
-from Crypto.Util.Padding import unpad
+try:
+    import gmalg
+except ImportError:
+    gmalg = None
+
+try:
+    from Crypto.Cipher import AES
+    from Crypto.Hash import SHA1
+    from Crypto.Util.Padding import unpad
+except ImportError:
+    AES = None
+    SHA1 = None
+    unpad = None
 
 ZUC_KEY = bytes.fromhex('01010101010101010101010101010101')
 ZUC_IV = bytes.fromhex('FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF')
@@ -19,6 +28,20 @@ RSA_MOD_2 = bytes.fromhex('7F58E8A39A4DA4E87357DDD650EAA16D3B5CE95B213D1030A6625
 
 SIMPLE1_DECRYPT_KEY = 121
 SIMPLE2_DECRYPT_KEY = bytes.fromhex('E55B4ED1')
+
+EM_SIMPLE1 = 1
+EM_SIMPLE2 = 16
+EM_SM4_2 = 2
+EM_SM4_4 = 4
+EM_SM4_NEW_BASE = 31
+EM_SM4_NEW_MASK = ~EM_SM4_NEW_BASE
+EM_UNKNOWN_17 = 17
+
+CM_NONE = 0
+CM_ZLIB = 1
+CM_ZSTD = 6
+CM_ZSTD_DICT = 8
+CM_MASK = 15
 SIMPLE2_BLOCK_SIZE = 16
 
 SM4_SECRET_4 = 'eb691efea914241317a8'
@@ -350,3 +373,7 @@ class PakCrypto:
             for i, x in enumerate(permutation):
                 inverse[x] = i
             return inverse
+
+_LCG = PakCrypto._LCG
+
+

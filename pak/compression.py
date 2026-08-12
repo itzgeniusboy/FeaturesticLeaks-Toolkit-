@@ -2,7 +2,12 @@ import zlib
 from functools import lru_cache
 from typing import Optional
 
-from zstandard import ZstdCompressionDict, ZstdDecompressor, DICT_TYPE_AUTO
+try:
+    from zstandard import ZstdCompressionDict, ZstdDecompressor, DICT_TYPE_AUTO
+except ImportError:
+    ZstdCompressionDict = None
+    ZstdDecompressor = None
+    DICT_TYPE_AUTO = None
 from pak.crypto import CM_NONE, CM_ZLIB, CM_ZSTD, CM_ZSTD_DICT
 
 class PakCompression:

@@ -82,7 +82,6 @@ def _ensure_package(pkg_name, import_name=None, required=True):
 
 _ensure_package("rich")
 _ensure_package("requests")
-import requests
 _ensure_package("pytz")
 _ensure_package("gmalg")
 _ensure_package("pycryptodome", "Crypto")
@@ -96,27 +95,74 @@ try:
 except Exception:
     HAS_WATCHDOG = False
 
-from rich.console import Console
-from rich.panel import Panel
-from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TaskProgressColumn, TimeElapsedColumn, TimeRemainingColumn
-from rich.table import Table
-from rich import print as rprint
-from rich.markup import escape
-from rich.text import Text
-from rich.align import Align
-from rich.console import Group
-from rich.live import Live
-from rich.box import HEAVY_EDGE, ROUNDED, DOUBLE_EDGE
-from datetime import datetime
-import pytz
-import gmalg
-from Crypto.Cipher import AES
-from Crypto.Cipher.AES import MODE_CBC
-from Crypto.Hash import SHA1
-from Crypto.Util.Padding import unpad
-from zstandard import ZstdDecompressor, ZstdCompressionDict, DICT_TYPE_AUTO, ZstdCompressor
+try:
+    import requests
+except ImportError:
+    requests = None
 
-console = Console()
+try:
+    import pytz
+except ImportError:
+    pytz = None
+
+try:
+    import gmalg
+except ImportError:
+    gmalg = None
+
+try:
+    from Crypto.Cipher import AES
+    from Crypto.Cipher.AES import MODE_CBC
+    from Crypto.Hash import SHA1
+    from Crypto.Util.Padding import unpad
+except ImportError:
+    AES = MODE_CBC = SHA1 = unpad = None
+
+try:
+    from zstandard import ZstdDecompressor, ZstdCompressionDict, DICT_TYPE_AUTO, ZstdCompressor
+except ImportError:
+    ZstdDecompressor = ZstdCompressionDict = DICT_TYPE_AUTO = ZstdCompressor = None
+
+try:
+    from rich.console import Console
+    from rich.panel import Panel
+    from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TaskProgressColumn, TimeElapsedColumn, TimeRemainingColumn
+    from rich.table import Table
+    from rich import print as rprint
+    from rich.markup import escape
+    from rich.text import Text
+    from rich.align import Align
+    from rich.console import Group
+    from rich.live import Live
+    from rich.box import HEAVY_EDGE, ROUNDED, DOUBLE_EDGE
+    console = Console()
+except ImportError:
+    class DummyConsole:
+        def print(self, *args, **kwargs):
+            if args:
+                print(args[0])
+    class DummyAlign:
+        @staticmethod
+        def center(val, *args, **kwargs):
+            return val
+    class DummyPanel:
+        def __init__(self, content, *args, **kwargs):
+            self.content = content
+        def __str__(self):
+            return str(self.content)
+    class DummyTable:
+        def __init__(self, *args, **kwargs): pass
+        def add_column(self, *args, **kwargs): pass
+        def add_row(self, *args, **kwargs): pass
+    console = DummyConsole()
+    Panel = DummyPanel
+    Align = DummyAlign
+    Table = DummyTable
+    Progress = SpinnerColumn = TextColumn = BarColumn = TaskProgressColumn = TimeElapsedColumn = TimeRemainingColumn = Group = Live = None
+    HEAVY_EDGE = ROUNDED = DOUBLE_EDGE = ""
+    def escape(s): return str(s)
+    def Text(s=""): return str(s)
+    def rprint(*args, **kwargs): print(*args)
 
 # ==================== ORIGINAL CLASSES ====================
 
@@ -169,7 +215,7 @@ CM_MASK = 15
 # ============================================================================
 # MODULE IMPORTS (REFACTORED CORE, PAK, LUA UTILITIES)
 # ============================================================================
-from pak.crypto import SM4, PakCrypto, _LCG, RollingKey
+from pak.crypto import SM4, PakCrypto, _LCG
 from pak.compression import PakCompression
 from pak.container import (
     Misc, Reader, PakInfo, TencentPakInfo, PakCompressedBlock,
@@ -2971,6 +3017,79 @@ def watch_mode_menu(data_path: Path):
         else:
             console.print('[bold red][X] Invalid choice.[/bold red]')
             time.sleep(1)
+
+
+def ensure_directories(data_path: Path):
+    dirs = [
+        data_path / "INPUT", data_path / "OUTPUT", data_path / "UNPACK",
+        data_path / "REPACK", data_path / "RESULT", data_path / "TEMP_INJECT",
+        data_path / "PAK", data_path / "LUA", data_path / "INJECT",
+        data_path / "PAK_WORKSPACE" / "1_INPUT",
+        data_path / "PAK_WORKSPACE" / "2_UNPACK",
+        data_path / "PAK_WORKSPACE" / "3_RESULT",
+        data_path / "PAK_WORKSPACE" / "4_INJECT",
+    ]
+    sd_path = Path("/sdcard/FeaturesticLeaks")
+    try:
+        if sd_path.exists() or Path("/sdcard").exists():
+            dirs.extend([
+                sd_path / "INPUT", sd_path / "OUTPUT", sd_path / "UNPACK",
+                sd_path / "REPACK", sd_path / "RESULT", sd_path / "TEMP_INJECT",
+                sd_path / "PAK", sd_path / "LUA", sd_path / "INJECT",
+                sd_path / "PAK_WORKSPACE" / "1_INPUT",
+                sd_path / "PAK_WORKSPACE" / "2_UNPACK",
+                sd_path / "PAK_WORKSPACE" / "3_RESULT",
+                sd_path / "PAK_WORKSPACE" / "4_INJECT",
+            ])
+    except Exception:
+        pass
+    for d in dirs:
+        try:
+            d.mkdir(parents=True, exist_ok=True)
+        except Exception:
+            pass
+
+
+def run_url_lib_patcher_tool(data_path: Path):
+    console.print("\n[bold cyan]🔗 URL & LIB PATCHER TOOL[/bold cyan]")
+    console.print("[dim white]Find and patch URLs or libraries in .so binaries or Lua scripts.[/dim white]")
+    target_str = safe_input("-> Enter file path (.so / .lua / binary): ").strip()
+    if not target_str:
+        console.print("[yellow]Cancelled.[/yellow]")
+        return
+    tf = Path(target_str)
+    if not tf.exists():
+        console.print(f"[bold red][X] File not found: {tf}[/bold red]")
+        return
+    old_url = safe_input("-> Enter old URL/string to search: ").strip()
+    new_url = safe_input("-> Enter new URL/string replacement: ").strip()
+    if not old_url or not new_url:
+        console.print("[yellow]Invalid inputs.[/yellow]")
+        return
+    try:
+        content = tf.read_bytes()
+        old_bytes = old_url.encode('utf-8')
+        new_bytes = new_url.encode('utf-8')
+        if old_bytes in content:
+            if len(new_bytes) > len(old_bytes):
+                console.print("[bold red][X] New URL cannot be longer than old URL for binary patch.[/bold red]")
+                return
+            new_bytes = new_bytes.ljust(len(old_bytes), b'\x00')
+            patched = content.replace(old_bytes, new_bytes)
+            tf.write_bytes(patched)
+            console.print(f"[bold green]✅ Successfully patched {tf.name}![/bold green]")
+        else:
+            console.print(f"[bold yellow][!] Old URL string '{old_url}' not found in {tf.name}[/bold yellow]")
+    except Exception as e:
+        console.print(f"[bold red][X] Patch error: {e}[/bold red]")
+
+
+def display_workspace_summary(data_path: Path):
+    snapshot = get_live_workspace_context(data_path)
+    if Panel:
+        console.print(Panel(f"[bold bright_white]{snapshot}[/bold bright_white]", title="[bold cyan] 📊 WORKSPACE SUMMARY [/bold cyan]", border_style="bright_cyan", box=ROUNDED))
+    else:
+        console.print(snapshot)
 
 
 def get_live_workspace_context(data_path: Path) -> str:

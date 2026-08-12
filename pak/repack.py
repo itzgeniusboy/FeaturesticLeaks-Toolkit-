@@ -6,10 +6,27 @@ import shutil
 from pathlib import Path, PurePath
 import copy as _cp
 
-from rich.console import Console
-from Crypto.Cipher import AES
-from Crypto.Hash import SHA1
-from zstandard import ZstdCompressor
+try:
+    from rich.console import Console
+    console = Console()
+except ImportError:
+    class DummyConsole:
+        def print(self, *args, **kwargs):
+            if args:
+                print(*args)
+    console = DummyConsole()
+
+try:
+    from Crypto.Cipher import AES
+    from Crypto.Hash import SHA1
+except ImportError:
+    AES = None
+    SHA1 = None
+
+try:
+    from zstandard import ZstdCompressor
+except ImportError:
+    ZstdCompressor = None
 
 from pak.crypto import (
     PakCrypto, RSA_MOD_1,
@@ -19,10 +36,8 @@ from pak.crypto import (
 from pak.compression import PakCompression
 from pak.container import (
     Reader, TencentPakInfo, PakCompressedBlock,
-    TencentPakEntry, check_disk_space
+    TencentPakEntry
 )
-
-console = Console()
 
 class SimpleBlockDisplay:
     def __init__(self, total_files: int, pak_name: str):
