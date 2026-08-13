@@ -142,6 +142,22 @@ def dump_unpacking_log(pak_file, output_log_path: Path):
         log_file.write('================================================================================\n')
     console.print(f'[bold #00FF88]✅ Debug log saved to: {output_log_path}[/bold #00FF88]')
 
+LARGE_FILE_THRESHOLD = 200 * 1024 * 1024
+
+def _compute_file_sha1(file_path: Path) -> bytes:
+    if SHA1 is not None:
+        h = SHA1.new()
+    else:
+        import hashlib
+        h = hashlib.sha1()
+    with open(file_path, 'rb') as f:
+        while True:
+            chunk = f.read(16 * 1024 * 1024)
+            if not chunk:
+                break
+            h.update(chunk)
+    return h.digest()
+
 def _zstd_add_skippable_padding(data: bytes, pad_len: int) -> bytes:
     if pad_len <= 0:
         return data
@@ -188,26 +204,50 @@ def _encrypt_plaintext(plaintext: bytes, pak_relative_path: PurePath, encryption
             else:
                 return plaintext
 
-def _repack_uncompressed(outfh, pak_file, entry, pak_relative_path: PurePath, new_data: bytes):
+def _repack_uncompressed(outfh, pak_file, entry, pak_relative_path: PurePath, new_data):
     enc_method = entry.encryption_method
     target_size = entry.size
     enc_region = PakCrypto.align_encrypted_content_size(target_size, enc_method) if entry.encrypted else target_size
-    plaintext = new_data[:enc_region]
-    if entry.encrypted:
-        a = PakCrypto.align_encrypted_content_size(len(plaintext), enc_method)
-        plaintext += b'\x00' * (a - len(plaintext))
-        cipher = _encrypt_plaintext(plaintext, pak_relative_path, enc_method)
+    
+    if isinstance(new_data, (str, Path)):
+        p_path = Path(new_data)
+        file_sz = p_path.stat().st_size
+        read_len = min(file_sz, enc_region)
         outfh.seek(entry.offset)
-        outfh.write(cipher)
-        with open(pak_file._file_path, 'rb') as src:
-            src.seek(entry.offset + len(cipher))
-            outfh.write(src.read(enc_region - len(cipher)))
+        if not entry.encrypted:
+            _stream_copy_bytes(p_path, 0, read_len, outfh)
+            if target_size > read_len:
+                outfh.seek(entry.offset + read_len)
+                with open(pak_file._file_path, 'rb') as src:
+                    src.seek(entry.offset + read_len)
+                    outfh.write(src.read(target_size - read_len))
+        else:
+            with open(p_path, 'rb') as pf:
+                chunk = pf.read(read_len)
+            a = PakCrypto.align_encrypted_content_size(len(chunk), enc_method)
+            chunk += b'\x00' * (a - len(chunk))
+            cipher = _encrypt_plaintext(chunk, pak_relative_path, enc_method)
+            outfh.write(cipher)
+            with open(pak_file._file_path, 'rb') as src:
+                src.seek(entry.offset + len(cipher))
+                outfh.write(src.read(enc_region - len(cipher)))
     else:
-        outfh.seek(entry.offset)
-        outfh.write(plaintext)
-        with open(pak_file._file_path, 'rb') as src:
-            src.seek(entry.offset + len(plaintext))
-            outfh.write(src.read(target_size - len(plaintext)))
+        plaintext = new_data[:enc_region]
+        if entry.encrypted:
+            a = PakCrypto.align_encrypted_content_size(len(plaintext), enc_method)
+            plaintext += b'\x00' * (a - len(plaintext))
+            cipher = _encrypt_plaintext(plaintext, pak_relative_path, enc_method)
+            outfh.seek(entry.offset)
+            outfh.write(cipher)
+            with open(pak_file._file_path, 'rb') as src:
+                src.seek(entry.offset + len(cipher))
+                outfh.write(src.read(enc_region - len(cipher)))
+        else:
+            outfh.seek(entry.offset)
+            outfh.write(plaintext)
+            with open(pak_file._file_path, 'rb') as src:
+                src.seek(entry.offset + len(plaintext))
+                outfh.write(src.read(target_size - len(plaintext)))
 
 def _best_compress(chunk, cm, zstd_dict=None):
     if cm == CM_ZLIB:
@@ -487,11 +527,9 @@ def repack_pak_file_full(pak_file, edited_root, output_path, target_path=None, f
                 try:
                     if full_path in edited_paths:
                         p, template = edited[full_path]
-                        new_raw = p.read_bytes()
+                        file_sz = p.stat().st_size
                         pak_rel = PurePath(full_path)
 
-                        ne.content_hash = SHA1.new(new_raw).digest()
-                        ne.uncompressed_size = len(new_raw)
                         ne.compression_method = template.compression_method if template else cm
                         ne.encryption_method = template.encryption_method if template else em
                         ne.encrypted = template.encrypted if template else old_entry.encrypted
@@ -499,38 +537,81 @@ def repack_pak_file_full(pak_file, edited_root, output_path, target_path=None, f
                         
                         full_path_str = mp_str + full_path
                         ne.unk2 = SHA1.new(full_path_str.lower().encode('utf-8')).digest()
-                            
                         ne.index_new_sep = template.index_new_sep if template else old_entry.index_new_sep
 
-                        if ne.compression_method == CM_NONE:
-                            cipher = (_encrypt_plaintext(new_raw, pak_rel, ne.encryption_method)
-                                      if ne.encrypted else new_raw)
-                            ne.offset = current_offset
-                            ne.size = len(new_raw)
-                            ne.uncompressed_size = len(new_raw)
-                            out_fh.write(cipher)
-                            current_offset += len(cipher)
+                        if file_sz >= LARGE_FILE_THRESHOLD:
+                            ne.content_hash = _compute_file_sha1(p)
+                            ne.uncompressed_size = file_sz
+
+                            if ne.compression_method == CM_NONE:
+                                ne.offset = current_offset
+                                ne.size = file_sz
+                                if not ne.encrypted:
+                                    _stream_copy_bytes(p, 0, file_sz, out_fh)
+                                else:
+                                    with open(p, 'rb') as pf:
+                                        while True:
+                                            chunk = pf.read(16 * 1024 * 1024)
+                                            if not chunk:
+                                                break
+                                            cipher = _encrypt_plaintext(chunk, pak_rel, ne.encryption_method)
+                                            out_fh.write(cipher)
+                                current_offset += file_sz
+                            else:
+                                cs = (template.compression_block_size if template and template.compression_block_size > 0 
+                                      else old_entry.compression_block_size if old_entry.compression_block_size > 0 
+                                      else 65536)
+                                new_blks = []
+                                with open(p, 'rb') as pf:
+                                    while True:
+                                        chunk = pf.read(cs)
+                                        if not chunk:
+                                            break
+                                        compressed = _best_compress(chunk, ne.compression_method, pak_file._zstd_dict)
+                                        cipher = (_encrypt_plaintext(compressed, pak_rel, ne.encryption_method)
+                                                  if ne.encrypted else compressed)
+                                        blk = PakCompressedBlock.__new__(PakCompressedBlock)
+                                        blk.start = current_offset
+                                        blk.end = blk.start + len(cipher)
+                                        out_fh.write(cipher)
+                                        current_offset += len(cipher)
+                                        new_blks.append(blk)
+
+                                ne.compressed_blocks = new_blks
+                                ne.offset = new_blks[0].start if new_blks else current_offset
+                                ne.size = sum(b.end - b.start for b in new_blks)
                         else:
-                            cs = (template.compression_block_size if template and template.compression_block_size > 0 
-                                  else old_entry.compression_block_size if old_entry.compression_block_size > 0 
-                                  else 65536)
-                            chunks = [new_raw[i:i+cs] for i in range(0, len(new_raw), cs)]
-                            new_blks = []
-                            for chunk in chunks:
-                                compressed = _best_compress(chunk, ne.compression_method, pak_file._zstd_dict)
-                                cipher = (_encrypt_plaintext(compressed, pak_rel, ne.encryption_method)
-                                          if ne.encrypted else compressed)
-                                blk = PakCompressedBlock.__new__(PakCompressedBlock)
-                                blk.start = current_offset
-                                blk.end = blk.start + len(cipher)
+                            new_raw = p.read_bytes()
+                            ne.content_hash = SHA1.new(new_raw).digest()
+                            ne.uncompressed_size = len(new_raw)
+
+                            if ne.compression_method == CM_NONE:
+                                cipher = (_encrypt_plaintext(new_raw, pak_rel, ne.encryption_method)
+                                          if ne.encrypted else new_raw)
+                                ne.offset = current_offset
+                                ne.size = len(new_raw)
                                 out_fh.write(cipher)
                                 current_offset += len(cipher)
-                                new_blks.append(blk)
+                            else:
+                                cs = (template.compression_block_size if template and template.compression_block_size > 0 
+                                      else old_entry.compression_block_size if old_entry.compression_block_size > 0 
+                                      else 65536)
+                                chunks = [new_raw[i:i+cs] for i in range(0, len(new_raw), cs)]
+                                new_blks = []
+                                for chunk in chunks:
+                                    compressed = _best_compress(chunk, ne.compression_method, pak_file._zstd_dict)
+                                    cipher = (_encrypt_plaintext(compressed, pak_rel, ne.encryption_method)
+                                              if ne.encrypted else compressed)
+                                    blk = PakCompressedBlock.__new__(PakCompressedBlock)
+                                    blk.start = current_offset
+                                    blk.end = blk.start + len(cipher)
+                                    out_fh.write(cipher)
+                                    current_offset += len(cipher)
+                                    new_blks.append(blk)
 
-                            ne.compressed_blocks = new_blks
-                            ne.offset = new_blks[0].start if new_blks else current_offset
-                            ne.size = sum(b.end - b.start for b in new_blks)
-                            ne.uncompressed_size = len(new_raw)
+                                ne.compressed_blocks = new_blks
+                                ne.offset = new_blks[0].start if new_blks else current_offset
+                                ne.size = sum(b.end - b.start for b in new_blks)
 
                         console.print(f'[green]✓ Processed: {full_path}[/green]')
 
@@ -577,11 +658,9 @@ def repack_pak_file_full(pak_file, edited_root, output_path, target_path=None, f
                 if not already_processed:
                     try:
                         ne = _cp.copy(template)
-                        new_raw = p.read_bytes()
+                        file_sz = p.stat().st_size
                         pak_rel = PurePath(fp)
                         
-                        ne.content_hash = SHA1.new(new_raw).digest()
-                        ne.uncompressed_size = len(new_raw)
                         ne.compression_method = template.compression_method
                         ne.encryption_method = template.encryption_method
                         ne.encrypted = template.encrypted
@@ -589,7 +668,6 @@ def repack_pak_file_full(pak_file, edited_root, output_path, target_path=None, f
                         
                         full_path_str = mp_str + fp
                         ne.unk2 = SHA1.new(full_path_str.lower().encode('utf-8')).digest()
-                        
                         ne.index_new_sep = template.index_new_sep
 
                         is_lua_file = p.suffix.lower() in ('.lua', '.luac', '.bytes', '.txt') or 'lua' in fp.lower()
@@ -597,33 +675,75 @@ def repack_pak_file_full(pak_file, edited_root, output_path, target_path=None, f
                             ne.compression_method = CM_NONE
                             ne.encrypted = False
 
-                        if ne.compression_method == CM_NONE:
-                            cipher = (_encrypt_plaintext(new_raw, pak_rel, ne.encryption_method)
-                                      if ne.encrypted else new_raw)
-                            ne.offset = current_offset
-                            ne.size = len(new_raw)
-                            ne.uncompressed_size = len(new_raw)
-                            out_fh.write(cipher)
-                            current_offset += len(cipher)
+                        if file_sz >= LARGE_FILE_THRESHOLD:
+                            ne.content_hash = _compute_file_sha1(p)
+                            ne.uncompressed_size = file_sz
+
+                            if ne.compression_method == CM_NONE:
+                                ne.offset = current_offset
+                                ne.size = file_sz
+                                if not ne.encrypted:
+                                    _stream_copy_bytes(p, 0, file_sz, out_fh)
+                                else:
+                                    with open(p, 'rb') as pf:
+                                        while True:
+                                            chunk = pf.read(16 * 1024 * 1024)
+                                            if not chunk:
+                                                break
+                                            cipher = _encrypt_plaintext(chunk, pak_rel, ne.encryption_method)
+                                            out_fh.write(cipher)
+                                current_offset += file_sz
+                            else:
+                                cs = template.compression_block_size if template.compression_block_size > 0 else 65536
+                                new_blks = []
+                                with open(p, 'rb') as pf:
+                                    while True:
+                                        chunk = pf.read(cs)
+                                        if not chunk:
+                                            break
+                                        compressed = _best_compress(chunk, ne.compression_method, pak_file._zstd_dict)
+                                        cipher = (_encrypt_plaintext(compressed, pak_rel, ne.encryption_method)
+                                                  if ne.encrypted else compressed)
+                                        blk = PakCompressedBlock.__new__(PakCompressedBlock)
+                                        blk.start = current_offset
+                                        blk.end = blk.start + len(cipher)
+                                        out_fh.write(cipher)
+                                        current_offset += len(cipher)
+                                        new_blks.append(blk)
+
+                                ne.compressed_blocks = new_blks
+                                ne.offset = new_blks[0].start if new_blks else current_offset
+                                ne.size = sum(b.end - b.start for b in new_blks)
                         else:
-                            cs = template.compression_block_size if template.compression_block_size > 0 else 65536
-                            chunks = [new_raw[i:i+cs] for i in range(0, len(new_raw), cs)]
-                            new_blks = []
-                            for chunk in chunks:
-                                compressed = _best_compress(chunk, ne.compression_method, pak_file._zstd_dict)
-                                cipher = (_encrypt_plaintext(compressed, pak_rel, ne.encryption_method)
-                                          if ne.encrypted else compressed)
-                                blk = PakCompressedBlock.__new__(PakCompressedBlock)
-                                blk.start = current_offset
-                                blk.end = blk.start + len(cipher)
+                            new_raw = p.read_bytes()
+                            ne.content_hash = SHA1.new(new_raw).digest()
+                            ne.uncompressed_size = len(new_raw)
+
+                            if ne.compression_method == CM_NONE:
+                                cipher = (_encrypt_plaintext(new_raw, pak_rel, ne.encryption_method)
+                                          if ne.encrypted else new_raw)
+                                ne.offset = current_offset
+                                ne.size = len(new_raw)
                                 out_fh.write(cipher)
                                 current_offset += len(cipher)
-                                new_blks.append(blk)
+                            else:
+                                cs = template.compression_block_size if template.compression_block_size > 0 else 65536
+                                chunks = [new_raw[i:i+cs] for i in range(0, len(new_raw), cs)]
+                                new_blks = []
+                                for chunk in chunks:
+                                    compressed = _best_compress(chunk, ne.compression_method, pak_file._zstd_dict)
+                                    cipher = (_encrypt_plaintext(compressed, pak_rel, ne.encryption_method)
+                                              if ne.encrypted else compressed)
+                                    blk = PakCompressedBlock.__new__(PakCompressedBlock)
+                                    blk.start = current_offset
+                                    blk.end = blk.start + len(cipher)
+                                    out_fh.write(cipher)
+                                    current_offset += len(cipher)
+                                    new_blks.append(blk)
 
-                            ne.compressed_blocks = new_blks
-                            ne.offset = new_blks[0].start if new_blks else current_offset
-                            ne.size = sum(b.end - b.start for b in new_blks)
-                            ne.uncompressed_size = len(new_raw)
+                                ne.compressed_blocks = new_blks
+                                ne.offset = new_blks[0].start if new_blks else current_offset
+                                ne.size = sum(b.end - b.start for b in new_blks)
 
                         new_files.append(ne)
                         
@@ -723,13 +843,20 @@ def _repack_compressed_with_display(outfh, pak_file, entry, pak_relative_path, n
     comp_method = entry.compression_method
     order = PakCrypto.generate_block_indices(len(blocks), enc_method)
     
-    if len(new_data) != entry.uncompressed_size:
-        if len(new_data) < entry.uncompressed_size:
-            is_text_lua = pak_relative_path.name.lower().endswith(('.lua', '.json', '.txt', '.xml', '.ini', '.csv')) or any(kw in new_data[:100] for kw in [b'function', b'local', b'--', b'return', b'{'])
-            pad_byte = b' ' if is_text_lua else b'\x00'
-            new_data = new_data.ljust(entry.uncompressed_size, pad_byte)
-        else:
-            new_data = new_data[:entry.uncompressed_size]
+    is_path_input = isinstance(new_data, (str, Path))
+    if is_path_input:
+        p_path = Path(new_data)
+        raw_len = p_path.stat().st_size
+    else:
+        raw_len = len(new_data)
+        if raw_len != entry.uncompressed_size:
+            if raw_len < entry.uncompressed_size:
+                is_text_lua = pak_relative_path.name.lower().endswith(('.lua', '.json', '.txt', '.xml', '.ini', '.csv')) or any(kw in new_data[:100] for kw in [b'function', b'local', b'--', b'return', b'{'])
+                pad_byte = b' ' if is_text_lua else b'\x00'
+                new_data = new_data.ljust(entry.uncompressed_size, pad_byte)
+            else:
+                new_data = new_data[:entry.uncompressed_size]
+            raw_len = len(new_data)
 
     if len(blocks) > 1:
         if entry.compression_block_size > 0:
@@ -742,62 +869,74 @@ def _repack_compressed_with_display(outfh, pak_file, entry, pak_relative_path, n
             chunk_size = int(avg_block_size / avg_compression_ratio) if avg_compression_ratio > 0 else 65536
         
         ptr = 0
-        for logical_i, phys_i in enumerate(order):
-            blk = blocks[phys_i]
-            target_size = blk.end - blk.start
-            chunk_len = min(chunk_size, len(new_data) - ptr)
-            if chunk_len <= 0: break
-            chunk = new_data[ptr:ptr + chunk_len]
-            ptr += chunk_len
-            
-            with open(pak_file._file_path, 'rb') as src:
-                src.seek(blk.start)
-                original_compressed = src.read(target_size)
-            
-            compressed_ok = False
-            new_compressed = None
-            zstd_dict = pak_file._zstd_dict if comp_method == CM_ZSTD_DICT else None
-            
-            if comp_method in (CM_ZSTD, CM_ZSTD_DICT):
-                for level in [19, 16, 12, 7, 4, 1]:
-                    c = ZstdCompressor(level=level, dict_data=zstd_dict, threads=0)
-                    new_compressed = c.compress(chunk)
+        pf = open(p_path, 'rb') if is_path_input else None
+        try:
+            for logical_i, phys_i in enumerate(order):
+                blk = blocks[phys_i]
+                target_size = blk.end - blk.start
+                chunk_len = min(chunk_size, raw_len - ptr)
+                if chunk_len <= 0: break
+                
+                if pf:
+                    pf.seek(ptr)
+                    chunk = pf.read(chunk_len)
+                    if len(chunk) < chunk_len:
+                        chunk = chunk.ljust(chunk_len, b'\x00')
+                else:
+                    chunk = new_data[ptr:ptr + chunk_len]
+                ptr += chunk_len
+                
+                with open(pak_file._file_path, 'rb') as src:
+                    src.seek(blk.start)
+                    original_compressed = src.read(target_size)
+                
+                compressed_ok = False
+                new_compressed = None
+                zstd_dict = pak_file._zstd_dict if comp_method == CM_ZSTD_DICT else None
+                
+                if comp_method in (CM_ZSTD, CM_ZSTD_DICT):
+                    for level in [19, 16, 12, 7, 4, 1]:
+                        c = ZstdCompressor(level=level, dict_data=zstd_dict, threads=0)
+                        new_compressed = c.compress(chunk)
+                        if len(new_compressed) <= target_size:
+                            compressed_ok = True
+                            break
+                elif comp_method == CM_ZLIB:
+                    new_compressed = zlib.compress(chunk, zlib.Z_BEST_COMPRESSION)
                     if len(new_compressed) <= target_size:
                         compressed_ok = True
-                        break
-            elif comp_method == CM_ZLIB:
-                new_compressed = zlib.compress(chunk, zlib.Z_BEST_COMPRESSION)
-                if len(new_compressed) <= target_size:
-                    compressed_ok = True
-            
-            if not compressed_ok:
-                outfh.seek(blk.start)
-                outfh.write(original_compressed)
-                display.add_block(logical_i, target_size, False)
-                del original_compressed
-                continue
-            
-            if entry.encrypted:
-                if PakCrypto._is_sm4_method(enc_method):
-                    pad_len = -len(new_compressed) % 16
-                    if pad_len > 0: new_compressed += b'\x00' * pad_len
-                new_compressed = _encrypt_plaintext(new_compressed, pak_relative_path, enc_method)
-            
-            if len(new_compressed) > target_size:
-                outfh.seek(blk.start)
-                outfh.write(original_compressed)
-                display.add_block(logical_i, target_size, False)
-            else:
-                outfh.seek(blk.start)
-                outfh.write(new_compressed)
-                if len(new_compressed) < target_size:
-                    outfh.write(b'\x00' * (target_size - len(new_compressed)))
-                ratio = len(new_compressed) / len(chunk) if len(chunk) > 0 else 1
-                display.add_block(logical_i, target_size, True, ratio)
+                
+                if not compressed_ok:
+                    outfh.seek(blk.start)
+                    outfh.write(original_compressed)
+                    display.add_block(logical_i, target_size, False)
+                    del original_compressed
+                    continue
+                
+                if entry.encrypted:
+                    if PakCrypto._is_sm4_method(enc_method):
+                        pad_len = -len(new_compressed) % 16
+                        if pad_len > 0: new_compressed += b'\x00' * pad_len
+                    new_compressed = _encrypt_plaintext(new_compressed, pak_relative_path, enc_method)
+                
+                if len(new_compressed) > target_size:
+                    outfh.seek(blk.start)
+                    outfh.write(original_compressed)
+                    display.add_block(logical_i, target_size, False)
+                else:
+                    outfh.seek(blk.start)
+                    outfh.write(new_compressed)
+                    if len(new_compressed) < target_size:
+                        outfh.write(b'\x00' * (target_size - len(new_compressed)))
+                    ratio = len(new_compressed) / len(chunk) if len(chunk) > 0 else 1
+                    display.add_block(logical_i, target_size, True, ratio)
 
-            del original_compressed, new_compressed
-            if logical_i % 20 == 0:
-                gc.collect()
+                del original_compressed, new_compressed
+                if logical_i % 20 == 0:
+                    gc.collect()
+        finally:
+            if pf is not None:
+                pf.close()
     else:
         if not blocks: return
         blk = blocks[0]
@@ -810,16 +949,17 @@ def _repack_compressed_with_display(outfh, pak_file, entry, pak_relative_path, n
         compressed_ok = False
         new_compressed = None
         zstd_dict = pak_file._zstd_dict if comp_method == CM_ZSTD_DICT else None
+        block_data = Path(new_data).read_bytes() if is_path_input else new_data
         
         if comp_method in (CM_ZSTD, CM_ZSTD_DICT):
             for level in [22, 19, 16, 13, 10, 7, 4, 1]:
                 c = ZstdCompressor(level=level, dict_data=zstd_dict, threads=1)
-                new_compressed = c.compress(new_data)
+                new_compressed = c.compress(block_data)
                 if len(new_compressed) <= target_size:
                     compressed_ok = True
                     break
         elif comp_method == CM_ZLIB:
-            new_compressed = zlib.compress(new_data, zlib.Z_BEST_COMPRESSION)
+            new_compressed = zlib.compress(block_data, zlib.Z_BEST_COMPRESSION)
             if len(new_compressed) <= target_size:
                 compressed_ok = True
         
@@ -844,7 +984,7 @@ def _repack_compressed_with_display(outfh, pak_file, entry, pak_relative_path, n
             outfh.write(new_compressed)
             if len(new_compressed) < target_size:
                 outfh.write(b'\x00' * (target_size - len(new_compressed)))
-            ratio = len(new_compressed) / len(new_data) if len(new_data) > 0 else 1
+            ratio = len(new_compressed) / len(block_data) if len(block_data) > 0 else 1
             display.add_block(0, target_size, True, ratio)
 
 def smart_resolve_by_fingerprint(filename: str, repack_file: Path, candidates: list):
@@ -991,17 +1131,22 @@ def repack_pak_file_with_block_display(pak_file, edited_root: Path, output_path:
             total_blocks = len(entry.compressed_blocks) if entry.compressed_blocks else 1
             
             display.start_file(file_name, total_blocks)
-            new_data = p.read_bytes()
+            file_sz = p.stat().st_size
+            if file_sz >= LARGE_FILE_THRESHOLD:
+                new_data = p
+            else:
+                new_data = p.read_bytes()
             pak_rel = PurePath(full_path)
             
             if entry.compression_method == CM_NONE:
                 _repack_uncompressed(outfh, pak_file, entry, pak_rel, new_data)
-                display.add_block(0, len(new_data), True)
+                display.add_block(0, file_sz if isinstance(new_data, (str, Path)) else len(new_data), True)
             else:
                 _repack_compressed_with_display(outfh, pak_file, entry, pak_rel, new_data, edited_root, display)
             
             display.finish_file()
-            del new_data
+            if not isinstance(new_data, (str, Path)):
+                del new_data
             gc.collect()
     
     display.final_summary()

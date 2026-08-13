@@ -250,6 +250,8 @@ from core.logging_utils import (
     get_device_user_info, cleanup_old_logs, send_telegram_bug_report,
     send_telegram_status_update, handle_exception
 )
+from ai.assistant import get_ai_config, call_ai_api
+
 def show_workflow_guide():
     console.print(Panel(Align.center("[bold bright_cyan]📖 FEATURESTIC LEAKS - EASY STEP-BY-STEP WORKFLOW GUIDE[/bold bright_cyan]"), border_style="cyan", box=ROUNDED))
     

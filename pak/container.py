@@ -34,6 +34,8 @@ from pak.crypto import (
 )
 from pak.compression import PakCompression
 
+LARGE_FILE_THRESHOLD = 200 * 1024 * 1024
+
 class Misc:
     @staticmethod
     def pad_to_n(data: bytes, n: int) -> bytes:
@@ -353,8 +355,37 @@ class TencentPakFile:
                     data = self._peek_content(entry.offset, entry.size, entry.encryption_method)
                     if entry.encrypted:
                         data = PakCrypto.decrypt_block(data, file_path, entry.encryption_method)
-                    data = PakCompression.decompress_block(data, self._zstd_dict, entry.compression_method)
-                    file.write(data)
+                    if entry.uncompressed_size >= LARGE_FILE_THRESHOLD:
+                        try:
+                            if entry.compression_method == CM_ZLIB:
+                                dobj = zlib.decompressobj()
+                                chunk_in_sz = 1024 * 1024
+                                for i in range(0, len(data), chunk_in_sz):
+                                    chunk = dobj.decompress(data[i:i + chunk_in_sz])
+                                    if chunk:
+                                        file.write(chunk)
+                                flush_chunk = dobj.flush()
+                                if flush_chunk:
+                                    file.write(flush_chunk)
+                            elif entry.compression_method in (CM_ZSTD, CM_ZSTD_DICT):
+                                active_dict = self._zstd_dict if entry.compression_method == CM_ZSTD_DICT else None
+                                decompressor = PakCompression._zstd_decompressor(active_dict) if hasattr(PakCompression, '_zstd_decompressor') else None
+                                if decompressor is not None and hasattr(decompressor, 'stream_reader'):
+                                    import io
+                                    import shutil
+                                    with decompressor.stream_reader(io.BytesIO(data)) as reader:
+                                        shutil.copyfileobj(reader, file, length=1024 * 1024)
+                                else:
+                                    data = PakCompression.decompress_block(data, self._zstd_dict, entry.compression_method)
+                                    file.write(data)
+                            else:
+                                file.write(bytes(data))
+                        except Exception:
+                            data = PakCompression.decompress_block(data, self._zstd_dict, entry.compression_method)
+                            file.write(data)
+                    else:
+                        data = PakCompression.decompress_block(data, self._zstd_dict, entry.compression_method)
+                        file.write(data)
                 else:
                     block_size = entry.compression_block_size if entry.compression_block_size > 0 else 65536
                     for x in PakCrypto.generate_block_indices(len(entry.compressed_blocks), entry.encryption_method):
