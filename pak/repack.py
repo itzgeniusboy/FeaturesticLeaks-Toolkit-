@@ -36,7 +36,7 @@ from pak.crypto import (
 from pak.compression import PakCompression
 from pak.container import (
     Reader, TencentPakInfo, PakCompressedBlock,
-    TencentPakEntry
+    TencentPakEntry, check_disk_space
 )
 
 class SimpleBlockDisplay:
