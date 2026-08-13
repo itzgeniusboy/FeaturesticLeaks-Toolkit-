@@ -1,0 +1,11 @@
+{
+  "name": "featurestic-leaks",
+  "version": "2.5.0",
+  "private": true,
+  "description": "FeaturesticLeaks Termux VIP Exploit Engine & 24/7 Telegram Bot",
+  "scripts": {
+    "build": "echo 'Build successful'",
+    "start": "node server.js",
+    "dev": "node server.js"
+  }
+}
