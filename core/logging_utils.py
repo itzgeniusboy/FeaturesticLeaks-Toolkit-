@@ -357,7 +357,7 @@ def handle_exception(e: Exception, action_name: str = "Operation", data_path: Op
         category_border = "yellow"
         diagnosis = (
             "[bold yellow]⚠️ Diagnostic Result:[/bold yellow] [bold white]Yeh issue AAPKI INPUT FILE / PATH me hai.[/bold white]\n"
-            "[dim white]Tool bilkul Sahi (OK) kaam kar raha hai. Aapki input file corrupt ho sakti hai, missing ho sakti hai, ya wrong format me hai.[/dim white]"
+            "[dim]Tool bilkul Sahi (OK) kaam kar raha hai. Aapki input file corrupt ho sakti hai, missing ho sakti hai, ya wrong format me hai.[/dim]"
         )
     else:
         category_header = "[bold bright_red]🛠️ TOOL INTERNAL BUG / CODE ISSUE[/bold bright_red]"
@@ -428,18 +428,18 @@ def handle_exception(e: Exception, action_name: str = "Operation", data_path: Op
         pass
 
     panel_content = (
-        f"[dim white]Category:[/dim white] {category_header}\n"
+        f"[dim]Category:[/dim] {category_header}\n"
         f"{diagnosis}\n\n"
-        f"[dim white]Operation:[/dim white] [cyan]{action_name}[/cyan]\n"
-        f"[dim white]Error Details:[/dim white] [bold red]{err_type}[/bold red] in [bold yellow]{func_name}()[/bold yellow] ([cyan]{file_info}[/cyan]:[yellow]{line_no}[/yellow])\n"
-        f"[dim white]Message:[/dim white] {escape(err_msg)}"
+        f"[dim]Operation:[/dim] [cyan]{action_name}[/cyan]\n"
+        f"[dim]Error Details:[/dim] [bold red]{err_type}[/bold red] in [bold yellow]{func_name}()[/bold yellow] ([cyan]{file_info}[/cyan]:[yellow]{line_no}[/yellow])\n"
+        f"[dim]Message:[/dim] {escape(err_msg)}"
     )
     if ai_live_fix:
         panel_content += f"\n[bold bright_cyan]🤖 OpenCode AI Auto-Fix Solution:[/bold bright_cyan] [bold white]{escape(ai_live_fix)}[/bold white]"
     elif hint_msg:
         panel_content += f"\n[bold yellow]💡 Solution Tip:[/bold yellow] [white]{escape(hint_msg)}[/white]"
     
-    panel_content += f"\n[dim white]Saved Log:[/dim white] [dim cyan]{log_filename}[/dim cyan]"
+    panel_content += f"\n[dim]Saved Log:[/dim] [dim cyan]{log_filename}[/]"
 
     error_panel = Panel(
         panel_content,

@@ -374,8 +374,8 @@ def print_banner():
     os.system('cls' if os.name == 'nt' else 'clear')
     
     banner_content = (
-        "[bold bright_cyan]⚡ FEATURESTIC LEAKS v2.5 ⚡[/bold bright_cyan] [dim white]│[/dim white] [bold bright_yellow]VIP EXPLOIT ENGINE[/bold bright_yellow]\n"
-        "[bold white]DEV:[bold cyan] @L359D[/bold cyan] [dim white]│[/dim white] TG:[bold cyan] t.me/FeaturesticLeaks[/bold cyan] [dim white]│[/dim white] STATUS:[bold bright_green] 🟢 READY[/bold bright_green][/bold white]"
+        "[bold bright_cyan]⚡ FEATURESTIC LEAKS v2.5 ⚡[/bold bright_cyan] [dim]│[/dim] [bold bright_yellow]VIP EXPLOIT ENGINE[/bold bright_yellow]\n"
+        "[bold white]DEV:[bold cyan] @L359D[/bold cyan] [dim]│[/dim] TG:[bold cyan] t.me/FeaturesticLeaks[/bold cyan] [dim]│[/dim] STATUS:[bold bright_green] 🟢 READY[/bold bright_green][/bold white]"
     )
     console.print(Panel(
         Align.center(banner_content),
@@ -426,7 +426,7 @@ def boot_sequence():
                 spaces = " " * (track_len - pos)
                 
                 if frame < total_frames:
-                    rocket_line = f"[dim cyan]{trail}[/dim cyan][bold bright_yellow]🚀[/bold bright_yellow][dim white]❯[/dim white]{spaces}"
+                    rocket_line = f"[dim cyan]{trail}[/dim cyan][bold bright_yellow]🚀[/bold bright_yellow][dim]❯[/dim]{spaces}"
                 else:
                     rocket_line = f"[dim cyan]{'═' * track_len}[/dim cyan][bold bright_yellow] 🚀 READY[/bold bright_yellow]"
                 
@@ -516,7 +516,7 @@ def check_and_auto_update(interactive: bool = False):
 
         if remote_hash != local_hash:
             has_update = True
-            UPDATE_NOTIF_BANNER = "🔥 [bold bright_yellow]NEW TOOL UPDATE AVAILABLE![/bold bright_yellow] [dim white]Press [bold cyan][U][/bold cyan] in Main Menu to Auto-Update Instantly![/dim white]"
+            UPDATE_NOTIF_BANNER = "🔥 [bold bright_yellow]NEW TOOL UPDATE AVAILABLE![/bold bright_yellow] [dim]Press [bold cyan][U][/bold cyan] in Main Menu to Auto-Update Instantly![/dim]"
 
         if interactive:
             if not has_update and not raw_resp:
@@ -581,21 +581,21 @@ def styled_prompt(message: str = "", context: str = "~") -> str:
     # Header line
     header = (
         "[dim cyan]┌─[/dim cyan]"
-        "[dim white][[/dim white]"
+        "[dim][[/dim]"
         "[bold bright_magenta]FeaturesticLeaks[/bold bright_magenta]"
         "[bold bright_cyan]@termux[/bold bright_cyan]"
-        "[dim white]][/dim white]"
+        "[dim]][/dim]"
         "[dim cyan]─[/dim cyan]"
-        "[dim white][[/dim white]"
+        "[dim][[/dim]"
         f"[bold yellow]{context}[/bold yellow]"
-        "[dim white]][/dim white]"
+        "[dim]][/dim]"
     )
     
     if clean_msg:
         if clean_msg.lower().startswith("press enter"):
             header += f" [dim yellow]({clean_msg})[/dim yellow]"
         else:
-            header += f" [dim white]({clean_msg})[/dim white]"
+            header += f" [dim]({clean_msg})[/dim]"
 
     console.print(header)
 
@@ -731,7 +731,7 @@ def pick_file_from_folder(action_title: str, default_folder: Path, extensions: L
                 selected = found_files[0]
                 size_mb = selected.stat().st_size / (1024 * 1024)
                 console.print(f"\n[bold green][OK] Auto-selected file: {selected.name} ({size_mb:.2f} MB)[/bold green]")
-                console.print(f"[dim white]📂 Folder Location: {selected.parent}[/dim white]")
+                console.print(f"[dim]📂 Folder Location: {selected.parent}[/dim]")
                 return selected, found_files
 
             # Multiple files found -> Display clean table directly without asking for folder path
@@ -1041,7 +1041,7 @@ class UE4StringTool:
 def run_ue4_string_tool(data_path: Path) -> None:
     console.print(Panel(
         "[bold cyan]⚡ FEATURESTIC LEAKS — UE4 ASSET STRING TOOL ⚡[/bold cyan]\n"
-        "[dim white]Extract readable string literals from .uasset / .uexp files to JSON & Repack JSON back to binary.[/dim white]",
+        "[dim]Extract readable string literals from .uasset / .uexp files to JSON & Repack JSON back to binary.[/dim]",
         border_style="cyan",
         box=ROUNDED,
         padding=(0, 2)
@@ -1049,7 +1049,7 @@ def run_ue4_string_tool(data_path: Path) -> None:
     
     console.print("[bold yellow]1.[/bold yellow] [bold white]Unpack Strings to JSON[/bold white]")
     console.print("[bold yellow]2.[/bold yellow] [bold white]Repack Strings from JSON[/bold white]")
-    console.print("[bold yellow]0.[/bold yellow] [dim white]Back to Main Menu[/dim white]")
+    console.print("[bold yellow]0.[/bold yellow] [dim]Back to Main Menu[/dim]")
     
     choice = safe_input("\n-> Select Mode (0-2): ").strip()
     tool = UE4StringTool()
@@ -1086,7 +1086,7 @@ def run_ue4_string_tool(data_path: Path) -> None:
 def run_file_finder_tool(data_path: Path) -> None:
     console.print(Panel(
         "[bold cyan]🔍 FEATURESTIC LEAKS — ADVANCED FILE FINDER 🔍[/bold cyan]\n"
-        "[dim white]Search .uasset, .uexp, .ubulk, .lua files by keyword in workspace.[/dim white]",
+        "[dim]Search .uasset, .uexp, .ubulk, .lua files by keyword in workspace.[/dim]",
         border_style="cyan",
         box=ROUNDED,
         padding=(0, 2)
@@ -1173,7 +1173,7 @@ def run_file_finder_tool(data_path: Path) -> None:
 def run_skin_dumper(data_path: Path) -> None:
     console.print(Panel(
         "[bold bright_cyan]🎨 SKIN ASSETS DUMPER & EXTRACTOR 🎨[/bold bright_cyan]\n"
-        "[dim white]Scan PAK files or UNPACK directory to dump skin textures, meshes, uassets & uexps.[/dim white]",
+        "[dim]Scan PAK files or UNPACK directory to dump skin textures, meshes, uassets & uexps.[/dim]",
         border_style="bright_cyan",
         box=ROUNDED,
         padding=(0, 2)
@@ -1248,7 +1248,7 @@ def run_skin_dumper(data_path: Path) -> None:
 
     console.print(table)
     if len(found_skins) > 25:
-        console.print(f"[dim white]... and {len(found_skins) - 25} more skin assets.[/dim white]")
+        console.print(f"[dim]... and {len(found_skins) - 25} more skin assets.[/dim]")
 
     console.print("\n[bold bright_yellow]Options:[/bold bright_yellow]")
     console.print("  [1] Save Skin Assets Log (.txt & .json)")
@@ -1318,7 +1318,7 @@ def run_skin_dumper(data_path: Path) -> None:
 def run_obb_manager(data_path: Path) -> None:
     console.print(Panel(
         "[bold cyan]📦 FEATURESTIC LEAKS — OBB PACKAGE MANAGER 📦[/bold cyan]\n"
-        "[dim white]Unzip OBB archive & Rezip OBB with byte-exact padding matching original size.[/dim white]",
+        "[dim]Unzip OBB archive & Rezip OBB with byte-exact padding matching original size.[/dim]",
         border_style="cyan",
         box=ROUNDED,
         padding=(0, 2)
@@ -1326,7 +1326,7 @@ def run_obb_manager(data_path: Path) -> None:
     
     console.print("[bold yellow]1.[/bold yellow] [bold white]Unzip OBB Package[/bold white]")
     console.print("[bold yellow]2.[/bold yellow] [bold white]Rezip OBB Package (with exact size padding)[/bold white]")
-    console.print("[bold yellow]0.[/bold yellow] [dim white]Back to Main Menu[/dim white]")
+    console.print("[bold yellow]0.[/bold yellow] [dim]Back to Main Menu[/dim]")
     
     choice = safe_input("\n-> Select Option (0-2): ").strip()
     
@@ -1419,7 +1419,7 @@ def run_obb_manager(data_path: Path) -> None:
 def run_pak_compare_dumper(data_path: Path) -> None:
     console.print(Panel(
         "[bold bright_cyan]🔍 PAK COMPARE & DUMP TOOL (PAK DUMPER) 🔍[/bold bright_cyan]\n"
-        "[dim white]Compare two .pak/.obb files or dump detailed internal file lists, offsets, sizes, hashes, and encryption modes.[/dim white]",
+        "[dim]Compare two .pak/.obb files or dump detailed internal file lists, offsets, sizes, hashes, and encryption modes.[/dim]",
         border_style="bright_cyan",
         box=ROUNDED,
         padding=(0, 2)
@@ -1628,7 +1628,7 @@ def run_pak_compare_dumper(data_path: Path) -> None:
 def run_file_resizer_tool(data_path: Path) -> None:
     console.print(Panel(
         "[bold cyan]📏 FEATURESTIC LEAKS — FILE RESIZER & SIZE EQUALIZER 📏[/bold cyan]\n"
-        "[dim white]Match exact byte sizes for PAK, OBB, LUA, or any file to pass anti-cheat integrity checks.[/dim white]",
+        "[dim]Match exact byte sizes for PAK, OBB, LUA, or any file to pass anti-cheat integrity checks.[/dim]",
         border_style="cyan",
         box=ROUNDED,
         padding=(0, 2)
@@ -1902,7 +1902,7 @@ def pak_obb_tools_menu(data_path: Path):
                         "[bold white]Please copy/move your edited files into one of these folders:[/bold white]\n"
                         " 📂 [bold bright_cyan]/sdcard/FeaturesticLeaks/REPLACE/[/bold bright_cyan]\n"
                         " 📂 [bold bright_cyan]/sdcard/FeaturesticLeaks/PAK_WORKSPACE/3_REPLACE/[/bold bright_cyan]\n\n"
-                        "[dim white]Tip: Put your modified files inside the REPLACE folder above, or enter custom path below.[/dim white]",
+                        "[dim]Tip: Put your modified files inside the REPLACE folder above, or enter custom path below.[/dim]",
                         title="[bold yellow] 📂 REPLACE FOLDER PATH GUIDE [/bold yellow]",
                         border_style="yellow",
                         box=ROUNDED
@@ -1992,7 +1992,7 @@ def pak_obb_tools_menu(data_path: Path):
                         "[bold white]Please copy/move your .lua or mod files into one of these folders:[/bold white]\n"
                         " 📂 [bold bright_yellow]/sdcard/FeaturesticLeaks/INJECT/[/bold bright_yellow]\n"
                         " 📂 [bold bright_yellow]/sdcard/FeaturesticLeaks/PAK_WORKSPACE/4_INJECT/[/bold bright_yellow]\n\n"
-                        "[dim white]Instructions:[/dim white]\n"
+                        "[dim]Instructions:[/dim]\n"
                         "1. Open your File Manager and put your files inside [bold yellow]/sdcard/FeaturesticLeaks/INJECT/[/bold yellow]\n"
                         "2. Or enter your custom folder path below:",
                         title="[bold yellow] 📂 INJECT FOLDER PATH GUIDE [/bold yellow]",
@@ -2047,7 +2047,7 @@ def pak_obb_tools_menu(data_path: Path):
                         "[bold bright_yellow]🇮🇳 BGMI LUA MODDING QUICK HELP:[/bold bright_yellow]\n\n"
                         "• [bold white]BGMI me Lua file inject karne ke liye:[/bold white] Seedha [bold bright_green]ENTER[/bold bright_green] dabayein! ([bold cyan]Preset P1[/bold cyan] select ho jayega).\n"
                         "• [bold white]Target Path:[/bold white] [bold yellow]Content/Lua/GameLua/Mod/BRMod/Gameplay/Core[/bold yellow]\n"
-                        "• [dim white]Aapko koi bhi complicated path type karne ki zaroorat nahi hai! Just press ENTER.[/dim white]",
+                        "• [dim]Aapko koi bhi complicated path type karne ki zaroorat nahi hai! Just press ENTER.[/dim]",
                         title="[bold bright_yellow] 🎮 BGMI SPECIAL PRESET INSTRUCTION 🎮 [/bold bright_yellow]",
                         border_style="yellow",
                         box=ROUNDED
@@ -2178,7 +2178,7 @@ def pak_obb_tools_menu(data_path: Path):
             time.sleep(1)
 
 def run_one_click_auto_lua_workflow(data_path: Path):
-    console.print(Panel(Align.center("[bold bright_cyan]🚀 1-CLICK AUTOMATIC LUA FIX & COMPILER WORKFLOW 🚀[/bold bright_cyan]\n[dim white]Auto-scans LUA/RESULT/REPLACE -> Auto-fixes syntax for Lua 5.1 -> Compiles to .luac -> Auto-syncs everywhere![/dim white]"), border_style="cyan", box=ROUNDED))
+    console.print(Panel(Align.center("[bold bright_cyan]🚀 1-CLICK AUTOMATIC LUA FIX & COMPILER WORKFLOW 🚀[/bold bright_cyan]\n[dim]Auto-scans LUA/RESULT/REPLACE -> Auto-fixes syntax for Lua 5.1 -> Compiles to .luac -> Auto-syncs everywhere![/dim]"), border_style="cyan", box=ROUNDED))
     
     lua_dir = data_path / "LUA"
     lua_file, _ = pick_file_from_folder("1-Click Auto Lua Workflow", lua_dir, extensions=[".lua", ".txt"])
@@ -2322,10 +2322,10 @@ def manage_ai_api_keys():
         console.print(Panel(
             "[bold bright_cyan]🤖 OPENCODE UNLIMITED AI MODEL & API MANAGER 🤖[/bold bright_cyan]\n\n"
             "[bold white]🚀 Primary OpenCode Custom Engine (No API Exhaustion / Rate Limits):[/bold white]\n"
-            " • [bold bright_yellow]OpenCode Endpoint:[bold /yellow]  [bold underline bright_green]https://api.opencode.ai/v1[/bold underline bright_green]\n"
-            " • [bold bright_yellow]🔑 OpenCode Auth Link:[bold /yellow] [bold underline bright_cyan]https://opencode.ai/auth[/bold underline bright_cyan]\n"
-            " • [bold bright_yellow]OpenCode API Keys:[bold /yellow]  [bold bright_green]Multi-Key Auto Rotation Active[/bold bright_green]\n\n"
-            "[dim white]OpenCode AI runs smoothly across all device modding tasks & auto-reports errors to Telegram![/dim white]",
+            " • [bold bright_yellow]OpenCode Endpoint:[/bold bright_yellow]  [bold underline bright_green]https://api.opencode.ai/v1[/bold underline bright_green]\n"
+            " • [bold bright_yellow]🔑 OpenCode Auth Link:[/bold bright_yellow] [bold underline bright_cyan]https://opencode.ai/auth[/bold underline bright_cyan]\n"
+            " • [bold bright_yellow]OpenCode API Keys:[/bold bright_yellow]  [bold bright_green]Multi-Key Auto Rotation Active[/bold bright_green]\n\n"
+            "[dim]OpenCode AI runs smoothly across all device modding tasks & auto-reports errors to Telegram![/dim]",
             border_style="cyan",
             box=ROUNDED
         ))
@@ -2357,7 +2357,7 @@ def manage_ai_api_keys():
         choice = safe_input("\n-> Select Option [0-3]: ").strip()
         if choice == '1':
             console.print("\n[bold cyan]🚀 Configure OpenCode API Key:[/bold cyan]")
-            console.print("[bold yellow]🔑 Get OpenCode API Keys Direct Link:[bold /yellow] [bold underline bright_cyan]https://opencode.ai/auth[/bold underline bright_cyan]\n")
+            console.print("[bold yellow]🔑 Get OpenCode API Keys Direct Link:[/bold bright_yellow] [bold underline bright_cyan]https://opencode.ai/auth[/bold underline bright_cyan]\n")
             
             curr_keys = cfg.get("opencode_keys", [])
             if not curr_keys and cfg.get("opencode_api_key"):
@@ -2426,7 +2426,7 @@ def manage_ai_api_keys():
             time.sleep(2)
         elif choice == '3':
             console.print("\n[bold cyan]🚨 Configure Telegram Auto-Report Bot for Direct Error Delivery:[/bold cyan]")
-            console.print("[dim white]Create a bot on Telegram via @BotFather to get your Bot Token & Chat ID.[/dim white]\n")
+            console.print("[dim]Create a bot on Telegram via @BotFather to get your Bot Token & Chat ID.[/dim]\n")
             
             curr_token = cfg.get("telegram_bot_token", "")
             curr_chat = cfg.get("telegram_chat_id", "")
@@ -2445,9 +2445,9 @@ def manage_ai_api_keys():
                 
             save_ai_config(cfg)
             console.print("[bold green]✅ Telegram Auto-Report configuration updated successfully![/bold green]")
-            console.print("[dim white]Sending test connection report to your Telegram group...[/dim white]")
+            console.print("[dim]Sending test connection report to your Telegram group...[/dim]")
             send_telegram_bug_report("TEST_PING", "Telegram Bot Connection Verified Successfully!", "Telegram Bot Config Test", "FeaturesticLeaks.py", "6699", "manage_ai_api_keys", "No errors! Bot is connected and working.")
-            console.print("[dim white]All unhandled errors anywhere on user devices will now instantly land on your Telegram![/dim white]")
+            console.print("[dim]All unhandled errors anywhere on user devices will now instantly land on your Telegram![/dim]")
             time.sleep(1.5)
         elif choice == '0':
             break
@@ -2638,7 +2638,7 @@ query_ai_for_lua_fix = ai_fix_lua_code
 
 
 def run_ai_assisted_lua_repair(data_path: Path):
-    console.print(Panel(Align.center("[bold bright_cyan]🤖 AI-ASSISTED LUA SCRIPT REPAIR ENGINE 🤖[/bold bright_cyan]\n[dim white]Uses Google Gemini / Groq / OpenRouter AI to fix broken Lua syntax, missing end statements, & GameGuard errors![/dim white]"), border_style="cyan", box=ROUNDED))
+    console.print(Panel(Align.center("[bold bright_cyan]🤖 AI-ASSISTED LUA SCRIPT REPAIR ENGINE 🤖[/bold bright_cyan]\n[dim]Uses Google Gemini / Groq / OpenRouter AI to fix broken Lua syntax, missing end statements, & GameGuard errors![/dim]"), border_style="cyan", box=ROUNDED))
     
     lua_dir = data_path / "LUA"
     lua_file, _ = pick_file_from_folder("AI Lua Repair", lua_dir, extensions=[".lua", ".txt"])
@@ -2808,7 +2808,7 @@ if HAS_WATCHDOG:
 
 def run_watch_mode(data_path: Path):
     print_banner()
-    console.print(Panel(Align.center("[bold bright_cyan]👁️ AUTOMATIC WATCH MODE 👁️[/bold bright_cyan]\n[dim white]Monitors PAK_INPUT and LUA_INPUT folders in real-time and auto-processes incoming files![/dim white]"), border_style="cyan", box=ROUNDED))
+    console.print(Panel(Align.center("[bold bright_cyan]👁️ AUTOMATIC WATCH MODE 👁️[/bold bright_cyan]\n[dim]Monitors PAK_INPUT and LUA_INPUT folders in real-time and auto-processes incoming files![/dim]"), border_style="cyan", box=ROUNDED))
 
     if not HAS_WATCHDOG:
         console.print("[bold red][X] 'watchdog' module is not installed. Please run: pip install watchdog[/bold red]")
@@ -2839,7 +2839,7 @@ def run_watch_mode(data_path: Path):
         return
 
     console.print("\n[bold bright_yellow]👁️ Watch Mode Active... Drop any .pak, .obb, or .lua file into the input folders to process![/bold bright_yellow]")
-    console.print("[bold dim white]Press Ctrl+C to stop watching and return to menu.[/bold dim white]\n")
+    console.print("[bold dim]Press Ctrl+C to stop watching and return to menu.[/bold dim]\n")
 
     observer.start()
     try:
@@ -2858,7 +2858,7 @@ def run_diagnostic_benchmark(data_path: Path):
     print_banner()
     console.print(Panel(
         "[bold bright_cyan]⚡ TERMUX PERFORMANCE BENCHMARK & DIAGNOSTIC LOG SUMMARY ⚡[/bold bright_cyan]\n"
-        "[dim white]Testing system response time, Lua compiler speed, memory usage & log hygiene...[/dim white]",
+        "[dim]Testing system response time, Lua compiler speed, memory usage & log hygiene...[/dim]",
         border_style="cyan",
         box=ROUNDED
     ))
@@ -3009,7 +3009,7 @@ def watch_mode_menu(data_path: Path):
                 f" • {data_path / 'LUA'}\n"
                 f" • /sdcard/FeaturesticLeaks/PAK_WORKSPACE/1_PAK_INPUT\n"
                 f" • /sdcard/FeaturesticLeaks/LUA_WORKSPACE/1_LUA_INPUT\n\n"
-                f"[dim white]When active, dropping any .pak/.obb file will automatically extract it, and any .lua file will be compiled automatically![/dim white]",
+                f"[dim]When active, dropping any .pak/.obb file will automatically extract it, and any .lua file will be compiled automatically![/dim]",
                 border_style="cyan",
                 box=ROUNDED
             ))
@@ -3054,7 +3054,7 @@ def ensure_directories(data_path: Path):
 
 def run_url_lib_patcher_tool(data_path: Path):
     console.print("\n[bold cyan]🔗 URL & LIB PATCHER TOOL[/bold cyan]")
-    console.print("[dim white]Find and patch URLs or libraries in .so binaries or Lua scripts.[/dim white]")
+    console.print("[dim]Find and patch URLs or libraries in .so binaries or Lua scripts.[/dim]")
     target_str = safe_input("-> Enter file path (.so / .lua / binary): ").strip()
     if not target_str:
         console.print("[yellow]Cancelled.[/yellow]")
@@ -3484,7 +3484,7 @@ def run_ai_watch_assistant(data_path: Path):
         "[bold bright_cyan]🤖 AI MODDING ASSISTANT & COMPANION 🤖[/bold bright_cyan]\n\n"
         "[bold white]Ha bhai! Kya krna h?[/bold white]\n"
         "[bold bright_yellow]PAK bnana h, unpack krna h, lua compile krna h ya fix krna h? Batao kya krna h![/bold bright_yellow]\n\n"
-        "[dim white]Type 'exit' or press Ctrl+C anytime to stop assistant.[/dim white]",
+        "[dim]Type 'exit' or press Ctrl+C anytime to stop assistant.[/dim]",
         border_style="cyan",
         box=ROUNDED
     ))
@@ -3565,8 +3565,8 @@ def run_ai_watch_assistant(data_path: Path):
 
                 default_action = "Unpack" if ext in ['.pak', '.obb'] else ("Compile" if ext in ['.lua', '.txt'] else "Process")
 
-                console.print(f"[bold bright_cyan]🤖 AI Assistant:[bold /bright_cyan] Ye file [bold white]'{new_file.name}'[/bold white] mili hai! Kya {default_action} karun?")
-                console.print("[dim white]Options: [Haan / 1] Unpack/Compile  |  [2] AI Fix  |  [3] Auto  |  [Nahi / 0] Skip[/dim white]")
+                console.print(f"[bold bright_cyan]🤖 AI Assistant:[/bold bright_cyan] Ye file [bold white]'{new_file.name}'[/bold white] mili hai! Kya {default_action} karun?")
+                console.print("[dim]Options: [Haan / 1] Unpack/Compile  |  [2] AI Fix  |  [3] Auto  |  [Nahi / 0] Skip[/dim]")
 
                 user_input = safe_input("\n💬 You: ").strip()
 
@@ -3586,7 +3586,7 @@ def run_ai_watch_assistant(data_path: Path):
                     should_process = True
                     action = 'fix'
                 elif low_in in ['nahi', 'no', 'n', '0', 'skip']:
-                    console.print("[bold dim white]🤖 AI Assistant: Okay, file skip kar di.[/bold dim white]\n")
+                    console.print("[bold dim]🤖 AI Assistant: Okay, file skip kar di.[/bold dim]\n")
                     continue
                 else:
                     should_process = True
@@ -3730,7 +3730,7 @@ def run_ai_chat_mode(data_path: Path):
         "[bold bright_cyan]💬 FRIENDLY AI CHAT COMPANION 💬[/bold bright_cyan]\n\n"
         "[bold white]Haan bhai! Batao kya help chahiye?[/bold white]\n"
         "[bold bright_yellow]PAK unpack, repack, Lua compile, ya script fix — sab kuch yahan ask kar sakte ho![/bold bright_yellow]\n\n"
-        "[dim white]Type 'exit' or 'back' anytime to return to menu.[/dim white]",
+        "[dim]Type 'exit' or 'back' anytime to return to menu.[/dim]",
         border_style="cyan",
         box=ROUNDED
     ))
@@ -3746,7 +3746,7 @@ def run_ai_chat_mode(data_path: Path):
 
     while True:
         try:
-            user_msg = safe_input("\n[bold bright_yellow]💬 You:[bold /bright_yellow] ").strip()
+            user_msg = safe_input("\n[bold bright_yellow]💬 You:[/bold bright_yellow] ").strip()
             if not user_msg:
                 continue
             if user_msg.lower() in ['exit', 'quit', 'back', '0']:
@@ -3848,7 +3848,7 @@ def main_menu():
             print_banner()
             console.print(Panel(
                 "[bold bright_cyan]👤 SET YOUR TELEGRAM USERNAME FOR BUG REPORTS[/bold bright_cyan]\n\n"
-                "[dim white]Enter your Telegram Handle (e.g. @itzraviking). This will be attached to all automated Telegram bug reports from your device so the developer can contact you directly.[/dim white]",
+                "[dim]Enter your Telegram Handle (e.g. @itzraviking). This will be attached to all automated Telegram bug reports from your device so the developer can contact you directly.[/dim]",
                 border_style="cyan",
                 box=ROUNDED
             ))
@@ -3887,7 +3887,7 @@ def main_menu():
 
     while True:
         print_banner()
-        console.print("[bold bright_cyan]📂 Termux Shortcuts:[bold bright_white] leak pak | leak lua | leak ai | leak update[/bold bright_white]\n")
+        console.print("[bold bright_cyan]📂 Termux Shortcuts:[/bold bright_cyan] [bold bright_white] leak pak | leak lua | leak ai | leak update[/bold bright_white]\n")
         menu_table = Table(
             title="[bold bright_cyan]⚡ MAIN CATEGORY MENU ⚡[/bold bright_cyan]",
             show_header=True,
@@ -3927,7 +3927,7 @@ def main_menu():
             check_and_auto_update(interactive=True)
             safe_input('\nPress Enter to continue...')
         elif choice == '0':
-            console.print("[dim white]Exiting Featurestic Leaks. Goodbye![/dim white]")
+            console.print("[dim]Exiting Featurestic Leaks. Goodbye![/dim]")
             time.sleep(1)
             break
         else:
