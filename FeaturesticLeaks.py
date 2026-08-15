@@ -251,6 +251,7 @@ from core.logging_utils import (
     send_telegram_status_update, handle_exception
 )
 from ai.assistant import get_ai_config, call_ai_api
+from ai.analyzer import run_ai_function_mod_generator, extract_lua_functions_and_symbols, scan_unpacked_directory
 
 def show_workflow_guide():
     console.print(Panel(Align.center("[bold bright_cyan]📖 FEATURESTIC LEAKS - EASY STEP-BY-STEP WORKFLOW GUIDE[/bold bright_cyan]"), border_style="cyan", box=ROUNDED))
@@ -3164,6 +3165,12 @@ def process_ai_smart_command(user_msg: str, data_path: Path) -> bool:
         display_workspace_summary(data_path)
         return True
 
+    # 2.5 AI Code Scanner & Function Mod Generator (DIRECT EXECUTION)
+    elif any(kw in low_um for kw in ['function', 'functions', 'scanner', 'code scan', 'ast', 'reverse', 'ai mod', 'mod generate', 'lua generate', 'generate lua', 'lua banao', 'function check', 'kya function', 'function scan']):
+        console.print("[bold cyan]🤖 AI Assistant: Unpacked Code Scanner & Lua Mod Generator launch ho raha hai...[/bold cyan]")
+        run_ai_function_mod_generator(data_path)
+        return True
+
     # 3. Lua PAK Inject Command (DIRECT EXECUTION)
     elif any(kw in low_um for kw in ['inject', 'lua pak inject', 'pak inject', 'lua inject', 'inject lua', 'script inject', 'lua pack inject', 'pak me inject']):
         console.print("[bold cyan]🤖 AI Assistant: Lua PAK Inject request detect hua! Scanning PAK and LUA folders...[/bold cyan]")
@@ -3780,7 +3787,42 @@ def run_ai_chat_mode(data_path: Path):
 
 
 def ai_tools_menu(data_path: Path):
-    manage_ai_api_keys()
+    while True:
+        print_banner()
+        ai_table = Table(
+            title="[bold bright_cyan]🤖 AI MODDING & REVERSE-ENGINEERING SUITE 🤖[/bold bright_cyan]",
+            show_header=True,
+            header_style="bold bright_cyan",
+            box=ROUNDED,
+            border_style="bright_cyan",
+            expand=True
+        )
+        ai_table.add_column("OPT", justify="center", width=8, style="bold bright_yellow")
+        ai_table.add_column("MODULE", justify="left", width=28, style="bold bright_white")
+        ai_table.add_column("DESCRIPTION", justify="left", style="bright_cyan")
+
+        ai_table.add_row("[1]", "AI Function Scanner & Modder 🧠", "Deep scan unpacked files, inspect functions & generate custom Lua 5.1 mods")
+        ai_table.add_row("[2]", "AI Interactive Chat & Watch Assistant 👁️💬", "All-in-One: Live file watcher, instant chat, auto-unpack, compile & smart voice/text commands")
+        ai_table.add_row("[3]", "OpenCode API & Keys Settings 🔑", "Manage multiple OpenCode AI keys, endpoints and Telegram bot config")
+        ai_table.add_row("[0]", "Back to Main Menu ↩", "Return to main screen")
+
+        console.print(ai_table)
+        console.print()
+        choice = safe_input('\033[1;36mSELECT AI OPTION [1-3] [0]: \033[0m').strip()
+
+        if choice == '1':
+            run_ai_function_mod_generator(data_path)
+            safe_input('\nPress Enter to continue...')
+        elif choice == '2':
+            run_ai_watch_assistant(data_path)
+            safe_input('\nPress Enter to continue...')
+        elif choice == '3':
+            manage_ai_api_keys()
+        elif choice in ['0', 'back', 'exit']:
+            break
+        else:
+            console.print('[bold red][X] Invalid option.[/bold red]')
+            time.sleep(1)
 
 
 _BOOTED = False
@@ -3913,8 +3955,7 @@ def main_menu():
         choice = safe_input('\033[1;36mSELECT OPTION [1-5 / U] [0]: \033[0m').strip()
 
         if choice == '1':
-            run_ai_watch_assistant(data_path)
-            safe_input('\nPress Enter to return to main menu...')
+            ai_tools_menu(data_path)
         elif choice == '2':
             pak_obb_tools_menu(data_path)
         elif choice == '3':
