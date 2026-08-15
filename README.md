@@ -18,10 +18,10 @@
 
 Termux open karke is single command ko copy-paste karke Enter press karein:
 
-### ⚡ Express One-Line Command (Fresh Setup & Launch)
+### ⚡ Express One-Line Command (Minimal Clean Setup & Launch)
 
 ```bash
-cd ~ && rm -rf FeaturesticLeaks-Toolkit- && pkg update -y && pkg install -y git python clang libffi zlib make nano && git clone https://github.com/itzgeniusboy/FeaturesticLeaks-Toolkit-.git && cd FeaturesticLeaks-Toolkit- && pip install rich requests pycryptodome zstandard pytz gmalg && python FeaturesticLeaks.py
+cd ~ && rm -rf FeaturesticLeaks-Toolkit- && pkg update -y && pkg install -y git python clang libffi zlib make nano && git clone --filter=blob:none --no-checkout https://github.com/itzgeniusboy/FeaturesticLeaks-Toolkit-.git && cd FeaturesticLeaks-Toolkit- && git sparse-checkout init --cone && git sparse-checkout set FeaturesticLeaks.py run.sh setup.sh README.md DOCUMENTATION.md .gitignore ai core lua pak && git checkout main && pip install rich requests pycryptodome zstandard pytz gmalg && python FeaturesticLeaks.py
 ```
 
 📖 **Detailed Usage Manual**: Detailed feature guides and step-by-step instructions ke liye **[DOCUMENTATION.md](./DOCUMENTATION.md)** dekhein.

@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FeaturesticLeaks Toolkit v2.7</title>
+  <style>
+    :root {
+      --bg: #090d16;
+      --card-bg: #111827;
+      --border: #1e293b;
+      --cyan: #00f0ff;
+      --green: #10b981;
+      --yellow: #f59e0b;
+      --text: #e2e8f0;
+      --dim: #94a3b8;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+    body {
+      background-color: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 24px 16px;
+    }
+    .container {
+      width: 100%;
+      max-width: 680px;
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 28px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+    }
+    .header {
+      text-align: center;
+      margin-bottom: 24px;
+    }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(16, 185, 129, 0.15);
+      border: 1px solid rgba(16, 185, 129, 0.4);
+      color: var(--green);
+      font-size: 12px;
+      font-weight: 600;
+      padding: 4px 12px;
+      border-radius: 999px;
+      margin-bottom: 12px;
+    }
+    .dot {
+      width: 8px;
+      height: 8px;
+      background-color: var(--green);
+      border-radius: 50%;
+      box-shadow: 0 0 8px var(--green);
+    }
+    h1 {
+      font-size: 22px;
+      font-weight: 700;
+      color: #ffffff;
+      margin-bottom: 6px;
+      letter-spacing: -0.5px;
+    }
+    .tagline {
+      color: var(--dim);
+      font-size: 14px;
+    }
+    .info-box {
+      background: rgba(0, 240, 255, 0.05);
+      border: 1px solid rgba(0, 240, 255, 0.2);
+      border-radius: 10px;
+      padding: 16px;
+      margin-bottom: 20px;
+      font-size: 14px;
+      line-height: 1.5;
+    }
+    .info-box strong { color: var(--cyan); }
+    .cmd-card {
+      background: #0d1322;
+      border: 1px solid #1e293b;
+      border-radius: 10px;
+      padding: 16px;
+      margin-bottom: 20px;
+    }
+    .cmd-title {
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--dim);
+      margin-bottom: 8px;
+      font-weight: 600;
+    }
+    .code-block {
+      background: #070a12;
+      border: 1px solid #1e293b;
+      border-radius: 8px;
+      padding: 12px;
+      font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+      font-size: 13px;
+      color: #38bdf8;
+      word-break: break-all;
+      user-select: all;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+    .grid-item {
+      background: #0d1322;
+      border: 1px solid #1e293b;
+      border-radius: 10px;
+      padding: 12px;
+      text-align: center;
+    }
+    .grid-label {
+      font-size: 11px;
+      color: var(--dim);
+      margin-bottom: 4px;
+    }
+    .grid-val {
+      font-size: 14px;
+      font-weight: 600;
+      color: #ffffff;
+    }
+    .footer {
+      text-align: center;
+      font-size: 12px;
+      color: var(--dim);
+      border-top: 1px solid var(--border);
+      padding-top: 16px;
+    }
+    .footer a {
+      color: var(--cyan);
+      text-decoration: none;
+    }
+    .footer a:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <div class="badge">
+        <span class="dot"></span> Engine Online
+      </div>
+      <h1>⚡ FEATURESTIC LEAKS v2.7</h1>
+      <p class="tagline">VIP PAK & LUA Modding Engine for Android / Termux</p>
+    </div>
+
+    <div class="info-box">
+      <strong>📱 Termux CLI Tool:</strong> This project is an interactive terminal toolkit designed to run directly inside Termux on Android. All core Python, PAK, and LUA modules are verified and operational.
+    </div>
+
+    <div class="cmd-card">
+      <div class="cmd-title">⚡ Termux 1-Line Setup Command</div>
+      <div class="code-block">cd ~ && pkg update -y && pkg install -y git python && git clone --filter=blob:none --no-checkout https://github.com/itzgeniusboy/FeaturesticLeaks-Toolkit-.git && cd FeaturesticLeaks-Toolkit- && git sparse-checkout init --cone && git sparse-checkout set FeaturesticLeaks.py run.sh setup.sh README.md DOCUMENTATION.md .gitignore ai core lua pak && git checkout main && pip install rich requests pycryptodome zstandard pytz gmalg && python FeaturesticLeaks.py</div>
+    </div>
+
+    <div class="grid">
+      <div class="grid-item">
+        <div class="grid-label">Developer</div>
+        <div class="grid-val">@L359D</div>
+      </div>
+      <div class="grid-item">
+        <div class="grid-label">Telegram Channel</div>
+        <div class="grid-val">FeaturesticLeaks</div>
+      </div>
+      <div class="grid-item">
+        <div class="grid-label">Engine Version</div>
+        <div class="grid-val">v2.7.0 VIP</div>
+      </div>
+      <div class="grid-item">
+        <div class="grid-label">CLI Status</div>
+        <div class="grid-val" style="color: #10b981;">Ready 🟢</div>
+      </div>
+    </div>
+
+    <div class="footer">
+      FeaturesticLeaks Suite • <a href="https://t.me/FeaturesticLeaks" target="_blank">Join Telegram Community</a>
+    </div>
+  </div>
+</body>
+</html>

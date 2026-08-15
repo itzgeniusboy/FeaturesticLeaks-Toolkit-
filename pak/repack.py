@@ -1108,14 +1108,23 @@ def repack_pak_file_with_block_display(pak_file, edited_root: Path, output_path:
                     edited[full_path] = (p, entry)
 
     if not edited and all_pak_entries:
-        data_path = Path("/sdcard/FeaturesticLeaks")
-        unpack_cand = data_path / "UNPACK" / pak_file._file_path.stem
-        if unpack_cand.exists():
-            v_unpack = [p for p in unpack_cand.rglob('*') if p.is_file() and p.name.lower() not in ignored_names and not p.name.startswith('.')]
-            for p in v_unpack:
-                fname_lower = p.name.lower()
-                if fname_lower in pak_name_map:
-                    edited[pak_name_map[fname_lower][0][0]] = (p, pak_name_map[fname_lower][0][1])
+        sd_path = Path("/sdcard/FeaturesticLeaks")
+        unpack_candidates = [
+            edited_root,
+            sd_path / "UNPACK" / pak_file._file_path.stem,
+            Path.cwd() / "UNPACK" / pak_file._file_path.stem,
+            sd_path / "UNPACK",
+            Path.cwd() / "UNPACK"
+        ]
+        for unpack_cand in unpack_candidates:
+            if unpack_cand and unpack_cand.exists():
+                v_unpack = [p for p in unpack_cand.rglob('*') if p.is_file() and p.name.lower() not in ignored_names and not p.name.startswith('.')]
+                for p in v_unpack:
+                    fname_lower = p.name.lower()
+                    if fname_lower in pak_name_map:
+                        edited[pak_name_map[fname_lower][0][0]] = (p, pak_name_map[fname_lower][0][1])
+                if edited:
+                    break
 
     if not edited:
         console.print('[bold red][X] No valid files found to repack in source folder![/bold red]')

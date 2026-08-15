@@ -98,7 +98,7 @@ def cleanup_old_logs(logs_dir: Optional[Path] = None, max_age_days: float = 2.0,
     except Exception:
         pass
 
-def send_telegram_bug_report(err_type: str, err_msg: str, action_name: str = "Operation", file_info: str = "?", line_no: str = "?", func_name: str = "?", tb_str: str = ""):
+def send_telegram_bug_report(err_type: str, err_msg: str, action_name: str = "Operation", file_info: str = "?", line_no: str = "?", func_name: str = "?", tb_str: str = "", ai_suggestion: str = ""):
     if any(k in str(err_type).upper() or k in str(err_msg).upper() for k in ["API_KEY", "EXHAUSTED", "RATE_LIMIT", "HTTP 429"]):
         if err_type != "TEST_PING":
             return
@@ -115,8 +115,8 @@ def send_telegram_bug_report(err_type: str, err_msg: str, action_name: str = "Op
                 
             dev_user = get_device_user_info()
             
-            ai_solution = ""
-            if err_type != "TEST_PING":
+            ai_solution = ai_suggestion.strip() if (ai_suggestion and str(ai_suggestion).strip()) else ""
+            if not ai_solution and err_type != "TEST_PING":
                 try:
                     fix_prompt = (
                         "You are OpenCode AI Auto-Fix & Diagnostic Engine.\n"
@@ -141,7 +141,7 @@ def send_telegram_bug_report(err_type: str, err_msg: str, action_name: str = "Op
             safe_tb = html.escape(str(tb_str)[-800:]) if tb_str else "N/A"
             safe_solution = html.escape(str(ai_solution)) if ai_solution else ""
 
-            ai_html_block = f"\n🛠️ <b>OPENCODE AI AUTO-FIX & SOLUTION:</b>\n<code>{safe_solution}</code>\n" if safe_solution else ""
+            ai_html_block = f"\n🤖 <b>AI Suggested Fix:</b>\n<code>{safe_solution}</code>\n" if safe_solution else ""
 
             report_html = (
                 f"🚨 <b>FEATURESTIC LEAKS - CODE BUG REPORT</b> 🚨\n\n"
@@ -407,12 +407,6 @@ def handle_exception(e: Exception, action_name: str = "Operation", data_path: Op
     except Exception:
         pass
 
-    if not is_file_issue and not any(k in str(err_type).upper() or k in str(err_msg).upper() for k in ["API_KEY", "EXHAUSTED", "RATE_LIMIT"]):
-        try:
-            send_telegram_bug_report(err_type, err_msg, action_name, file_info, str(line_no), func_name, traceback.format_exc())
-        except Exception:
-            pass
-
     ai_live_fix = ""
     try:
         from ai.assistant import call_ai_api
@@ -426,6 +420,21 @@ def handle_exception(e: Exception, action_name: str = "Operation", data_path: Op
             ai_live_fix = sol.strip()
     except Exception:
         pass
+
+    if not is_file_issue and not any(k in str(err_type).upper() or k in str(err_msg).upper() for k in ["API_KEY", "EXHAUSTED", "RATE_LIMIT"]):
+        try:
+            send_telegram_bug_report(
+                err_type,
+                err_msg,
+                action_name,
+                file_info,
+                str(line_no),
+                func_name,
+                traceback.format_exc(),
+                ai_suggestion=ai_live_fix
+            )
+        except Exception:
+            pass
 
     panel_content = (
         f"[dim]Category:[/dim] {category_header}\n"
