@@ -277,7 +277,7 @@ def show_workflow_guide():
   👉 [bold green]/sdcard/FeaturesticLeaks/RESULT/[/bold green]
 • Is file ko Game/OBB folder me copy kar do aur game start karo!
     """
-    console.print(Panel(guide_text, border_style="dim white", box=ROUNDED))
+    console.print(Panel(guide_text.strip(), border_style="cyan", box=ROUNDED))
 
 def install_termux_shortcut_and_sdcard(data_path: Path, silent: bool = False):
     if not silent:
