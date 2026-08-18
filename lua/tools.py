@@ -15,6 +15,8 @@ try:
     from rich.panel import Panel
     from rich.align import Align
     from rich.box import ROUNDED
+    from rich.table import Table
+    from rich.markup import escape
     console = Console()
 except ImportError:
     class DummyConsole:
@@ -25,6 +27,8 @@ except ImportError:
     Panel = None
     Align = None
     ROUNDED = None
+    Table = None
+    escape = lambda x: str(x)
 
 from lua.reader import (
     _LuaCustomReader, _LuaProto, _LuaStdReader, _LuaStdProto,
@@ -388,22 +392,22 @@ def run_lua_anti_bypass_analyzer(data_path: Path):
     risk_score = min(100, risk_score)
 
     table = Table(
-        title=f"[bold bright_cyan]📊 LUA AUDIT RESULTS: {lua_file.name} (Risk Score: {risk_score}/100)[/bold bright_cyan]",
+        title=f"[bold bright_cyan]📊 LUA AUDIT RESULTS: {escape(lua_file.name)} (Risk Score: {risk_score}/100)[/bold bright_cyan]",
         border_style="bright_cyan",
         box=ROUNDED
     )
     table.add_column("Line", style="bold yellow", justify="center", width=6)
     table.add_column("Severity", style="bold white", width=10)
     table.add_column("Category", style="bright_cyan", width=20)
-    table.add_column("Code Snippet", style="dim white")
+    table.add_column("Code Snippet", style="dim")
 
     for f in findings[:25]:
         sev_color = "red" if f["severity"] in ["CRITICAL", "HIGH"] else "yellow" if f["severity"] == "MEDIUM" else "green"
         table.add_row(
             str(f["line"]),
             f"[{sev_color}]{f['severity']}[/{sev_color}]",
-            f["category"],
-            f["text"]
+            escape(str(f["category"])),
+            escape(str(f["text"]))
         )
 
     console.print(table)

@@ -439,8 +439,8 @@ def handle_exception(e: Exception, action_name: str = "Operation", data_path: Op
     panel_content = (
         f"[dim]Category:[/dim] {category_header}\n"
         f"{diagnosis}\n\n"
-        f"[dim]Operation:[/dim] [cyan]{action_name}[/cyan]\n"
-        f"[dim]Error Details:[/dim] [bold red]{err_type}[/bold red] in [bold yellow]{func_name}()[/bold yellow] ([cyan]{file_info}[/cyan]:[yellow]{line_no}[/yellow])\n"
+        f"[dim]Operation:[/dim] [cyan]{escape(action_name)}[/cyan]\n"
+        f"[dim]Error Details:[/dim] [bold red]{escape(err_type)}[/bold red] in [bold yellow]{escape(func_name)}()[/bold yellow] ([cyan]{escape(file_info)}[/cyan]:[yellow]{line_no}[/yellow])\n"
         f"[dim]Message:[/dim] {escape(err_msg)}"
     )
     if ai_live_fix:
@@ -448,7 +448,7 @@ def handle_exception(e: Exception, action_name: str = "Operation", data_path: Op
     elif hint_msg:
         panel_content += f"\n[bold yellow]💡 Solution Tip:[/bold yellow] [white]{escape(hint_msg)}[/white]"
     
-    panel_content += f"\n[dim]Saved Log:[/dim] [dim cyan]{log_filename}[/]"
+    panel_content += f"\n[dim]Saved Log:[/dim] [dim cyan]{escape(log_filename)}[/dim cyan]"
 
     error_panel = Panel(
         panel_content,

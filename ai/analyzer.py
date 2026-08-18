@@ -8,6 +8,7 @@ from rich.console import Console
 from rich.table import Table
 from rich.panel import Panel
 from rich.box import ROUNDED
+from rich.markup import escape
 
 from ai.assistant import call_ai_api
 from core.ui import safe_input
@@ -188,12 +189,14 @@ def run_ai_function_mod_generator(data_path: Path):
         
         all_funcs_summary = []
         for item in scanned_results[:12]:
-            funcs_str = "\n".join([f"• {f['name']}({f['params']})" for f in item['functions'][:5]])
+            funcs_list = [f"• {escape(f['name'])}({escape(f['params'])})" for f in item['functions'][:5]]
+            funcs_str = "\n".join(funcs_list)
             if len(item['functions']) > 5:
                 funcs_str += f"\n[dim]+{len(item['functions']) - 5} more functions...[/dim]"
                 
-            hooks_str = ", ".join(item['hooks'][:3] + item['tables'][:3])
-            table.add_row(item['file'], funcs_str if funcs_str else "[dim]No direct funcs[/dim]", hooks_str if hooks_str else "[dim]-[/dim]")
+            hooks_escaped = [escape(h) for h in (item['hooks'][:3] + item['tables'][:3])]
+            hooks_str = ", ".join(hooks_escaped)
+            table.add_row(escape(item['file']), funcs_str if funcs_str else "[dim]No direct funcs[/dim]", hooks_str if hooks_str else "[dim]-[/dim]")
             
             for f in item['functions']:
                 all_funcs_summary.append(f"{item['file']} -> {f['name']}({f['params']})")
@@ -257,7 +260,7 @@ def run_ai_function_mod_generator(data_path: Path):
         lua_code = code_match.group(1).strip()
 
     console.print("\n[bold bright_green]✅ AI Generated Lua Mod Script:[/bold bright_green]\n")
-    console.print(Panel(lua_code[:1200] + ("\n... [truncated]" if len(lua_code) > 1200 else ""), border_style="green", box=ROUNDED))
+    console.print(Panel(escape(lua_code[:1200]) + ("\n... [truncated]" if len(lua_code) > 1200 else ""), border_style="green", box=ROUNDED))
     
     # Save script to LUA / RESULT folders
     timestamp = int(time.time())

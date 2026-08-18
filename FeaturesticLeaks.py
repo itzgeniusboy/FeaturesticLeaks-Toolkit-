@@ -375,8 +375,8 @@ def print_banner():
     os.system('cls' if os.name == 'nt' else 'clear')
     
     banner_content = (
-        "[bold bright_cyan]⚡ FEATURESTIC LEAKS v2.5 ⚡[/bold bright_cyan] [dim]│[/dim] [bold bright_yellow]VIP EXPLOIT ENGINE[/bold bright_yellow]\n"
-        "[bold white]DEV:[bold cyan] @L359D[/bold cyan] [dim]│[/dim] TG:[bold cyan] t.me/FeaturesticLeaks[/bold cyan] [dim]│[/dim] STATUS:[bold bright_green] 🟢 READY[/bold bright_green][/bold white]"
+        "[bold bright_cyan]⚡ FEATURESTIC LEAKS v2.5 ⚡[/bold bright_cyan] │ [bold bright_yellow]VIP EXPLOIT ENGINE[/bold bright_yellow]\n"
+        "[bold white]DEV:[bold cyan] @L359D[/bold cyan] │ TG:[bold cyan] t.me/FeaturesticLeaks[/bold cyan] │ STATUS:[bold bright_green] 🟢 READY[/bold bright_green][/bold white]"
     )
     console.print(Panel(
         Align.center(banner_content),
@@ -646,7 +646,7 @@ def delete_folder(data_path: Path) -> None:
     )
     folder_table.add_column("Index", justify="center", style="bold yellow", width=8)
     folder_table.add_column("Folder Name", justify="left", style="bold white")
-    folder_table.add_column("Size", justify="right", style="dim white")
+    folder_table.add_column("Size", justify="right", style="dim")
     for i, folder in enumerate(folders, 1):
         folder_size = 0
         for root, dirs, files in os.walk(folder):
@@ -654,7 +654,7 @@ def delete_folder(data_path: Path) -> None:
                 file_path = os.path.join(root, file)
                 if os.path.isfile(file_path):
                     folder_size += os.path.getsize(file_path)
-        folder_table.add_row(str(i), folder.name, human_size(folder_size))
+        folder_table.add_row(str(i), escape(folder.name), human_size(folder_size))
     console.print(folder_table)
     try:
         choice_str = safe_input(f"\n-> Select folder number (1-{len(folders)}): ").strip()
@@ -746,11 +746,11 @@ def pick_file_from_folder(action_title: str, default_folder: Path, extensions: L
             )
             file_table.add_column("Index", style="bold yellow", justify="center", width=8)
             file_table.add_column("Filename", style="bold white", justify="left")
-            file_table.add_column("Size", style="dim white", justify="right", width=12)
+            file_table.add_column("Size", style="dim", justify="right", width=12)
             
             for i, f in enumerate(found_files, 1):
                 size_mb = f.stat().st_size / (1024 * 1024)
-                file_table.add_row(str(i), f.name, f"{size_mb:.2f} MB")
+                file_table.add_row(str(i), escape(f.name), f"{size_mb:.2f} MB")
             
             file_table.add_row("F", "Filter files by keyword", "-")
             file_table.add_row("P", "Custom Folder Path", "-")
@@ -1130,10 +1130,10 @@ def run_file_finder_tool(data_path: Path) -> None:
     )
     file_table.add_column("#", style="bold yellow", justify="center", width=6)
     file_table.add_column("Filename", style="bold white")
-    file_table.add_column("Size", style="dim white", justify="right", width=12)
+    file_table.add_column("Size", style="dim", justify="right", width=12)
     
     for i, f in enumerate(found_files[:15], 1):
-        file_table.add_row(str(i), f.name, human_size(f.stat().st_size))
+        file_table.add_row(str(i), escape(f.name), human_size(f.stat().st_size))
     
     if len(found_files) > 15:
         file_table.add_row("...", f"and {len(found_files) - 15} more files", "")
@@ -1648,10 +1648,10 @@ def run_file_resizer_tool(data_path: Path) -> None:
         table.add_column("Index", style="bold yellow", justify="center", width=8)
         table.add_column("File Name", style="bold white")
         table.add_column("Current Size", style="bold cyan")
-        table.add_column("Path", style="dim white")
+        table.add_column("Path", style="dim")
         
         for i, f in enumerate(valid_files[:15], 1):
-            table.add_row(str(i), f.name, human_size(f.stat().st_size), str(f.parent.name))
+            table.add_row(str(i), escape(f.name), human_size(f.stat().st_size), escape(str(f.parent.name)))
         console.print(table)
         
         sel = safe_input("-> Enter file number or custom file path: ").strip().strip('"\'')
@@ -2334,7 +2334,7 @@ def manage_ai_api_keys():
         table = Table(title="[bold cyan]OpenCode AI Provider Status & Details[/bold cyan]", box=ROUNDED)
         table.add_column("Provider Engine", style="bold yellow")
         table.add_column("Status", style="bold white", justify="center")
-        table.add_column("Endpoint & Key Details", style="dim white")
+        table.add_column("Endpoint & Key Details", style="dim")
         
         oc_ep = cfg.get("opencode_endpoint", "https://api.opencode.ai/v1")
         oc_mod = cfg.get("opencode_model", "opencode-modding-v1")
