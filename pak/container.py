@@ -77,9 +77,13 @@ class Reader:
         return self.unpack(f'{n}s', move_cursor=move_cursor)[0]
 
     def unpack(self, f: str, offset=0, move_cursor=True):
-        x = struct.unpack_from(f, self._buffer, self._cursor + offset)
+        size = struct.calcsize(f)
+        total_offset = self._cursor + offset
+        if total_offset < 0 or total_offset + size > len(self._buffer):
+            raise ValueError(f"PAK reader buffer underflow: requested {size} bytes at offset {total_offset}, but buffer has only {len(self._buffer)} bytes. (Input PAK file is truncated, corrupt, or too small)")
+        x = struct.unpack_from(f, self._buffer, total_offset)
         if move_cursor:
-            self._cursor += struct.calcsize(f)
+            self._cursor += size
         return x
 
     def string(self, move_cursor=True) -> str:
@@ -87,12 +91,17 @@ class Reader:
         if length == 0:
             return str()
         else:
-            assert length > 0, "String length in PAK index reader must be greater than 0"
+            if length < 0 or length > 4096:
+                raise ValueError(f"Invalid string length in PAK index: {length} (corrupted index).")
             offset = 0 if move_cursor else 4
             return self.unpack(f'{length}s', offset=offset, move_cursor=move_cursor)[0].rstrip(b'\x00').decode()
 
 class PakInfo:
     def __init__(self, buffer, keystream: List[int]):
+        min_footer = PakInfo._mem_size((-1))
+        if len(buffer) < min_footer:
+            raise ValueError(f"Input file is too small ({len(buffer)} bytes) to be a valid PAK file. Minimum required footer size is {min_footer} bytes.")
+
         def decrypt_index_encrypted(x: int) -> int:
             MASK_8 = 255
             return (x ^ keystream[3]) & MASK_8
@@ -107,7 +116,7 @@ class PakInfo:
         def decrypt_index_offset(x: int) -> int:
             return x ^ (keystream[0] << 32 | keystream[1])
 
-        reader = Reader(buffer[-PakInfo._mem_size((-1)):])
+        reader = Reader(buffer[-min_footer:])
         self.index_encrypted = decrypt_index_encrypted(reader.u1()) == 1
         self.magic = decrypt_magic(reader.u4())
         self.version = reader.u4()
@@ -133,7 +142,10 @@ class TencentPakInfo(PakInfo):
             return x ^ keystream[9]
 
         super().__init__(buffer, keystream)
-        reader = Reader(buffer[-TencentPakInfo._mem_size(self.version):])
+        req_footer_size = TencentPakInfo._mem_size(self.version)
+        if len(buffer) < req_footer_size:
+            raise ValueError(f"Tencent PAK file is truncated ({len(buffer)} bytes vs required {req_footer_size} bytes for version {self.version}).")
+        reader = Reader(buffer[-req_footer_size:])
         self.unk1 = decrypt_unk(reader.s(32)) if self.version >= 7 else bytes()
         self.packed_key = reader.s(256) if self.version >= 8 else bytes()
         self.packed_iv = reader.s(256) if self.version >= 8 else bytes()

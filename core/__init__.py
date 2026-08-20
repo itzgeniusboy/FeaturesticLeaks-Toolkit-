@@ -5,6 +5,11 @@ from core.logging_utils import (
     send_telegram_status_update,
     handle_exception,
 )
+from core.ui import (
+    safe_input,
+    styled_prompt,
+    human_size,
+)
 
 __all__ = [
     "get_device_user_info",
@@ -12,4 +17,7 @@ __all__ = [
     "send_telegram_bug_report",
     "send_telegram_status_update",
     "handle_exception",
+    "safe_input",
+    "styled_prompt",
+    "human_size",
 ]

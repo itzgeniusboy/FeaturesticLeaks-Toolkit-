@@ -37,18 +37,11 @@ from lua.reader import (
 )
 from lua.decompiler import _pseudo_decompile_lua, fix_lua_syntax_for_lua51
 from core.logging_utils import handle_exception
+from core.ui import safe_input, human_size, styled_prompt
 
 def _ui():
     import FeaturesticLeaks
-    return FeaturesticLeaks.safe_input, FeaturesticLeaks.human_size, FeaturesticLeaks.pick_file_from_folder
-
-def safe_input(prompt: str = '', context: str = '~') -> str:
-    import FeaturesticLeaks
-    return FeaturesticLeaks.safe_input(prompt, context)
-
-def human_size(size: int) -> str:
-    import FeaturesticLeaks
-    return FeaturesticLeaks.human_size(size)
+    return safe_input, human_size, FeaturesticLeaks.pick_file_from_folder
 
 def pick_file_from_folder(action_title: str, default_folder: Path, extensions: Optional[List[str]] = None):
     import FeaturesticLeaks

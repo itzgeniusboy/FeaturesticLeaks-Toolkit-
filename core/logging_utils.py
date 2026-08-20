@@ -335,12 +335,13 @@ def handle_exception(e: Exception, action_name: str = "Operation", data_path: Op
 
     is_file_issue = False
     
-    if isinstance(e, (FileNotFoundError, PermissionError, IsADirectoryError, MemoryError, EOFError)):
+    if isinstance(e, (FileNotFoundError, PermissionError, IsADirectoryError, MemoryError, EOFError, struct.error)):
         is_file_issue = True
     elif isinstance(e, OSError) and ("no space" in err_msg.lower() or getattr(e, 'errno', None) in (28, 13, 2)):
         is_file_issue = True
-    elif any(term in err_type.lower() for term in ["badzip", "zlib", "zstd", "compression", "struct"]):
-        is_file_issue = True
+    elif any(term in err_type.lower() for term in ["badzip", "zlib", "zstd", "compression", "struct", "error"]):
+        if any(kw in err_msg.lower() for kw in ["unpack", "buffer", "offset", "magic", "header", "truncate", "corrupt", "bytes"]):
+            is_file_issue = True
     elif isinstance(e, (AssertionError, ValueError, KeyError, IndexError)):
         file_keywords = [
             "pak", "header", "magic", "version", "corrupt", "index", "zlib", "zstd",
@@ -378,6 +379,8 @@ def handle_exception(e: Exception, action_name: str = "Operation", data_path: Op
         hint_msg = "Storage full hai. Internal memory me space free karke retry karein."
     elif any(term in err_type.lower() or term in err_msg.lower() for term in ["zlib", "zstd", "decompress", "compress", "badzip"]):
         hint_msg = "File corrupt hai ya unsupported compression/encryption format hai."
+    elif any(term in err_msg.lower() for term in ["buffer", "unpack", "struct", "truncated", "too small", "underflow"]):
+        hint_msg = "PAK/OBB file incomplete/truncated hai ya size 45 bytes se chhota hai. Please complete original .pak file use karein."
     elif "magic" in err_msg.lower() or "header" in err_msg.lower() or "version" in err_msg.lower():
         hint_msg = "File ka PAK/OBB Header mismatch ho raha hai. File corrupt ya password protected/encrypted ho sakti hai."
     elif is_file_issue:

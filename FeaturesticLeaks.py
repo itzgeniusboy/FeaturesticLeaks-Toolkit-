@@ -250,6 +250,7 @@ from core.logging_utils import (
     get_device_user_info, cleanup_old_logs, send_telegram_bug_report,
     send_telegram_status_update, handle_exception
 )
+from core.ui import styled_prompt, safe_input, human_size
 from ai.assistant import get_ai_config, call_ai_api
 from ai.analyzer import run_ai_function_mod_generator, extract_lua_functions_and_symbols, scan_unpacked_directory
 
@@ -721,6 +722,8 @@ def pick_file_from_folder(action_title: str, default_folder: Path, extensions: L
             if sdir.exists() and sdir.is_dir():
                 for p in sdir.iterdir():
                     if p.is_file() and any(p.name.lower().endswith(ext.lower()) for ext in extensions):
+                        if any(p.name.lower().endswith(ext) for ext in ['.pak', '.obb']) and p.stat().st_size < 45:
+                            continue
                         if not any(existing.name.lower() == p.name.lower() for existing in found_files):
                             found_files.append(p)
         

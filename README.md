@@ -1,48 +1,51 @@
-# ⚡ FEATURESTIC LEAKS PAK & LUA MASTER SUITE v2.7
+# ⚡ FEATURESTIC LEAKS PAK & LUA MASTER SUITE v2.8 ⚡
 
 > **Termux / Android Game Reverse Engineering, High-Speed PAK Manipulation & Universal Lua Suite**  
-> Complete high-performance reverse engineering suite for unpacking, repacking, path-injecting, rebuilding Unreal Engine / Tencent `.pak` & `.obb` containers, dumping skin assets, UAsset/UExp auto-pairing, AI Lua repair, and managing Lua bytecode natively on Termux, Android Linux, and PC.
+> Complete high-performance reverse engineering toolkit for unpacking, repacking, path-injecting, rebuilding Unreal Engine / Tencent `.pak` & `.obb` containers, dumping skin assets, UAsset/UExp auto-pairing, AI-powered function scanning & Lua mod generation, and managing Lua bytecode natively on Termux, Android Linux, and PC.
 
 ---
 
 ## 👤 Developer & Official Credits
 
-* **Developer Telegram**: [@L359D](https://t.me/L359D) (VIP Developer)
-* **Official Telegram Channel**: [https://t.me/FeaturesticLeaks](https://t.me/FeaturesticLeaks)
-* **Tool Version**: `FeaturesticLeaks PAK & LUA Master Suite v2.7`
-* **Supported Platform**: Termux / Android Linux / Windows / Linux
+| Category | Details & Links |
+| :--- | :--- |
+| **👑 Main Developer** | [**@L359D**](https://t.me/L359D) (VIP Developer) |
+| **📢 Official Telegram Channel** | [**t.me/FeaturesticLeaks**](https://t.me/FeaturesticLeaks) |
+| **🐙 Official GitHub Repository** | [**itzgeniusboy/FeaturesticLeaks-Toolkit-**](https://github.com/itzgeniusboy/FeaturesticLeaks-Toolkit-) |
+| **⚡ Current Version** | **v2.8 Master Suite** |
+| **📱 Supported Platforms** | **Termux (Android)**, **Linux (Debian/Ubuntu/Arch)**, **Windows (WSL / Native Python)** |
 
 ---
 
 ## 🚀 Termux Installation & Quick Start
 
-Termux open karke is single command ko copy-paste karke Enter press karein:
+Termux open karke is **Express Single Command** ko copy-paste karke Enter press karein:
 
-### ⚡ Express One-Line Command (Minimal Clean Setup & Launch)
+### ⚡ Express 1-Line Command (Instant Setup & Launch)
 
 ```bash
-cd ~ && rm -rf FeaturesticLeaks-Toolkit- && pkg update -y && pkg install -y git python clang libffi zlib make nano && git clone --filter=blob:none --no-checkout https://github.com/itzgeniusboy/FeaturesticLeaks-Toolkit-.git && cd FeaturesticLeaks-Toolkit- && git sparse-checkout init --cone && git sparse-checkout set FeaturesticLeaks.py run.sh setup.sh README.md DOCUMENTATION.md .gitignore ai core lua pak && git checkout main && pip install rich requests pycryptodome zstandard pytz gmalg && python FeaturesticLeaks.py
+cd ~ && rm -rf FeaturesticLeaks-Toolkit- && pkg update -y && pkg install -y git python clang libffi zlib make nano && git clone https://github.com/itzgeniusboy/FeaturesticLeaks-Toolkit-.git && cd FeaturesticLeaks-Toolkit- && pip install rich requests pycryptodome zstandard pytz gmalg && python FeaturesticLeaks.py
 ```
 
-📖 **Detailed Usage Manual**: Detailed feature guides and step-by-step instructions ke liye **[DOCUMENTATION.md](./DOCUMENTATION.md)** dekhein.
+📖 **Complete User Manual**: Har feature aur workflow ke deep step-by-step guide ke liye **[DOCUMENTATION.md](./DOCUMENTATION.md)** check karein.
 
 ---
 
 ## 🛠️ Step-by-Step Manual Setup
 
-Agar aap single-command ki bajaye step-by-step setup karna chahte hain:
+Agar aap step-by-step install karna chahte hain:
 
-### **Step 1: Storage Permission Dijiye**
+### **Step 1: Storage Permission Allow Karein**
 ```bash
 termux-setup-storage
 ```
 
-### **Step 2: Termux System Packages Install Karein**
+### **Step 2: Termux System Packages Update & Install**
 ```bash
 pkg update -y && pkg install -y git python clang libffi zlib make nano
 ```
 
-### **Step 3: Python Dependencies Install Karein**
+### **Step 3: Required Python Packages Install**
 ```bash
 pip install rich requests pycryptodome zstandard pytz gmalg
 ```
@@ -52,7 +55,7 @@ pip install rich requests pycryptodome zstandard pytz gmalg
 cd ~ && git clone https://github.com/itzgeniusboy/FeaturesticLeaks-Toolkit-.git
 ```
 
-### **Step 5: Project Directory Enter Karein**
+### **Step 5: Project Directory Me Enter Karein**
 ```bash
 cd FeaturesticLeaks-Toolkit-
 ```
@@ -64,157 +67,192 @@ python FeaturesticLeaks.py
 
 ---
 
-## 💡 Quick Launch Shortcuts & One-Click Auto-Update
+## 💡 Quick Launch Shortcuts & Commands
 
-Shortcut commands through tool ko Termux me kisi bhi location se launch kar sakte hain:
+Tool setup hone ke baad aap Termux me kisi bhi folder se direct shortcuts use kar sakte hain:
 
-1. **`leak` Command** (Main Category Menu):
-   ```bash
-   leak
-   ```
-2. **Category Direct Termux Shortcuts**:
-   ```bash
-   leak pak     # Launch PAK & OBB Tools Menu directly
-   leak lua     # Launch LUA Master Suite directly
-   leak watch   # Launch Watch Mode Engine directly
-   leak ai      # Launch AI Tools & Multi-API Key Manager
-   leak utils   # Launch Utilities & Setup Menu
-   leak update  # Run Instant Auto-Updater
-   ```
-3. **`paktool` Command**:
-   ```bash
-   paktool
-   ```
-4. **🚀 Instant Auto-Update & Update Banner System**:
-   - **Boot Update Banner**: Tool startup par GitHub check karta hai. Agar update available hai, toh banner notification screen par dikhayega.
-   - **Interactive One-Click Update**: Main Menu par **`U`** press karein ya **Utilities Menu -> Option [9] Check Tool Update** select karein. Tool update download karke, syntax verify karega, `.py.bak` backup create karega, aur auto-restart kar dega.
+### 1. Global Terminal Shortcuts
+| Command | Action / Target Menu |
+| :--- | :--- |
+| **`leak`** | 🏠 Launch Main FeaturesticLeaks Menu |
+| **`leak ai`** | 🤖 Direct Open AI Assistant & Function Modder Menu |
+| **`leak pak`** | 📦 Direct Open PAK / OBB Tools Menu |
+| **`leak lua`** | 🌙 Direct Open LUA Master Suite Menu |
+| **`leak watch`** | 👁️ Direct Launch Real-Time Auto-Watch Engine |
+| **`leak utils`** | 🛠️ Direct Open Utilities, Patcher & Guides Menu |
+| **`leak update`** | 🚀 Run 1-Click Instant GitHub Auto-Updater |
+| **`leak bot`** | 🤖 Launch Local Telegram Automation Bot Mode |
+| **`paktool`** | 📦 Alternative Quick Shortcut for PAK Menu |
+
+---
+
+### 2. Direct Headless CLI Commands
+Termux shell ya scripts me bina interactive menu khole directly process karne ke liye flags:
+
+```bash
+# 📦 Unpack a PAK/OBB file directly
+python FeaturesticLeaks.py --unpack /path/to/game.pak
+
+# 📦 Repack an unpacked directory
+python FeaturesticLeaks.py --repack /path/to/unpacked_folder
+
+# 🌙 Compile a Lua script to bytecode (.luac)
+python FeaturesticLeaks.py --lua-compile /path/to/script.lua
+
+# 🌙 Decompile a bytecode file to source (.lua)
+python FeaturesticLeaks.py --lua-decompile /path/to/script.luac
+
+# 🌙 Auto-repair Lua 5.1 syntax errors
+python FeaturesticLeaks.py --lua-fix /path/to/script.lua
+
+# 🤖 Ask OpenCode AI via CLI
+python FeaturesticLeaks.py --ai "How to inject custom Lua into PUBG Mobile PAK?"
+```
 
 ---
 
 ## 📂 Category-Wise Modular Menu Architecture
 
-Tool visual layout is restructured into clean, high-performance category menus:
+Tool visual layout clean, high-performance structured menus me organized hai:
 
 ```text
-⚡ MAIN CATEGORY MENU
-├── [1] 🤖 AI Watch Assistant Engine --> Real-time file watch & AI Companion
+⚡ FEATURESTIC LEAKS v2.8 MAIN MENU
+├── [1] 🤖 AI Assistant & Modder     --> Function scanner, custom mod generator & live chat
 ├── [2] 📦 PAK Tools                 --> Unpack, Repack, Replace, Inject, Skin Swapper, OBB Manager
-├── [3] 🌙 LUA Tools                 --> Compile, Decompile, Script Merger, Obfuscator, Universal Packer
-├── [4] 🔑 OpenCode API & Settings   --> Manage OpenCode API Keys (Multi-Key Auto Rotation), Base URL & Telegram Bot
-├── [5] 🛠️ Utilities & Help          --> UE4 tools, File Resizer, Patcher, Shortcuts & Guides
-└── [U] 🚀 Auto-Update               --> One-touch GitHub auto-update & auto-restart engine
+├── [3] 🌙 LUA Tools                 --> Compile, Decompile, 1-Click Auto Workflow, Obfuscator, Merger
+├── [4] 🔑 OpenCode API & Settings   --> Multi-Key auto-rotation, custom endpoint & Telegram bot config
+├── [5] 🛠️ Utilities & Help          --> UE4 tools, File Resizer, URL Patcher, Shortcuts & Beginner FAQ
+├── [U] 🚀 Auto-Update               --> 1-Touch GitHub update check, backup & auto-restart
+└── [0] ✗ EXIT                       --> Close application
 ```
 
 ---
 
-## 📂 Clean & Organized Workspace Structure
+## 🤖 AI Assistant & Modder Engine (Category [1])
 
-Tool launch hote hi SDCard (`/sdcard/FeaturesticLeaks/`) me structured workspace system automatically setup ho jata hai, jisse File Manager (ZArchiver) bilkul clean rehta hai:
+```text
+🤖 AI ASSISTANT & MODDER MENU
+├── [1] 🧠 AI Function Scanner & Modder
+│       └── Unpacked folder/file ko scan karta hai, functions, hooks, tables & parameters extract
+│           karta hai aur user ke demand par custom Lua 5.1 Game mod script generate karta hai!
+├── [2] 👁️💬 AI Interactive Chat & Watch Assistant
+│       └── Live File Watcher + AI Chat Assistant! Voice/text commands se real-time auto-unpack,
+│           compile aur interactive modding help provide karta hai!
+├── [3] 🔑 OpenCode API & Keys Settings
+│       └── Multi-Key management (Auto-Rotation), Custom Endpoint & Developer Telegram Bot setup.
+└── [0] ↩️ Back to Main Menu
+```
+
+---
+
+## 📂 Clean Workspace Directory Structure
+
+Tool launch hote hi aapke SDCard (`/sdcard/FeaturesticLeaks/`) me structured clean folders auto-create ho jaate hain:
 
 ```text
 /sdcard/FeaturesticLeaks/
 ├── 📦 PAK_WORKSPACE/            <-- Everything related to PAK & OBB Modding
-│   ├── 📥 1_PAK_INPUT/          <-- Put original game .pak / .obb files here
+│   ├── 📥 1_PAK_INPUT/          <-- Original game .pak / .obb files yahan daalo
 │   ├── 📂 2_UNPACK/             <-- Extracted folders & assets
-│   ├── ✏️ 3_REPLACE/            <-- Put edited files here for replacement mode
-│   ├── 💉 4_INJECT/             <-- Put custom files for direct path injection
-│   └── 🚀 5_RESULT/             <-- Final repacked .pak & .obb files
+│   ├── ✏️ 3_REPLACE/            <-- Edited files yahan daalo for replacement
+│   ├── 💉 4_INJECT/             <-- Custom files direct path injection ke liye
+│   └── 🚀 5_RESULT/             <-- Final modified .pak & .obb files
 │
-├── 🌙 LUA_WORKSPACE/            <-- Everything related to Lua Scripts Modding
-│   ├── 📜 1_LUA_INPUT/          <-- Put .lua / .luac scripts here
+├── 🌙 LUA_WORKSPACE/            <-- Everything related to Lua Scripting
+│   ├── 📜 1_LUA_INPUT/          <-- .lua / .luac files yahan daalo
 │   ├── 🔓 2_DECOMPILED/         <-- Decompiled .lua source files
 │   ├── ⚙️ 3_COMPILED/           <-- Compiled .luac bytecode files
 │   └── 🎉 4_RESULT/             <-- Final processed & merged scripts
 │
-└── 📋 LOGS/                    <-- System logs & auto-trimmed debug reports
+├── 📁 FOUND_FILES/              <-- Files extracted via Search/Filter tool
+├── 📑 DUMP_LOGS/                <-- Security audit reports & memory dumps
+└── 📋 LOGS/                    <-- System diagnostic reports & error logs
 ```
-
-> 💡 **Clean File Manager Experience**: Bikhre hue temporary folders auto-clean ho jaate hain. Aap ZArchiver me direct `/sdcard/FeaturesticLeaks/` open karke easily manage kar sakte hain.
 
 ---
 
 ## 🧰 Complete Feature Overview
 
-### 📦 1. PAK / OBB Tools
-1. **Multi-Threaded PAK Unpacker**: Multi-threaded engine (up to 32 worker threads) supporting SM4/AES decryption, Zstandard/OBB decompression, and automatic CRC32 stem hash auto-repair for corrupt PAK headers.
-2. **Repack All Types PAKs**: Auto-detects container modes (`MINI_OBB`, `GAMEPATCH`, `OBBZSDIC`) and rebuilds container blocks with high efficiency.
-3. **Replace Existing Files**: Size-independent byte replacer that modifies existing PAK files without crash or header corruption issues.
-4. **Inject Path (New Files)**: Direct path injector for inserting custom files/folders directly into target internal game directories (e.g., `Content/Lua/GameLua/Mod/...`). Features auto-in-place Lua 5.1 syntax repair, temporary file auto-cleanup, and strict workspace sync so deleted files never get re-injected.
-5. **One-Click Mods**: White body mesh nuller & character asset converter.
-6. **Skin ID Swap & Asset Dumper**:
-   - Swaps Lobby, Ingame, Weapon, Hit Effect & Deadbox skin IDs inside `.uasset` / `.uexp` binaries.
-   - **Skin Asset Dumper**: Scans PAK files or UNPACK folders for skin textures, meshes, uassets/uexps, generates `.txt` and `.json` reports, and exports raw skin assets.
-7. **OBB Manager**: Extract and rezip OBB containers with byte-exact padding to match original file sizes.
-8. **UAsset / UExp Sync Engine**: Auto-pairs companion `.uasset` and `.uexp` files when selecting files and warns if a companion asset is missing in the game directory. Includes keyword filtering `[F]`.
+### 📦 1. PAK / OBB Manipulation Engine
+* **Multi-Threaded PAK Unpacker**: 32-thread high-speed engine supporting SM4/AES decryption, Zstandard/OBB decompression, and CRC32 stem hash auto-repair.
+* **Smart PAK Repacker**: Auto-detects container modes (`MINI_OBB`, `GAMEPATCH`, `OBBZSDIC`) and rebuilds container blocks with byte-exact padding.
+* **Replace Existing Files**: Size-independent binary replacer that updates existing assets without header corruption or game crashes.
+* **Inject Path (New Files)**: Direct path injector for inserting custom mods into internal game directories (e.g. `Content/Lua/GameLua/Mod/...`). Features built-in Lua 5.1 syntax auto-repair and workspace synchronization.
+* **Skin ID Swapper & Asset Dumper**:
+  - Swaps Lobby, Ingame, Weapon, Hit Effect & Deadbox skin IDs inside `.uasset` / `.uexp` files.
+  - Scans PAK files for textures, meshes, and uassets, exporting raw skin assets with JSON/TXT reports.
+* **OBB Manager**: Extract and re-compress OBB containers with exact byte matching.
+* **UAsset / UExp Sync Engine**: Auto-pairs companion `.uasset` + `.uexp` files and alerts if asset pairs are broken.
+
+---
 
 ### 🌙 2. Lua Master Suite
-1. **Compile Lua**: Converts `.lua` source code into `.luac` bytecode.
-2. **Decompile Lua**: Converts `.luac` bytecode back to readable `.lua` source text.
-3. **Embed PAK into Lua**: Converts `.pak` into Base64 payload and embeds it directly into a GameGuard Lua installer script.
-4. **Universal Pack & Unpack Lua**: Encodes/decodes Lua scripts using extensible plugin architecture with fixed 8-byte ASCII tags (`B64_____`, `XOR_____`, `ZLIB____`, `RAW_____`).
-5. **Lua String Obfuscator & Dumper Engine**: Encrypts string literals with Hex/Base64/XOR wrappers and dumps URLs/IPs.
-6. **Anti-Bypass & Security Analyzer**: Audits Lua scripts for GameGuard memory calls and outputs a 0-100 risk score report.
-7. **Bytecode Header Fixer**: Repairs corrupted magic headers for Lua 5.1 (`1B 4C 75 61 51 00...`) or LuaJIT (`1B 4C 4A 02...`).
-8. **Lua Script Merger**: Merges multiple `.lua` scripts into a clean, modular `Master_Merged_Script.lua` file wrapped in `do...end` blocks.
+* **1-Click Auto Lua Workflow**: Scans Lua folders, auto-fixes Lua 5.1 syntax errors, compiles to bytecode, and syncs output to workspace.
+* **Universal Compiler & Decompiler**: Converts `.lua` source to `.luac` bytecode and decompiles bytecode back to clean readable Lua.
+* **Embed PAK into Lua**: Converts `.pak` into Base64 payload and embeds it directly into a GameGuard Lua script.
+* **Universal Pack & Unpack Lua**: Encodes/decodes Lua scripts with standard 8-byte tags (`B64_____`, `XOR_____`, `ZLIB____`, `RAW_____`).
+* **Lua String Obfuscator & Dumper**: Encrypts string literals with Hex/Base64/XOR and dumps hidden URLs/IPs.
+* **Anti-Bypass & Security Analyzer**: Scans Lua scripts for memory calls, hooks, and bypass signatures with a 0-100 risk score report.
+* **Bytecode Header Fixer**: Repairs corrupted magic headers for standard Lua 5.1 (`1B 4C 75 61 51 00...`) or LuaJIT (`1B 4C 4A 02...`).
+* **Lua Script Merger**: Combines multiple `.lua` scripts into a modular `Master_Merged_Script.lua` file.
+
+---
 
 ### 🤖 3. OpenCode AI Modder & Multi-Key Engine
-1. **1-Click AI Companion & Watcher**: Real-time interactive AI companion for automated PAK unpacking/repacking, Lua script generation, syntax auto-repair, and modding guidance.
-2. **OpenCode Unlimited API Engine**: Powered by primary OpenCode custom models (`opencode-modding-v1`, `qwen2.5-coder`, or custom OpenAI-compatible endpoints) with multi-key auto-rotation.
-3. **Direct Key Setup**: Direct key acquisition portal link `https://opencode.ai/auth` included inside settings menu with multi-key support (`key1, key2, key3`).
-4. **Auto Error Handler & Fallback**: Robust error fallback mechanism preventing JSON parse crashes and providing silent retry handling.
+* **AI Function Scanner & Modder**: Scans unpacked PAK/LUA folders, analyzes function signatures and exports custom GameGuard / Lua 5.1 mod scripts on demand.
+* **AI Interactive Watch Assistant**: Real-time voice/text watcher that processes incoming files automatically.
+* **Unlimited Multi-Key Rotation**: Supports multiple OpenCode API keys with auto-failover, custom endpoints (`https://api.opencode.ai/v1`), and model selection.
+* **Silent Error Recovery**: Smart error classification that filters normal user file issues and reports code bugs cleanly.
 
-### 🛠️ 4. Utilities, Diagnostic & Auto-Updater
-1. **UE4 String Tool**: Extract and repack readable string literals inside `.uasset` / `.uexp` binary files.
-2. **File Finder**: Search files inside PAK structure by keyword or extension.
-3. **Termux Auto-Setup**: Configures `leak` global terminal command and SDCard directories automatically.
-4. **File Resizer & Equalizer**: Match exact byte size of any PAK, OBB, or LUA file.
-5. **Workspace Cleanup**: Easily clear temporary working folders to free up storage space.
-6. **Check Tool Update 🚀 (`[U]`)**: Force instant GitHub update check to download verified updates and auto-restart.
-7. **Diagnostic & Benchmark ⚡ (`Option [10]`)**: Real-time system RAM inspection, Lua compiler speed test (in ms), and automatic log hygiene.
-8. **Watch Mode 👁️**: Monitors PAK and LUA input folders in real-time with direct menu shortcuts (`[1]-[5]`, `[U]`, `[help]`).
-9. **Filtered Telegram Bug Reporter**: Sends silent crash reports for actual code bugs to developer Telegram bot, while filtering out normal API limits and file missing notices.
+---
+
+### 🛠️ 4. Utilities, Diagnostics & Auto-Update
+* **UE4 String Tool**: Extract and repack ASCII/Unicode string literals inside `.uasset` / `.uexp` binaries.
+* **File Resizer & Equalizer**: Match exact byte size of any PAK, OBB, or LUA file with null-padding.
+* **URL & LIB Patcher 🔗**: Find and replace encrypted API endpoints/URLs in `.so` shared libraries.
+* **1-Touch GitHub Auto-Updater (`[U]`)**: Checks GitHub for updates, validates syntax, creates backups, and auto-restarts seamlessly.
+* **System Diagnostic & Benchmark ⚡**: Live RAM inspection, Lua compiler speed benchmark (ms), and automatic log hygiene.
 
 ---
 
 ## 🤖 24/7 GitHub Actions Telegram Bot Service
 
-FeaturesticLeaks includes a built-in continuous 24/7 Telegram Bot engine (`bot_runner.py` & `.github/workflows/bot_247.yml`):
+FeaturesticLeaks includes a continuous 24/7 Telegram Bot engine (`bot_runner.py` & `.github/workflows/bot_247.yml`):
 
-### 🚀 Features:
-- **Continuous 24/7 Uptime**: Automatically runs via GitHub Actions.
-- **5h 50m Auto-Restart Loop**: Automatically triggers a repository dispatch at 5 hours 50 minutes to bypass GitHub's 6-hour execution limit without any downtime!
-- **Auto File Processing**: Direct send any `.pak`, `.obb`, `.lua`, or `.luac` file to your Telegram Bot to auto-unpack, compile, or process!
-- **Interactive Bot Commands**:
-  - `/status` - View live workspace summary & file snapshot
-  - `/ai <query>` - Ask OpenCode AI assistant questions
-  - `/unpack` - Unpack files in PAK folder
-  - `/repack` - Repack files in UNPACK/RESULT folder
-  - `/clean` - Clear temporary workspace files
-  - `/restart` - Trigger runner loop restart
+### 🚀 Bot Commands:
+* `/start` - Bot status & welcome message
+* `/help` - View complete command manual
+* `/status` - Live workspace file count & memory summary
+* `/ai <prompt>` - Ask OpenCode AI modding questions
+* `/unpack` - Auto-unpack files in PAK folder
+* `/repack` - Repack files from UNPACK folder
+* `/lua_compile` - Compile all `.lua` scripts to `.luac`
+* `/lua_fix` - Auto-repair Lua 5.1 syntax errors
+* `/clean` - Clear temporary workspace files
+* `/restart` - Trigger runner loop restart
 
-### 🔧 Setup on GitHub Actions:
-1. Go to your GitHub Repository **Settings** -> **Secrets and variables** -> **Actions**.
-2. Add the following secrets:
-   - `TELEGRAM_BOT_TOKEN`: Your Telegram Bot Token from @BotFather
-   - `TELEGRAM_CHAT_ID`: Your Telegram User / Group ID
-   - `GH_PAT_TOKEN`: Your GitHub Personal Access Token (with `repo` & `workflow` permissions) for continuous restart loop
-3. The workflow `.github/workflows/bot_247.yml` will automatically start and run continuously!
+### 🔧 GitHub Actions Setup:
+1. GitHub Repository me jaakar **Settings** -> **Secrets and variables** -> **Actions** kholein.
+2. Secrets add karein:
+   - `TELEGRAM_BOT_TOKEN`: Bot token from [@BotFather](https://t.me/BotFather)
+   - `TELEGRAM_CHAT_ID`: Aapka Telegram User ID / Group ID
+   - `GH_PAT_TOKEN`: GitHub Personal Access Token (`repo` & `workflow` scopes)
+3. Bot 24/7 GitHub Actions par continuously run hota rahega!
 
 ### 📱 Running Bot Mode in Termux:
-Run bot mode locally in Termux or Linux using:
 ```bash
 leak bot
-# OR
-bash run.sh --bot
 # OR
 python3 bot_runner.py
 ```
 
 ---
 
-## 👤 Developer Contact & Official Credits
+## 👤 Developer Contact & Community
 
-* **Main Developer**: **[@L359D](https://t.me/L359D)**
-* **Official Telegram Channel**: **[t.me/FeaturesticLeaks](https://t.me/FeaturesticLeaks)**
-* **Platform**: Termux / Android Linux / Windows / Linux
+* 👑 **Main Developer**: [**@L359D**](https://t.me/L359D)
+* 📢 **Telegram Channel**: [**t.me/FeaturesticLeaks**](https://t.me/FeaturesticLeaks)
+* 🐙 **GitHub Repository**: [**itzgeniusboy/FeaturesticLeaks-Toolkit-**](https://github.com/itzgeniusboy/FeaturesticLeaks-Toolkit-)
+* 💬 **Support**: Direct contact developer on Telegram for VIP mods, keys & inquiries.
+
 

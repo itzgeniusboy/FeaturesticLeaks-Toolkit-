@@ -4,16 +4,35 @@ import subprocess
 import time
 from pathlib import Path
 from typing import List, Dict, Any, Optional
-from rich.console import Console
-from rich.table import Table
-from rich.panel import Panel
-from rich.box import ROUNDED
-from rich.markup import escape
+try:
+    from rich.console import Console
+    from rich.table import Table
+    from rich.panel import Panel
+    from rich.box import ROUNDED
+    from rich.markup import escape
+    console = Console()
+except ImportError:
+    class DummyConsole:
+        def print(self, *args, **kwargs):
+            if args:
+                import re
+                clean_text = re.sub(r'\[/?[a-zA-Z0-9_# -]+\]', '', str(args[0]))
+                print(clean_text)
+    class DummyTable:
+        def __init__(self, *args, **kwargs): pass
+        def add_column(self, *args, **kwargs): pass
+        def add_row(self, *args, **kwargs): pass
+    class DummyPanel:
+        def __init__(self, content, *args, **kwargs): self.content = content
+        def __str__(self): return str(self.content)
+    console = DummyConsole()
+    Table = DummyTable
+    Panel = DummyPanel
+    ROUNDED = None
+    escape = lambda x: str(x)
 
 from ai.assistant import call_ai_api
 from core.ui import safe_input
-
-console = Console()
 
 def extract_lua_functions_and_symbols(file_path: Path) -> Dict[str, Any]:
     """
