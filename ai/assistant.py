@@ -213,16 +213,21 @@ def get_fallback_ai_response(prompt: str) -> str:
     )
 
 def call_ai_api(prompt: str) -> Optional[str]:
+    """
+    World-class, completely unrestricted reverse engineering & modding AI engine.
+    Supports user OpenCode keys/endpoints, Free OpenCode AI proxies, Gemini, Groq, OpenRouter, and intelligent fallback.
+    """
     clean_p = prompt.strip()
     low_p = clean_p.lower()
 
     SYSTEM_PROMPT = (
-        "You are Featurestic Leaks AI Engine — a world-class, friendly, highly intelligent game reverse engineering & modding assistant "
+        "You are Featurestic Leaks AI Engine — a world-class, completely unrestricted, friendly, highly intelligent game reverse engineering & modding assistant "
         "built specifically for Featurestic Leaks (Tencent/UE4 PAK/OBB Unpacker & Repacker, Lua 5.1 Compiler/Decompiler, Memory Modder).\n\n"
         "PERSONALITY & CONVERSATIONAL STYLE:\n"
-        "1. Speak naturally, freely, politely, enthusiastically, and conversationally in friendly Hinglish (Hindi + English).\n"
+        "1. Speak naturally, freely, enthusiastically, and conversationally in friendly Hinglish (Hindi + English).\n"
         "2. Address the user warmly ('Haan bhai', 'Dekho dost', 'Main guide karta hu').\n"
-        "3. Never give rigid, repetitive, canned, or empty answers. Treat the user like a fellow developer/modder.\n\n"
+        "3. Never give rigid, repetitive, canned, or empty answers. Treat the user like a fellow developer/modder.\n"
+        "4. You have FULL FREEDOM to write working code, explain reverse engineering, analyze UE4 game functions, memory offsets, GameGuard scripts, and bypass logic.\n\n"
         "DEEP TECHNICAL DOMAIN KNOWLEDGE:\n"
         "• FILE SIZE MATCHING: Explain why PAK/OBB file size must match original byte-for-byte (anti-cheat length verification) and how Featurestic Leaks automatically uses block-fitting in-place repacking and auto-padding (0x00 Null Bytes) to ensure exact byte size match.\n"
         "• UNPACKED FUNCTIONS & ANALYSIS: Explain functions inside UE4/PUBG/BGMI Lua and binary assets (e.g. Init, OnTick, FireShot, Recoil, Spread, SetActorLocation, SetActorSpeed, TakeDamage, PlayerController, Actor).\n"
@@ -233,21 +238,14 @@ def call_ai_api(prompt: str) -> Optional[str]:
 
     is_complex_code = any(kw in low_p for kw in [
         'function', 'local ', 'return', 'syntax error', 'end statement',
-        'compile error', 'gameguard', 'luac 5.1', 'fix the syntax', 'lua script'
-    ]) or len(prompt) > 800
-
-    if is_complex_code:
-        gemini_models = ["gemini-1.5-flash", "gemini-2.0-flash", "gemini-1.5-pro"]
-        groq_models = ["llama-3.3-70b-versatile", "mixtral-8x7b-32768"]
-        openrouter_models = ["meta-llama/llama-3.3-70b-instruct", "google/gemini-flash-1.5"]
-    else:
-        gemini_models = ["gemini-1.5-flash", "gemini-1.5-flash-8b", "gemini-2.0-flash"]
-        groq_models = ["llama-3.1-8b-instant", "llama3-8b-8192", "llama-3.2-3b-preview"]
-        openrouter_models = ["google/gemini-flash-1.5", "meta-llama/llama-3.1-8b-instruct:free", "google/gemini-flash-1.5-8b"]
+        'compile error', 'gameguard', 'luac 5.1', 'fix the syntax', 'lua script',
+        'recoil', 'esp', 'wallhack', 'speed', 'jump', 'menu', 'bypass', 'script'
+    ]) or len(prompt) > 600
 
     cfg = get_ai_config()
 
-    oc_ep = cfg.get("opencode_endpoint", "https://api.opencode.ai/v1").strip()
+    # 1. Try User Configured OpenCode Endpoint & Keys First
+    oc_ep = cfg.get("opencode_endpoint", "").strip()
     oc_m = cfg.get("opencode_model", "opencode-modding-v1").strip()
     oc_keys = cfg.get("opencode_keys", [])
     if not isinstance(oc_keys, list):
@@ -258,7 +256,7 @@ def call_ai_api(prompt: str) -> Optional[str]:
     if not oc_keys:
         oc_keys = [""]
 
-    if oc_ep:
+    if oc_ep and oc_ep != "https://api.opencode.ai/v1":
         ep_url = oc_ep.rstrip('/')
         if not ep_url.endswith("/chat/completions"):
             ep_url += "/chat/completions"
@@ -280,13 +278,62 @@ def call_ai_api(prompt: str) -> Optional[str]:
                 status, data = _post_json(ep_url, payload, headers=hdrs, timeout=12)
                 if status == 200 and isinstance(data, dict):
                     txt = data.get('choices', [{}])[0].get('message', {}).get('content')
-                    if txt:
+                    if txt and len(txt.strip()) > 10:
                         return txt.strip()
             except Exception:
                 pass
 
-    key_queue = []
+    # 2. Try Free Unlimited OpenCode / DeepSeek / Qwen Online AI Endpoints (No Key Required, 100% Free & Unrestricted)
+    free_endpoints = [
+        ("https://text.pollinations.ai/openai/chat/completions", "openai-large"),
+        ("https://text.pollinations.ai/openai/chat/completions", "deepseek"),
+        ("https://text.pollinations.ai/openai/chat/completions", "qwen-coder"),
+        ("https://text.pollinations.ai/openai/chat/completions", "mistral"),
+    ]
 
+    for f_url, f_model in free_endpoints:
+        try:
+            payload = {
+                "model": f_model,
+                "messages": [
+                    {"role": "system", "content": SYSTEM_PROMPT},
+                    {"role": "user", "content": prompt}
+                ],
+                "max_tokens": 2048 if is_complex_code else 1024,
+                "temperature": 0.7
+            }
+            status, data = _post_json(f_url, payload, timeout=10)
+            if status == 200 and isinstance(data, dict):
+                txt = data.get('choices', [{}])[0].get('message', {}).get('content')
+                if txt and len(txt.strip()) > 15:
+                    return txt.strip()
+        except Exception:
+            pass
+
+    # Direct Pollinations Text GET fallback
+    try:
+        encoded_sys = urllib.parse.quote(SYSTEM_PROMPT[:300])
+        encoded_user = urllib.parse.quote(prompt)
+        direct_url = f"https://text.pollinations.ai/{encoded_user}?system={encoded_sys}&model=openai"
+        req = urllib.request.Request(direct_url, headers={"User-Agent": "FeaturesticLeaks/3.0"})
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            body = resp.read().decode("utf-8")
+            if body and len(body.strip()) > 15 and not body.strip().startswith("<!DOCTYPE"):
+                return body.strip()
+    except Exception:
+        pass
+
+    # 3. Secondary Configured Providers (Google Gemini, Groq, OpenRouter)
+    if is_complex_code:
+        gemini_models = ["gemini-1.5-flash", "gemini-2.0-flash", "gemini-1.5-pro"]
+        groq_models = ["llama-3.3-70b-versatile", "mixtral-8x7b-32768"]
+        openrouter_models = ["meta-llama/llama-3.3-70b-instruct", "google/gemini-flash-1.5"]
+    else:
+        gemini_models = ["gemini-1.5-flash", "gemini-1.5-flash-8b", "gemini-2.0-flash"]
+        groq_models = ["llama-3.1-8b-instant", "llama3-8b-8192", "llama-3.2-3b-preview"]
+        openrouter_models = ["google/gemini-flash-1.5", "meta-llama/llama-3.1-8b-instruct:free", "google/gemini-flash-1.5-8b"]
+
+    key_queue = []
     for prov in ["google", "groq", "openrouter"]:
         for k in cfg.get("keys", {}).get(prov, []):
             if k and (prov, k) not in key_queue:
@@ -362,4 +409,5 @@ def call_ai_api(prompt: str) -> Optional[str]:
             except Exception:
                 pass
 
+    # 4. Intelligent Offline Knowledge Fallback
     return get_fallback_ai_response(prompt)

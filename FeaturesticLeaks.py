@@ -2508,166 +2508,11 @@ def manage_ai_api_keys():
             break
 
 def call_ai_api(prompt: str) -> Optional[str]:
-    clean_p = prompt.strip()
-    low_p = clean_p.lower()
-
-    SYSTEM_PROMPT = (
-        "You are Featurestic Leaks AI Engine — a world-class, friendly, highly intelligent game reverse engineering & modding assistant "
-        "built specifically for Featurestic Leaks (Tencent/UE4 PAK/OBB Unpacker & Repacker, Lua 5.1 Compiler/Decompiler, Memory Modder).\n\n"
-        "PERSONALITY & CONVERSATIONAL STYLE:\n"
-        "1. Speak naturally, freely, politely, enthusiastically, and conversationally in friendly Hinglish (Hindi + English).\n"
-        "2. Address the user warmly ('Haan bhai', 'Dekho dost', 'Main guide karta hu').\n"
-        "3. Never give rigid, repetitive, canned, or empty answers. Treat the user like a fellow developer/modder.\n\n"
-        "DEEP TECHNICAL DOMAIN KNOWLEDGE:\n"
-        "• FILE SIZE MATCHING: Explain why PAK/OBB file size must match original byte-for-byte (anti-cheat length verification) and how Featurestic Leaks automatically uses block-fitting in-place repacking and auto-padding (0x00 Null Bytes) to ensure exact byte size match.\n"
-        "• UNPACKED FUNCTIONS & ANALYSIS: Explain functions inside UE4/PUBG/BGMI Lua and binary assets (e.g. Init, OnTick, FireShot, Recoil, Spread, SetActorLocation, SetActorSpeed, TakeDamage, PlayerController, Actor).\n"
-        "• HOW TO MODIFY: Give step-by-step instructions on modifying variables, overriding function returns, and hooking game loops in Lua 5.1.\n"
-        "• LUA SCRIPT TYPES: Explain ESP/Wallhack shaders, No Recoil memory overrides, High Jump / Speed Boost, Anti-ban memory log cleaning, and GameGuard (gg.*) multi-feature interactive menus.\n"
-        "• FULL WORKING CODE: Always write complete, copy-paste ready Lua 5.1 code with proper error handling and gg calls (`gg.searchNumber`, `gg.getResults`, `gg.editAll`, `gg.clearResults`)."
-    )
-
-    # Determine task complexity to pick models smartly
-    is_complex_code = any(kw in low_p for kw in [
-        'function', 'local ', 'return', 'syntax error', 'end statement',
-        'compile error', 'gameguard', 'luac 5.1', 'fix the syntax', 'lua script'
-    ]) or len(prompt) > 800
-
-    if is_complex_code:
-        gemini_models = ["gemini-1.5-flash", "gemini-2.0-flash", "gemini-1.5-pro"]
-        groq_models = ["llama-3.3-70b-versatile", "mixtral-8x7b-32768"]
-        openrouter_models = ["meta-llama/llama-3.3-70b-instruct", "google/gemini-flash-1.5"]
-    else:
-        gemini_models = ["gemini-1.5-flash", "gemini-1.5-flash-8b", "gemini-2.0-flash"]
-        groq_models = ["llama-3.1-8b-instant", "llama3-8b-8192", "llama-3.2-3b-preview"]
-        openrouter_models = ["google/gemini-flash-1.5", "meta-llama/llama-3.1-8b-instruct:free", "google/gemini-flash-1.5-8b"]
-
-    cfg = get_ai_config()
-
-    # Always attempt OpenCode API call first (Primary Engine)
-    oc_ep = cfg.get("opencode_endpoint", "https://api.opencode.ai/v1").strip()
-    oc_m = cfg.get("opencode_model", "opencode-modding-v1").strip()
-    oc_keys = cfg.get("opencode_keys", [])
-    if not isinstance(oc_keys, list):
-        oc_keys = []
-    single_oc_k = cfg.get("opencode_api_key", "").strip()
-    if single_oc_k and single_oc_k not in oc_keys:
-        oc_keys.append(single_oc_k)
-    if not oc_keys:
-        oc_keys = [""]
-
-    if oc_ep:
-        ep_url = oc_ep.rstrip('/')
-        if not ep_url.endswith("/chat/completions"):
-            ep_url += "/chat/completions"
-        for oc_k in oc_keys:
-            try:
-                headers = {"Content-Type": "application/json"}
-                if oc_k:
-                    headers["Authorization"] = f"Bearer {oc_k}"
-                max_tok = 2048 if is_complex_code else 1024
-                payload = {
-                    "model": oc_m or "opencode-modding-v1",
-                    "messages": [
-                        {"role": "system", "content": SYSTEM_PROMPT},
-                        {"role": "user", "content": prompt}
-                    ],
-                    "max_tokens": max_tok,
-                    "temperature": 0.7
-                }
-                resp = requests.post(ep_url, json=payload, headers=headers, timeout=12)
-                if resp.status_code == 200:
-                    try:
-                        data = resp.json()
-                        txt = data['choices'][0]['message']['content']
-                        if txt:
-                            return txt.strip()
-                    except Exception:
-                        pass
-            except Exception:
-                pass
-
-    # Secondary providers fallback
-    key_queue = [] # list of (provider, key)
-
-    for prov in ["google", "groq", "openrouter"]:
-        for k in cfg.get("keys", {}).get(prov, []):
-            if k and (prov, k) not in key_queue:
-                key_queue.append((prov, k))
-
-    env_gemini = os.environ.get("GEMINI_API_KEY")
-    if env_gemini and ("google", env_gemini) not in key_queue:
-        key_queue.append(("google", env_gemini))
-
-    if key_queue:
-        for prov, key in key_queue:
-            try:
-                if prov == "google":
-                    for g_model in gemini_models:
-                        url = f"https://generativelanguage.googleapis.com/v1beta/models/{g_model}:generateContent?key={key}"
-                        payload = {
-                            "system_instruction": {"parts": [{"text": SYSTEM_PROMPT}]},
-                            "contents": [{"parts": [{"text": prompt}]}],
-                            "generationConfig": {"maxOutputTokens": 1024, "temperature": 0.7}
-                        }
-                        resp = requests.post(url, json=payload, timeout=15)
-                        if resp.status_code == 200:
-                            data = resp.json()
-                            try:
-                                txt = data['candidates'][0]['content']['parts'][0]['text']
-                                if txt:
-                                    return txt.strip()
-                            except (KeyError, IndexError):
-                                pass
-
-                elif prov == "groq":
-                    for g_model in groq_models:
-                        url = "https://api.groq.com/openai/v1/chat/completions"
-                        headers = {"Authorization": f"Bearer {key}", "Content-Type": "application/json"}
-                        payload = {
-                            "model": g_model,
-                            "messages": [
-                                {"role": "system", "content": SYSTEM_PROMPT},
-                                {"role": "user", "content": prompt}
-                            ],
-                            "max_tokens": 1024,
-                            "temperature": 0.7
-                        }
-                        resp = requests.post(url, json=payload, headers=headers, timeout=15)
-                        if resp.status_code == 200:
-                            data = resp.json()
-                            try:
-                                txt = data['choices'][0]['message']['content']
-                                if txt:
-                                    return txt.strip()
-                            except (KeyError, IndexError):
-                                pass
-
-                elif prov == "openrouter":
-                    for or_model in openrouter_models:
-                        url = "https://openrouter.ai/api/v1/chat/completions"
-                        headers = {"Authorization": f"Bearer {key}", "Content-Type": "application/json"}
-                        payload = {
-                            "model": or_model,
-                            "messages": [
-                                {"role": "system", "content": SYSTEM_PROMPT},
-                                {"role": "user", "content": prompt}
-                            ],
-                            "max_tokens": 1024,
-                            "temperature": 0.7
-                        }
-                        resp = requests.post(url, json=payload, headers=headers, timeout=15)
-                        if resp.status_code == 200:
-                            data = resp.json()
-                            try:
-                                txt = data['choices'][0]['message']['content']
-                                if txt:
-                                    return txt.strip()
-                            except (KeyError, IndexError):
-                                pass
-            except Exception:
-                pass
-
-    return get_fallback_ai_response(prompt)
+    """
+    Delegates to world-class unrestricted multi-engine OpenCode AI in ai.assistant module.
+    """
+    from ai.assistant import call_ai_api as assistant_call_ai_api
+    return assistant_call_ai_api(prompt)
 
 
 def ai_fix_lua_code(lua_code: str, error_msg: str = "") -> Optional[str]:
@@ -3849,6 +3694,36 @@ def run_ai_all_in_one_assistant(data_path: Path):
                             console.print(f"\n[bold bright_cyan]🤖 AI Assistant:[/bold bright_cyan]\n{resp.strip()}\n")
                             history.append(f"User: {user_msg}")
                             history.append(f"AI: {resp.strip()}")
+
+                            # Check if AI generated a Lua script code block
+                            lua_blocks = re.findall(r'```(?:lua)?\s*\n(.*?)\n```', resp, flags=re.DOTALL)
+                            if lua_blocks:
+                                console.print("[bold bright_green]📜 AI generated a Lua mod script! Save & auto-compile karke RESULT folder me chahiye? [Y/n][/bold bright_green]")
+                                save_act = safe_input("💬 Choice [Y/n]: ").strip().lower()
+                                if save_act in ['y', 'yes', '1', 'haan', '']:
+                                    lua_code = lua_blocks[0]
+                                    clean_name = re.sub(r'[^a-zA-Z0-9_]', '_', user_msg)[:20].strip('_') or f"ai_mod_{int(time.time())}"
+                                    lua_save_path = data_path / "LUA" / f"{clean_name}.lua"
+                                    lua_save_path.parent.mkdir(parents=True, exist_ok=True)
+                                    lua_save_path.write_text(lua_code, encoding='utf-8')
+                                    
+                                    sd_lua = Path("/sdcard/FeaturesticLeaks/LUA") / f"{clean_name}.lua"
+                                    if sd_lua.parent.exists():
+                                        try:
+                                            sd_lua.write_text(lua_code, encoding='utf-8')
+                                        except Exception:
+                                            pass
+                                    console.print(f"[bold green]✅ Saved script: {lua_save_path}[/bold green]")
+                                    
+                                    compiler = "luac5.1" if shutil.which("luac5.1") else ("luac" if shutil.which("luac") else None)
+                                    if compiler:
+                                        out_luac = data_path / "RESULT" / f"{clean_name}.luac"
+                                        out_luac.parent.mkdir(parents=True, exist_ok=True)
+                                        proc = subprocess.run([compiler, "-o", str(out_luac), str(lua_save_path)], capture_output=True, text=True)
+                                        if proc.returncode == 0:
+                                            console.print(f"[bold bright_green]🚀 Auto-Compiled successfully to bytecode: {out_luac.name} in RESULT folder![/bold bright_green]\n")
+                                        else:
+                                            console.print(f"[bold yellow]⚠️ Compiler note: {proc.stderr.strip()}[/bold yellow]\n")
                         else:
                             fallback = get_fallback_ai_response(user_msg)
                             console.print(f"\n[bold bright_cyan]🤖 AI Assistant:[/bold bright_cyan]\n{fallback}\n")
