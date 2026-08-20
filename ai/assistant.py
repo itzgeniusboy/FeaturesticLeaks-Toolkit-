@@ -81,21 +81,21 @@ def _post_json(url: str, payload: dict, headers: dict = None, timeout: int = 15)
 def get_fallback_ai_response(prompt: str) -> str:
     """
     Intelligent built-in modding knowledge engine for offline fallback.
-    Answers size queries, function analysis, Lua script templates, and modding advice in friendly Hinglish.
+    Answers specific queries dynamically without generic repetitive templates.
     """
-    low_p = prompt.lower()
+    low_p = prompt.lower().strip()
+
+    # Greetings
+    if low_p in ['hi', 'hello', 'hlw', 'hey', 'hii', 'kaise ho', 'helo']:
+        return "Haan bhai! Main aapka Featurestic Leaks AI Assistant hu. Batao kya karna hai — PAK unpack, repack, exact size match, ya custom Lua mod banana hai? 🚀"
 
     # 1. Size Mismatch / File Size Questions
-    if any(kw in low_p for kw in ['size', 'same nahi', 'size alag', 'chhota', 'bada', 'size match', 'size kam', 'size jyada', 'bytes', 'file size']):
+    if any(kw in low_p for kw in ['size same nahi', 'size alag', 'size match kaise', 'chhota bada', 'size kam', 'size jyada', 'size error']):
         return (
-            "Haan bhai! Main samajh gaya aapka issue. PAK/OBB repacking me **File Size Match** hona bahut zaroori hota hai taaki game ka anti-cheat integrity check pass ho sake! 📦⚡\n\n"
-            "🔍 **Size Same Na Rehne Ka Reason:**\n"
-            "1. **Compression Difference:** Original game files ZSTD ya ZLIB high compression me hoti hain. Jab hum new files inject karte hain toh compression ratio thoda change ho sakta hai.\n"
-            "2. **Index / Metadata Rebuild:** Agar naye files add hoti hain toh PAK ka index table expand hota hai.\n\n"
-            "🛠️ **100% Exact Size Match Kaise Karein (Featurestic Leaks Me):**\n"
-            "• **In-Place Repack (Auto Block-Fitting):** Category [1] -> Option [2] use karein. Yeh original PAK ke blocks ke andar hi modified data fit karta hai jisse original size 100% same rehti hai.\n"
-            "• **File Resizer & Size Equalizer:** Main Menu -> Category [4] (Tools) -> File Resizer Tool use karein. Yeh exact original PAK jitne bytes ka automatic **0x00 Null Padding** add karke size identical kar deta hai!\n"
-            "• **AI Watch / Chat Mode:** Chat me bas 'size match karo' bol do, tool auto-pad karke exact byte-to-byte match kar dega! 🚀"
+            "Haan bhai! PAK/OBB repacking me **File Size Match** hona zaroori hota hai taaki game ka anti-cheat pass ho sake! 📦⚡\n\n"
+            "🔍 **Size Match Karne Ka Tarika:**\n"
+            "• **In-Place Repack (Auto Block-Fitting):** Original PAK blocks ke andar hi modified data fit hota hai.\n"
+            "• **File Resizer & Auto-Padding:** Agar file thodi choti reh jaye toh chat me bas 'size match karo' bol do, tool auto **0x00 Null Padding** add karke byte-to-byte exact bana dega! 🚀"
         )
 
     # 2. Unpacked Functions & How to Modify Them

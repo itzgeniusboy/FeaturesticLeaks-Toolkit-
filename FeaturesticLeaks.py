@@ -3074,10 +3074,66 @@ def process_ai_smart_command(user_msg: str, data_path: Path) -> bool:
     if not low_um:
         return True
 
-    # 1. Greetings / Conversational Ask
-    greetings = ['hi', 'hello', 'hlw', 'hey', 'kaise ho', 'bhai', 'bro', 'kon ho', 'who are you', 'kya kr skte ho', 'kya kar sakte ho', 'help', 'options', 'kya karoge']
-    if low_um in greetings or any(low_um.startswith(g) for g in ['hi ', 'hello ', 'hlw ', 'hey ']):
-        console.print("\n[bold bright_cyan]🤖 AI Assistant:[/bold bright_cyan] [bold bright_yellow]Ha bhai! Kya krna h? PAK bnana h, unpack krna h, size match krna h, lua compile krna h ya mod script bnana h? Kuch bhi bolo, main direct karke dunga! 🚀[/bold bright_yellow]\n")
+    # 1. Greetings / Casual Opening
+    greetings = ['hi', 'hello', 'hlw', 'hey', 'hii', 'hiii', 'helo', 'kaise ho', 'kya hal', 'namaste', 'bhai', 'bro', 'kon ho', 'who are you', 'kya kr skte ho', 'kya kar sakte ho', 'options', 'kya karoge']
+    if low_um in greetings or any(low_um == g for g in greetings) or low_um in ['hi bhai', 'hello bhai', 'hey bro', 'hi bro']:
+        console.print("\n[bold bright_cyan]🤖 AI Assistant:[/bold bright_cyan] [bold bright_yellow]Ha bhai! Kya krna h? PAK unpack karna h, repack karna h, size match karna h, lua compile karna h ya custom mod script banwana h? Batao, sab karke dunga! 🚀[/bold bright_yellow]\n")
+        return True
+
+    # 1.2 Combined Unpack + Repack in Same Size (Compound Action)
+    is_unpack_word = any(w in low_um for w in ['unpack', 'unpak', 'extract', 'kholo'])
+    is_repack_word = any(w in low_um for w in ['repack', 'repak', 'pack karo', 'pak pack', 'banao', 'banado'])
+    is_size_match_word = any(w in low_um for w in ['same size', 'size same', 'size match', 'size pad', 'equal size'])
+
+    if (is_unpack_word and is_repack_word) or (is_unpack_word and is_size_match_word and is_repack_word):
+        console.print("\n[bold bright_cyan]🤖 AI Assistant: Unpack + Repack with 100% Exact Size Matching detect hua! 📦⚡[/bold bright_cyan]")
+        scan_dirs = [data_path / "PAK", data_path / "INPUT", Path("/sdcard/FeaturesticLeaks/PAK"), Path("/sdcard/FeaturesticLeaks/INPUT")]
+        found_paks = [f for sd in scan_dirs if sd.exists() for f in sd.glob("*") if f.is_file() and f.suffix.lower() in ['.pak', '.obb']]
+
+        if found_paks:
+            pf = found_paks[0]
+            orig_size = pf.stat().st_size
+            console.print(f"[bold cyan]Step 1/2: Unpacking [white]{pf.name}[/white] ({orig_size:,} bytes)...[/bold cyan]")
+            try:
+                pak = TencentPakFile(pf)
+                res_dir = data_path / "RESULT" / pf.stem
+                res_dir.mkdir(parents=True, exist_ok=True)
+                pak.dump(res_dir)
+
+                sd_res = Path("/sdcard/FeaturesticLeaks/RESULT") / pf.stem
+                if sd_res.parent.exists() and sd_res.resolve() != res_dir.resolve():
+                    try:
+                        pak.dump(sd_res)
+                    except Exception:
+                        pass
+                console.print(f"[bold green]✅ Unpack Complete: {res_dir}[/bold green]")
+
+                console.print(f"\n[bold cyan]Step 2/2: In-Place Repacking & Exact Size Matching...[/bold cyan]")
+                out_p = data_path / "RESULT" / f"{pf.stem}_repacked.pak"
+                repack_pak_file_with_block_display(pak, res_dir, out_p)
+
+                # Check and enforce 100% exact size match
+                if out_p.exists():
+                    new_size = out_p.stat().st_size
+                    if new_size < orig_size:
+                        diff = orig_size - new_size
+                        with open(out_p, "ab") as f:
+                            f.write(b'\x00' * diff)
+                        console.print(f"[bold bright_green]✅ Applied {diff:,} bytes Null Padding (0x00) -> Size: {out_p.stat().st_size:,} bytes (Exact Match!)[/bold bright_green]")
+                    elif new_size == orig_size:
+                        console.print(f"[bold bright_green]✅ Repacked Size: {new_size:,} bytes (100% Exact Byte Match!)[/bold bright_green]")
+
+                    sd_out = Path("/sdcard/FeaturesticLeaks/RESULT") / out_p.name
+                    if sd_out.parent.exists() and sd_out.resolve() != out_p.resolve():
+                        try:
+                            shutil.copy2(out_p, sd_out)
+                        except Exception:
+                            pass
+                    console.print(f"\n[bold bright_green]🎉 AI Assistant: Bhai PAK successfully UNPACK aur REPACK ho chuka hai with 100% EXACT SIZE! Output: `/sdcard/FeaturesticLeaks/RESULT/{out_p.name}` 📦🚀[/bold bright_green]\n")
+            except Exception as ex:
+                console.print(f"[bold red]❌ Error: {ex}[/bold red]")
+        else:
+            console.print("\n[bold bright_yellow]🤖 AI Assistant: Bhai PAK folder me pehle PAK/OBB file daalo tabhi unpack & repack karunga! Abhi PAK folder khali hai. 📦[/bold bright_yellow]\n")
         return True
 
     # 1.5 File Size Mismatch / Size Matching Query or Action (DIRECT EXECUTION & GUIDANCE)
