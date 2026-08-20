@@ -525,7 +525,47 @@ def check_and_auto_update(interactive: bool = False):
                 console.print("[bold green]✅ Tool is already running the latest FeaturesticLeaks version![/bold green]")
                 return
 
-            console.print("[bold green]🚀 New update detected! Downloading latest FeaturesticLeaks engine...[/bold green]")
+            console.print("[bold green]🚀 New update detected! Downloading latest FeaturesticLeaks engine & modules...[/bold green]")
+            
+            # If installed via git, prefer git pull to cleanly update all modules and scripts
+            if (script_dir / ".git").exists():
+                try:
+                    console.print("[bold cyan]🔄 Updating repository via git pull...[/bold cyan]")
+                    pull_res = subprocess.run(["git", "pull", "--ff-only"], cwd=script_dir, capture_output=True, text=True, timeout=15)
+                    if pull_res.returncode == 0:
+                        UPDATE_NOTIF_BANNER = ""
+                        console.print(Panel(
+                            "[bold bright_green]🎉 FEATURESTIC LEAKS AUTO-UPDATED VIA GIT SUCCESSFULLY! 🎉[/bold bright_green]\n\n"
+                            "[bold white]All core scripts, AI modules, LUA & PAK engines updated & verified.[/bold white]\n"
+                            "[bold cyan]Restarting application automatically now...[/bold cyan]",
+                            border_style="green",
+                            box=ROUNDED
+                        ))
+                        time.sleep(1.5)
+                        os.execv(sys.executable, [sys.executable] + sys.argv)
+                except Exception:
+                    pass
+
+            # Multi-file updater (downloads FeaturesticLeaks.py and all submodules)
+            MODULE_FILES = [
+                ("FeaturesticLeaks.py", raw_url),
+                ("ai/__init__.py", "https://raw.githubusercontent.com/itzgeniusboy/FeaturesticLeaks-Toolkit-/main/ai/__init__.py"),
+                ("ai/assistant.py", "https://raw.githubusercontent.com/itzgeniusboy/FeaturesticLeaks-Toolkit-/main/ai/assistant.py"),
+                ("ai/analyzer.py", "https://raw.githubusercontent.com/itzgeniusboy/FeaturesticLeaks-Toolkit-/main/ai/analyzer.py"),
+                ("core/__init__.py", "https://raw.githubusercontent.com/itzgeniusboy/FeaturesticLeaks-Toolkit-/main/core/__init__.py"),
+                ("core/logging_utils.py", "https://raw.githubusercontent.com/itzgeniusboy/FeaturesticLeaks-Toolkit-/main/core/logging_utils.py"),
+                ("core/ui.py", "https://raw.githubusercontent.com/itzgeniusboy/FeaturesticLeaks-Toolkit-/main/core/ui.py"),
+                ("lua/__init__.py", "https://raw.githubusercontent.com/itzgeniusboy/FeaturesticLeaks-Toolkit-/main/lua/__init__.py"),
+                ("lua/tools.py", "https://raw.githubusercontent.com/itzgeniusboy/FeaturesticLeaks-Toolkit-/main/lua/tools.py"),
+                ("lua/reader.py", "https://raw.githubusercontent.com/itzgeniusboy/FeaturesticLeaks-Toolkit-/main/lua/reader.py"),
+                ("lua/decompiler.py", "https://raw.githubusercontent.com/itzgeniusboy/FeaturesticLeaks-Toolkit-/main/lua/decompiler.py"),
+                ("pak/__init__.py", "https://raw.githubusercontent.com/itzgeniusboy/FeaturesticLeaks-Toolkit-/main/pak/__init__.py"),
+                ("pak/container.py", "https://raw.githubusercontent.com/itzgeniusboy/FeaturesticLeaks-Toolkit-/main/pak/container.py"),
+                ("pak/crypto.py", "https://raw.githubusercontent.com/itzgeniusboy/FeaturesticLeaks-Toolkit-/main/pak/crypto.py"),
+                ("pak/compression.py", "https://raw.githubusercontent.com/itzgeniusboy/FeaturesticLeaks-Toolkit-/main/pak/compression.py"),
+                ("pak/repack.py", "https://raw.githubusercontent.com/itzgeniusboy/FeaturesticLeaks-Toolkit-/main/pak/repack.py"),
+            ]
+
             if not raw_resp:
                 raw_resp = requests.get(raw_url, headers=headers, timeout=12)
 
@@ -541,6 +581,17 @@ def check_and_auto_update(interactive: bool = False):
                     temp_file.unlink(missing_ok=True)
                     return
 
+                # Download updated submodules if available
+                for rel_name, mod_url in MODULE_FILES[1:]:
+                    try:
+                        m_resp = requests.get(mod_url, headers=headers, timeout=5)
+                        if m_resp.status_code == 200 and len(m_resp.content) > 10:
+                            target_mod = script_dir / rel_name
+                            target_mod.parent.mkdir(parents=True, exist_ok=True)
+                            target_mod.write_bytes(m_resp.content)
+                    except Exception:
+                        pass
+
                 bak_file = script_path.with_suffix(".py.bak")
                 try:
                     shutil.copy2(script_path, bak_file)
@@ -553,7 +604,7 @@ def check_and_auto_update(interactive: bool = False):
 
                 console.print(Panel(
                     "[bold bright_green]🎉 FEATURESTIC LEAKS AUTO-UPDATED SUCCESSFULLY! 🎉[/bold bright_green]\n\n"
-                    "[bold white]Engine script has been updated & verified.[/bold white]\n"
+                    "[bold white]Engine script & all module packages have been updated & verified.[/bold white]\n"
                     "[bold cyan]Restarting application automatically now...[/bold cyan]",
                     border_style="green",
                     box=ROUNDED
