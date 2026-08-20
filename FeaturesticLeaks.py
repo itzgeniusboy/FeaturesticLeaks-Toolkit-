@@ -3136,6 +3136,38 @@ def process_ai_smart_command(user_msg: str, data_path: Path) -> bool:
             console.print("\n[bold bright_yellow]🤖 AI Assistant: Bhai PAK folder me pehle PAK/OBB file daalo tabhi unpack & repack karunga! Abhi PAK folder khali hai. 📦[/bold bright_yellow]\n")
         return True
 
+    # 1.3 Unpack + Analyze / Inspect Functions + Create Mod Lua Script (Compound Multi-step Request)
+    is_check_inspect = any(w in low_um for w in ['check', 'btao', 'batao', 'modify', 'dekh', 'scan', 'functions'])
+    is_lua_make = any(w in low_um for w in ['lua', 'script', 'inject', 'mod'])
+    if (is_unpack_word and is_check_inspect and is_lua_make) or (is_unpack_word and is_check_inspect):
+        console.print("\n[bold bright_cyan]🤖 AI Assistant: Unpack + Function Inspection + Lua Mod Generator request detect hua! 📦🧠[/bold bright_cyan]")
+        scan_dirs = [data_path / "PAK", data_path / "INPUT", Path("/sdcard/FeaturesticLeaks/PAK"), Path("/sdcard/FeaturesticLeaks/INPUT")]
+        found_paks = [f for sd in scan_dirs if sd.exists() for f in sd.glob("*") if f.is_file() and f.suffix.lower() in ['.pak', '.obb']]
+        
+        if found_paks:
+            pf = found_paks[0]
+            console.print(f"[bold cyan]⚡ Step 1/3: Unpacking [white]{pf.name}[/white]...[/bold cyan]")
+            try:
+                pak = TencentPakFile(pf)
+                res_dir = data_path / "RESULT" / pf.stem
+                res_dir.mkdir(parents=True, exist_ok=True)
+                pak.dump(res_dir)
+                console.print(f"[bold green]✅ Unpack Complete: {res_dir}[/bold green]\n")
+            except Exception as ex:
+                console.print(f"[bold red]❌ Unpack failed: {ex}[/bold red]")
+                res_dir = None
+        else:
+            # Check existing unpacked folder
+            res_dirs = [d for d in (data_path / "RESULT").iterdir() if d.is_dir()] if (data_path / "RESULT").exists() else []
+            res_dir = res_dirs[0] if res_dirs else None
+
+        if res_dir and res_dir.exists():
+            console.print(f"[bold cyan]⚡ Step 2/3: Analyzing functions & hooks in [white]{res_dir.name}[/white]...[/bold cyan]")
+            run_ai_function_mod_generator(data_path)
+        else:
+            console.print("[bold yellow]🤖 AI Assistant: PAK file ya unpacked folder nahi mila! Pehle PAK folder me game file daalein.[/bold yellow]\n")
+        return True
+
     # 1.5 File Size Mismatch / Size Matching Query or Action (DIRECT EXECUTION & GUIDANCE)
     elif any(kw in low_um for kw in ['size same nahi', 'size match', 'size same', 'size alag', 'size kam', 'size jyada', 'size equal', 'size fix', 'size pad', 'file size']):
         console.print("\n[bold bright_cyan]📏 AI Assistant: File Size Analysis & Equalizer...[/bold bright_cyan]")
@@ -3628,7 +3660,7 @@ def run_ai_all_in_one_assistant(data_path: Path):
                 if should_process:
                     console.print(f"\n[bold cyan]⚡ AI Executing Action...[/bold cyan]")
                     try:
-                        if ext in ['.pak', '.obb'] or 'pak' in action or 'unpack' in action or 'auto' in action:
+                        if ext in ['.pak', '.obb']:
                             pak = TencentPakFile(new_file)
                             out_unpack = data_path / "UNPACK" / new_file.stem
                             pak.dump(out_unpack)
@@ -3642,7 +3674,7 @@ def run_ai_all_in_one_assistant(data_path: Path):
                                     pass
                             console.print("[bold bright_cyan]💡 AI Suggestion: Iske baad Option [1] se functions scan karke custom Lua mod generate kar sakte hain ya Option [2] se repack kar sakte hain![/bold bright_cyan]\n")
 
-                        elif ext in ['.lua', '.txt'] or 'lua' in action or 'compile' in action or 'auto' in action:
+                        elif ext in ['.lua', '.luac', '.txt']:
                             if action == 'fix' or 'fix' in action or 'repair' in action:
                                 code = new_file.read_text(errors='ignore')
                                 console.print("[bold cyan]🤖 AI repairing Lua syntax...[/bold cyan]")
@@ -3686,13 +3718,13 @@ def run_ai_all_in_one_assistant(data_path: Path):
                     except Exception as ex:
                         console.print(f"[bold red]❌ Error occurred: {ex}[/bold red]")
                         send_telegram_bug_report(
-                            error_type=type(ex).__name__,
-                            error_msg=str(ex),
-                            context=f"AI Assistant processing file '{new_file.name}'",
-                            file_name="FeaturesticLeaks.py",
-                            line_no="7395",
+                            err_type=type(ex).__name__,
+                            err_msg=str(ex),
+                            action_name=f"AI Assistant processing file '{new_file.name}'",
+                            file_info="FeaturesticLeaks.py",
+                            line_no="3680",
                             func_name="run_ai_all_in_one_assistant",
-                            stack_trace=traceback.format_exc()
+                            tb_str=traceback.format_exc()
                         )
                         console.print("[bold green]📲 Auto-sent error bug report directly to developer Telegram group![/bold green]")
                         rep_dir = Path("/sdcard/FeaturesticLeaks/ERROR_REPORTS")
