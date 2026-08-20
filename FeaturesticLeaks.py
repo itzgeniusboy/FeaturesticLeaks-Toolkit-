@@ -251,7 +251,7 @@ from core.logging_utils import (
     send_telegram_status_update, handle_exception
 )
 from core.ui import styled_prompt, safe_input, human_size
-from ai.assistant import get_ai_config, call_ai_api
+from ai.assistant import get_ai_config, call_ai_api, get_fallback_ai_response
 from ai.analyzer import run_ai_function_mod_generator, extract_lua_functions_and_symbols, scan_unpacked_directory
 
 def show_workflow_guide():
@@ -2461,15 +2461,18 @@ def call_ai_api(prompt: str) -> Optional[str]:
     low_p = clean_p.lower()
 
     SYSTEM_PROMPT = (
-        "You are Featurestic Leaks AI Engine — a highly capable, natural, friendly AI modding assistant built for Featurestic Leaks "
-        "(PAK/OBB Unpacker & Repacker, Lua 5.1 Compiler/Decompiler, AI Syntax Repair).\n\n"
+        "You are Featurestic Leaks AI Engine — a world-class, friendly, highly intelligent game reverse engineering & modding assistant "
+        "built specifically for Featurestic Leaks (Tencent/UE4 PAK/OBB Unpacker & Repacker, Lua 5.1 Compiler/Decompiler, Memory Modder).\n\n"
         "PERSONALITY & CONVERSATIONAL STYLE:\n"
-        "1. Speak naturally, freely, politely, and conversationally in friendly Hinglish (Hindi + English).\n"
-        "2. Never give rigid, repetitive, or canned template answers. Respond dynamically and uniquely to whatever the user asks or says.\n"
-        "3. When writing Lua 5.1 scripts (GameGuard / PUBG / BGMI / UE4 memory modding), write COMPLETE, FULLY WORKING, copy-paste ready code without placeholders.\n"
-        "4. Include complete functions, error checks (`gg.isVisible()`, `gg.clearResults()`, `gg.searchNumber()`, `gg.getResults()`, `gg.editAll()`), and correct memory types (`gg.TYPE_FLOAT`, `gg.TYPE_DWORD`).\n"
-        "5. Provide exact step-by-step guidance for PAK/OBB unpacking, repacking, and injecting Lua files into target paths when asked.\n"
-        "6. Everything is done directly inside Featurestic Leaks on Termux/Android."
+        "1. Speak naturally, freely, politely, enthusiastically, and conversationally in friendly Hinglish (Hindi + English).\n"
+        "2. Address the user warmly ('Haan bhai', 'Dekho dost', 'Main guide karta hu').\n"
+        "3. Never give rigid, repetitive, canned, or empty answers. Treat the user like a fellow developer/modder.\n\n"
+        "DEEP TECHNICAL DOMAIN KNOWLEDGE:\n"
+        "• FILE SIZE MATCHING: Explain why PAK/OBB file size must match original byte-for-byte (anti-cheat length verification) and how Featurestic Leaks automatically uses block-fitting in-place repacking and auto-padding (0x00 Null Bytes) to ensure exact byte size match.\n"
+        "• UNPACKED FUNCTIONS & ANALYSIS: Explain functions inside UE4/PUBG/BGMI Lua and binary assets (e.g. Init, OnTick, FireShot, Recoil, Spread, SetActorLocation, SetActorSpeed, TakeDamage, PlayerController, Actor).\n"
+        "• HOW TO MODIFY: Give step-by-step instructions on modifying variables, overriding function returns, and hooking game loops in Lua 5.1.\n"
+        "• LUA SCRIPT TYPES: Explain ESP/Wallhack shaders, No Recoil memory overrides, High Jump / Speed Boost, Anti-ban memory log cleaning, and GameGuard (gg.*) multi-feature interactive menus.\n"
+        "• FULL WORKING CODE: Always write complete, copy-paste ready Lua 5.1 code with proper error handling and gg calls (`gg.searchNumber`, `gg.getResults`, `gg.editAll`, `gg.clearResults`)."
     )
 
     # Determine task complexity to pick models smartly
@@ -2613,7 +2616,7 @@ def call_ai_api(prompt: str) -> Optional[str]:
             except Exception:
                 pass
 
-    return None
+    return get_fallback_ai_response(prompt)
 
 
 def ai_fix_lua_code(lua_code: str, error_msg: str = "") -> Optional[str]:
@@ -3101,6 +3104,7 @@ def display_workspace_summary(data_path: Path):
 def get_live_workspace_context(data_path: Path) -> str:
     """
     Returns a live file status snapshot of the device & tool workspace for AI prompts.
+    Includes discovered Lua functions and symbols from unpacked directories.
     """
     sd_path = Path("/sdcard/FeaturesticLeaks")
     lines = ["CURRENT LIVE WORKSPACE & DEVICE FILE SNAPSHOT:"]
@@ -3132,7 +3136,27 @@ def get_live_workspace_context(data_path: Path) -> str:
                     res_items.append(f"{item.name} ({'Folder' if item.is_dir() else human_size(item.stat().st_size)})")
     lines.append(f"• RESULT/UNPACK Files & Folders: {', '.join(res_items) if res_items else 'None (Folder empty)'}")
 
-    # 4. SD Card Download files
+    # 4. Scanned Lua Functions & Symbols in Unpacked Folders
+    discovered_funcs = []
+    for p in [data_path / "UNPACK", data_path / "RESULT", sd_path / "UNPACK", sd_path / "RESULT", data_path / "LUA"]:
+        if p.exists():
+            for sub in p.rglob("*"):
+                if sub.is_file() and sub.suffix.lower() in ['.lua', '.txt'] and not sub.name.startswith("."):
+                    try:
+                        syms = extract_lua_functions_and_symbols(sub)
+                        if syms.get("functions"):
+                            fn_names = [f["name"] for f in syms["functions"][:4]]
+                            discovered_funcs.append(f"{sub.name}: {', '.join(fn_names)}")
+                        if len(discovered_funcs) >= 6:
+                            break
+                    except Exception:
+                        pass
+        if len(discovered_funcs) >= 6:
+            break
+    if discovered_funcs:
+        lines.append(f"• Discovered Lua Functions & Hooks: {'; '.join(discovered_funcs)}")
+
+    # 5. SD Card Download files
     dl_files = []
     for p in [Path("/sdcard/Download"), Path("/sdcard/Telegram")]:
         if p.exists():
@@ -3148,7 +3172,7 @@ def get_live_workspace_context(data_path: Path) -> str:
 def process_ai_smart_command(user_msg: str, data_path: Path) -> bool:
     """
     AUTONOMOUS INTENT & FILE-AWARE AI AGENT ENGINE
-    Directly executes modding tasks (unpack, compile, inject, repair, repack, clean, move) on workspace files.
+    Directly executes modding tasks (unpack, compile, inject, repair, repack, clean, move, size matching) on workspace files.
     """
     low_um = user_msg.lower().strip()
     if not low_um:
@@ -3157,7 +3181,43 @@ def process_ai_smart_command(user_msg: str, data_path: Path) -> bool:
     # 1. Greetings / Conversational Ask
     greetings = ['hi', 'hello', 'hlw', 'hey', 'kaise ho', 'bhai', 'bro', 'kon ho', 'who are you', 'kya kr skte ho', 'kya kar sakte ho', 'help', 'options', 'kya karoge']
     if low_um in greetings or any(low_um.startswith(g) for g in ['hi ', 'hello ', 'hlw ', 'hey ']):
-        console.print("\n[bold bright_cyan]🤖 AI Assistant:[/bold bright_cyan] [bold bright_yellow]Ha bhai! Kya krna h? PAK bnana h, unpack krna h, lua compile krna h ya fix krna h? Kuch bhi bolo, main direct karke dunga! 🚀[/bold bright_yellow]\n")
+        console.print("\n[bold bright_cyan]🤖 AI Assistant:[/bold bright_cyan] [bold bright_yellow]Ha bhai! Kya krna h? PAK bnana h, unpack krna h, size match krna h, lua compile krna h ya mod script bnana h? Kuch bhi bolo, main direct karke dunga! 🚀[/bold bright_yellow]\n")
+        return True
+
+    # 1.5 File Size Mismatch / Size Matching Query or Action (DIRECT EXECUTION & GUIDANCE)
+    elif any(kw in low_um for kw in ['size same nahi', 'size match', 'size same', 'size alag', 'size kam', 'size jyada', 'size equal', 'size fix', 'size pad', 'file size']):
+        console.print("\n[bold bright_cyan]📏 AI Assistant: File Size Analysis & Equalizer...[/bold bright_cyan]")
+        
+        # Check original PAK vs repacked files in workspace
+        pak_dirs = [data_path / "PAK", Path("/sdcard/FeaturesticLeaks/PAK")]
+        res_dirs = [data_path / "RESULT", Path("/sdcard/FeaturesticLeaks/RESULT")]
+        
+        orig_paks = [f for pd in pak_dirs if pd.exists() for f in pd.glob("*") if f.is_file() and f.suffix.lower() in ['.pak', '.obb']]
+        res_paks = [f for rd in res_dirs if rd.exists() for f in rd.glob("*") if f.is_file() and f.suffix.lower() in ['.pak', '.obb']]
+        
+        if orig_paks and res_paks:
+            orig_f = orig_paks[0]
+            rep_f = res_paks[0]
+            orig_sz = orig_f.stat().st_size
+            rep_sz = rep_f.stat().st_size
+            
+            console.print(f"📦 [bold white]Original PAK:[/bold white] {orig_f.name} ({orig_sz:,} bytes)")
+            console.print(f"📦 [bold white]Repacked PAK:[/bold white] {rep_f.name} ({rep_sz:,} bytes)")
+            
+            if rep_sz == orig_sz:
+                console.print("\n[bold bright_green]✅ Size 100% Exact Match hai! Anti-cheat signature integrity pass ho jayegi! 🚀[/bold bright_green]\n")
+            elif rep_sz < orig_sz:
+                diff = orig_sz - rep_sz
+                console.print(f"\n[bold yellow]⚠️ Repacked file is {diff:,} bytes smaller. Auto-padding Null Bytes (0x00)...[/bold yellow]")
+                with open(rep_f, "ab") as f:
+                    f.write(b'\x00' * diff)
+                console.print(f"[bold bright_green]✅ Successfully padded {diff:,} bytes -> New size: {rep_f.stat().st_size:,} bytes (100% Exact Match!) 🚀[/bold bright_green]\n")
+            else:
+                diff = rep_sz - orig_sz
+                console.print(f"\n[bold yellow]⚠️ Repacked file is {diff:,} bytes larger than original (added extra files). Anti-cheat safe in-place repack Option [2] use karein![/bold yellow]\n")
+        else:
+            explanation = get_fallback_ai_response("size same nahi hai")
+            console.print(f"\n[bold bright_cyan]🤖 AI Assistant:[/bold bright_cyan]\n{explanation}\n")
         return True
 
     # 2. Workspace File Inspection / Scan Command (DIRECT EXECUTION)
@@ -3169,7 +3229,7 @@ def process_ai_smart_command(user_msg: str, data_path: Path) -> bool:
         return True
 
     # 2.5 AI Code Scanner & Function Mod Generator (DIRECT EXECUTION)
-    elif any(kw in low_um for kw in ['function', 'functions', 'scanner', 'code scan', 'ast', 'reverse', 'ai mod', 'mod generate', 'lua generate', 'generate lua', 'lua banao', 'function check', 'kya function', 'function scan']):
+    elif any(kw in low_um for kw in ['function', 'functions', 'scanner', 'code scan', 'ast', 'reverse', 'ai mod', 'mod generate', 'lua generate', 'generate lua', 'lua banao', 'function check', 'kya function', 'function scan', 'kisko change', 'kaise change', 'kya kya function', 'kis type ka lua', 'kis kis type']):
         console.print("[bold cyan]🤖 AI Assistant: Unpacked Code Scanner & Lua Mod Generator launch ho raha hai...[/bold cyan]")
         run_ai_function_mod_generator(data_path)
         return True
@@ -3482,20 +3542,29 @@ def process_ai_smart_command(user_msg: str, data_path: Path) -> bool:
     return False
 
 
-def run_ai_watch_assistant(data_path: Path):
+def run_ai_all_in_one_assistant(data_path: Path):
     """
-    AI ASSISTANT - WATCH MODE STYLE
-    Runs in background loop, detects incoming files in workspace input folders,
-    asks user interactively, performs actions (Unpack, Compile, AI Repair, Explain),
-    reports results, and offers error fixing / developer auto-reporting.
+    FEATURESTIC AI ALL-IN-ONE MODDING ASSISTANT
+    Unified AI Engine:
+    1. Live File Watcher (Drop PAK/LUA into INPUT for 1-click unpack/compile/repair/inject)
+    2. Deep Unpacked Code & Function Scanner (inspect functions, hooks, tables & symbols)
+    3. Custom Lua 5.1 Mod Generator (No Recoil, ESP, High Jump, Speed, Anti-ban, GameGuard Menu)
+    4. Exact File Size Equalizer & Auto Null Padding (0x00) for byte-for-byte PAK match
+    5. Conversational Hinglish AI Modding Chat Companion
     """
     print_banner()
     console.print(Panel(
-        "[bold bright_cyan]🤖 AI MODDING ASSISTANT & COMPANION 🤖[/bold bright_cyan]\n\n"
-        "[bold white]Ha bhai! Kya krna h?[/bold white]\n"
-        "[bold bright_yellow]PAK bnana h, unpack krna h, lua compile krna h ya fix krna h? Batao kya krna h![/bold bright_yellow]\n\n"
-        "[dim]Type 'exit' or press Ctrl+C anytime to stop assistant.[/dim]",
-        border_style="cyan",
+        "[bold bright_cyan]🤖 FEATURESTIC AI ALL-IN-ONE MODDING ASSISTANT 🤖[/bold bright_cyan]\n\n"
+        "[bold white]Haan bhai! Main aapka AI Modding Assistant hu.[/bold white]\n"
+        "[bold bright_yellow]Kuch bhi bolo — PAK unpack/repack, size match, unpacked functions scan, ya custom Lua mod script banwana ho, sab direct karke dunga! 🚀[/bold bright_yellow]\n\n"
+        "[bold bright_green]⚡ ALL-IN-ONE CAPABILITIES:[/bold bright_green]\n"
+        " • 📦 [bold white]PAK / OBB Tools:[/bold white] Unpack, Repack, In-Place block fit & 100% Size Matching\n"
+        " • 🔍 [bold white]Function Scanner:[/bold white] Unpacked folder scan karke functions & hooks inspect karna\n"
+        " • 📜 [bold white]Custom Lua Generator:[/bold white] Working Lua 5.1 mods (Recoil, ESP, Speed, Anti-ban, Menu)\n"
+        " • 🛠️ [bold white]Auto Syntax Repair:[/bold white] Broken scripts ko instant fix karke .luac me compile karna\n"
+        " • 👁️ [bold white]Live File Watcher:[/bold white] Drop any file in INPUT/PAK/LUA for instant 1-click action\n\n"
+        "[dim]💡 Quick Commands: [1/scan] Function Scanner & Modder  |  [2/size] Size Equalizer  |  [3/pak] PAK Tools  |  [4/lua] LUA Tools  |  [0/exit] Back[/dim]",
+        border_style="bright_cyan",
         box=ROUNDED
     ))
 
@@ -3520,7 +3589,9 @@ def run_ai_watch_assistant(data_path: Path):
                 if f.is_file() and not f.name.startswith("."):
                     processed_files.add(f.resolve())
 
-    console.print("\n[bold bright_yellow]👁️ AI Watch Assistant Active! Listening for new files or commands...[/bold bright_yellow]\n")
+    console.print("\n[bold bright_yellow]👁️ AI Watch & Chat Active! Listening for files, voice/text commands, or questions...[/bold bright_yellow]\n")
+
+    history = []
 
     while True:
         try:
@@ -3617,7 +3688,7 @@ def run_ai_watch_assistant(data_path: Path):
                                     console.print(f"[bold green]   Also saved to SDCard: {sd_unpack}[/bold green]")
                                 except Exception:
                                     pass
-                            console.print("[bold bright_cyan]💡 AI Suggestion: Iske baad Option [1] -> Option [2] se files replace/repack karke game me test kar sakte hain![/bold bright_cyan]\n")
+                            console.print("[bold bright_cyan]💡 AI Suggestion: Iske baad Option [1] se functions scan karke custom Lua mod generate kar sakte hain ya Option [2] se repack kar sakte hain![/bold bright_cyan]\n")
 
                         elif ext in ['.lua', '.txt'] or 'lua' in action or 'compile' in action or 'auto' in action:
                             if action == 'fix' or 'fix' in action or 'repair' in action:
@@ -3665,10 +3736,10 @@ def run_ai_watch_assistant(data_path: Path):
                         send_telegram_bug_report(
                             error_type=type(ex).__name__,
                             error_msg=str(ex),
-                            context=f"AI Watch Assistant processing file '{new_file.name}'",
+                            context=f"AI Assistant processing file '{new_file.name}'",
                             file_name="FeaturesticLeaks.py",
                             line_no="7395",
-                            func_name="run_ai_watch_assistant",
+                            func_name="run_ai_all_in_one_assistant",
                             stack_trace=traceback.format_exc()
                         )
                         console.print("[bold green]📲 Auto-sent error bug report directly to developer Telegram group![/bold green]")
@@ -3684,23 +3755,27 @@ def run_ai_watch_assistant(data_path: Path):
             if not new_file:
                 user_msg = safe_input("\n💬 You: ").strip()
                 if user_msg.lower() in ['exit', 'quit', 'back', 'cancel', '0']:
-                    console.print("[bold cyan]🤖 AI Assistant: Watch mode stopped. Main menu me wapas aa gaye![/bold cyan]")
+                    console.print("[bold cyan]🤖 AI Assistant: Main menu me wapas aa gaye![/bold cyan]")
                     break
                 
                 if user_msg:
                     low_um = user_msg.lower()
                     
-                    if low_um in ['1', 'pak', 'obb', 'pak tool', 'pak tools', 'pak/obb']:
+                    # Quick Commands / Shortcuts
+                    if low_um in ['1', 'scan', 'scanner', 'code scan', 'function scan', 'function scanner', 'mod generator', 'scan function']:
+                        console.print("[bold cyan]🤖 AI Assistant: Unpacked Code Scanner & Function Modder launch ho raha hai...[/bold cyan]")
+                        run_ai_function_mod_generator(data_path)
+                        continue
+                    elif low_um in ['2', 'size', 'size match', 'size pad', 'size same', 'file size']:
+                        process_ai_smart_command("size match karo", data_path)
+                        continue
+                    elif low_um in ['3', 'pak', 'obb', 'pak tool', 'pak tools', 'pak/obb']:
                         console.print("[bold cyan]🚀 Opening PAK/OBB Tools Module...[/bold cyan]\n")
                         pak_obb_tools_menu(data_path)
                         continue
-                    elif low_um in ['2', 'lua', 'luac', 'lua tool', 'lua tools']:
+                    elif low_um in ['4', 'lua', 'luac', 'lua tool', 'lua tools']:
                         console.print("[bold cyan]🚀 Opening LUA Tools Module...[/bold cyan]\n")
                         lua_tools_menu(data_path)
-                        continue
-                    elif low_um in ['3', 'ai tools', 'ai tool', 'keys', 'telegram', 'repair']:
-                        console.print("[bold cyan]🚀 Opening AI Tools & Multi-API Manager...[/bold cyan]\n")
-                        ai_tools_menu(data_path)
                         continue
 
                     handled = process_ai_smart_command(user_msg, data_path)
@@ -3709,91 +3784,45 @@ def run_ai_watch_assistant(data_path: Path):
                         console.print("[dim cyan]🤖 AI Assistant is thinking...[/dim cyan]")
                         live_ctx = get_live_workspace_context(data_path)
                         sys_prompt = (
-                            "You are Featurestic Leaks AI, a highly intelligent, polite, friendly PUBG/BGMI PAK & Lua modding expert AI assistant. "
-                            "Respond naturally, conversationally, and helpfully in friendly Hinglish with appropriate formatting and emojis.\n\n"
+                            "You are Featurestic Leaks AI, a world-class, polite, friendly PUBG/BGMI PAK & Lua modding expert AI assistant. "
+                            "Respond naturally, conversationally, and helpfully in friendly Hinglish with clear formatting, step-by-step guidance, and emojis.\n\n"
                             f"{live_ctx}"
                         )
-                        resp = call_ai_api(f"{sys_prompt}\nUser typed: '{user_msg}'")
+                        prompt = f"{sys_prompt}\n"
+                        if history:
+                            prompt += "Recent Chat History:\n" + "\n".join(history[-4:]) + "\n"
+                        prompt += f"User: {user_msg}\nAI Assistant:"
+
+                        resp = call_ai_api(prompt)
                         if resp:
                             console.print(f"\n[bold bright_cyan]🤖 AI Assistant:[/bold bright_cyan]\n{resp.strip()}\n")
+                            history.append(f"User: {user_msg}")
+                            history.append(f"AI: {resp.strip()}")
                         else:
-                            console.print("\n[bold bright_cyan]🤖 AI Assistant:[/bold bright_cyan] Haan bhai! Main aapka Featurestic Leaks AI Assistant hu. Batao kya help chahiye? 🚀\n")
+                            fallback = get_fallback_ai_response(user_msg)
+                            console.print(f"\n[bold bright_cyan]🤖 AI Assistant:[/bold bright_cyan]\n{fallback}\n")
                     continue
                 else:
                     time.sleep(1)
 
         except KeyboardInterrupt:
-            console.print("\n[bold yellow]⏹️ AI Watch Assistant Stopped.[/bold yellow]")
+            console.print("\n[bold yellow]⏹️ AI Assistant Stopped.[/bold yellow]")
             break
         except Exception as e:
             console.print(f"[dim yellow][!] Assistant note: {e}[/dim yellow]")
             time.sleep(2)
 
 
-def run_ai_chat_mode(data_path: Path):
-    """
-    FRIENDLY CONVERSATIONAL AI CHAT COMPANION
-    User can directly chat with AI or command PAK unpack, Lua compile, syntax repair, etc.
-    """
-    print_banner()
-    console.print(Panel(
-        "[bold bright_cyan]💬 FRIENDLY AI CHAT COMPANION 💬[/bold bright_cyan]\n\n"
-        "[bold white]Haan bhai! Batao kya help chahiye?[/bold white]\n"
-        "[bold bright_yellow]PAK unpack, repack, Lua compile, ya script fix — sab kuch yahan ask kar sakte ho![/bold bright_yellow]\n\n"
-        "[dim]Type 'exit' or 'back' anytime to return to menu.[/dim]",
-        border_style="cyan",
-        box=ROUNDED
-    ))
-
-    system_context = (
-        "You are Featurestic Leaks AI, a super friendly, intelligent, and helpful AI modding companion. "
-        "You talk in casual, enthusiastic, natural Hinglish (Hindi + English). "
-        "Answer freely, creatively, and uniquely to whatever the user asks, without repeating fixed or canned templates. "
-        "Be friendly, polite, encouraging, and use clear formatting with emojis!"
-    )
-
-    history = []
-
-    while True:
-        try:
-            user_msg = safe_input("\n[bold bright_yellow]💬 You:[/bold bright_yellow] ").strip()
-            if not user_msg:
-                continue
-            if user_msg.lower() in ['exit', 'quit', 'back', '0']:
-                console.print("[bold cyan]🤖 AI: Alvida! Phir milenge dosto! Happy Modding! 🚀[/bold cyan]\n")
-                break
-
-            handled = process_ai_smart_command(user_msg, data_path)
-
-            if not handled:
-                live_ctx = get_live_workspace_context(data_path)
-                prompt = f"{system_context}\n\n{live_ctx}\n"
-                if history:
-                    prompt += "Recent Chat History:\n" + "\n".join(history[-6:]) + "\n"
-                prompt += f"User: {user_msg}\nAI Assistant:"
-
-                console.print("[dim cyan]🤖 AI Assistant is thinking...[/dim cyan]")
-                response = call_ai_api(prompt)
-
-                if response:
-                    console.print(f"\n[bold bright_cyan]🤖 AI Assistant:[/bold bright_cyan]\n{response.strip()}\n")
-                    history.append(f"User: {user_msg}")
-                    history.append(f"AI: {response.strip()}")
-                else:
-                    console.print("\n[bold bright_cyan]🤖 AI Assistant:[/bold bright_cyan] Haan bhai! Main aapka Featurestic Leaks AI Assistant hu. Direct apana sawaal ya problem poochho! 🚀\n")
-
-        except KeyboardInterrupt:
-            console.print("\n[bold yellow]Chat ended.[/bold yellow]")
-            break
-        except Exception as ex:
-            console.print(f"[dim red]Chat note: {ex}[/dim red]")
+# Aliases for backwards compatibility
+run_ai_watch_assistant = run_ai_all_in_one_assistant
+run_ai_chat_mode = run_ai_all_in_one_assistant
 
 
 def ai_tools_menu(data_path: Path):
     while True:
         print_banner()
         ai_table = Table(
-            title="[bold bright_cyan]🤖 AI MODDING & REVERSE-ENGINEERING SUITE 🤖[/bold bright_cyan]",
+            title="[bold bright_cyan]🤖 FEATURESTIC AI MODDING ENGINE 🤖[/bold bright_cyan]",
             show_header=True,
             header_style="bold bright_cyan",
             box=ROUNDED,
@@ -3801,25 +3830,21 @@ def ai_tools_menu(data_path: Path):
             expand=True
         )
         ai_table.add_column("OPT", justify="center", width=8, style="bold bright_yellow")
-        ai_table.add_column("MODULE", justify="left", width=28, style="bold bright_white")
+        ai_table.add_column("MODULE", justify="left", width=34, style="bold bright_white")
         ai_table.add_column("DESCRIPTION", justify="left", style="bright_cyan")
 
-        ai_table.add_row("[1]", "AI Function Scanner & Modder 🧠", "Deep scan unpacked files, inspect functions & generate custom Lua 5.1 mods")
-        ai_table.add_row("[2]", "AI Interactive Chat & Watch Assistant 👁️💬", "All-in-One: Live file watcher, instant chat, auto-unpack, compile & smart voice/text commands")
-        ai_table.add_row("[3]", "OpenCode API & Keys Settings 🔑", "Manage multiple OpenCode AI keys, endpoints and Telegram bot config")
+        ai_table.add_row("[1]", "Featurestic AI Assistant (All-in-One) 🤖", "Live watcher, smart chat, PAK unpack/repack, size match, function scan & Lua modder")
+        ai_table.add_row("[2]", "OpenCode API & Keys Settings 🔑", "Manage multiple OpenCode AI keys, endpoints and Telegram bot config")
         ai_table.add_row("[0]", "Back to Main Menu ↩", "Return to main screen")
 
         console.print(ai_table)
         console.print()
-        choice = safe_input('\033[1;36mSELECT AI OPTION [1-3] [0]: \033[0m').strip()
+        choice = safe_input('\033[1;36mSELECT AI OPTION [1-2] [0]: \033[0m').strip()
 
         if choice == '1':
-            run_ai_function_mod_generator(data_path)
+            run_ai_all_in_one_assistant(data_path)
             safe_input('\nPress Enter to continue...')
         elif choice == '2':
-            run_ai_watch_assistant(data_path)
-            safe_input('\nPress Enter to continue...')
-        elif choice == '3':
             manage_ai_api_keys()
         elif choice in ['0', 'back', 'exit']:
             break
@@ -3948,14 +3973,13 @@ def main_menu():
         menu_table.add_row("[1]", "AI Assistant & Modder 🤖", "1-Click AI Companion for Auto Unpack, Repack, Lua Inject & Modding")
         menu_table.add_row("[2]", "PAK Tools 📦", "Unpack, Repack, Replace & Inject PAK/OBB")
         menu_table.add_row("[3]", "LUA Tools 🌙", "Compile, Decompile & Auto 1-Click Lua Workflow")
-        menu_table.add_row("[4]", "OpenCode API & Settings 🔑", "Manage OpenCode API Keys (Multi-Key), Endpoint & Telegram Bot")
-        menu_table.add_row("[5]", "Utilities & Help 🛠️", "UE4 tools, File Resizer, Patcher, Shortcuts & Guides")
+        menu_table.add_row("[4]", "Utilities & Help 🛠️", "UE4 tools, File Resizer, Patcher, Shortcuts & Guides")
         menu_table.add_row("[U]", "Auto-Update 🚀", "Check & install latest GitHub version")
         menu_table.add_row("[0]", "EXIT ✗", "Close application")
 
         console.print(menu_table)
         console.print()
-        choice = safe_input('\033[1;36mSELECT OPTION [1-5 / U] [0]: \033[0m').strip()
+        choice = safe_input('\033[1;36mSELECT OPTION [1-4 / U] [0]: \033[0m').strip()
 
         if choice == '1':
             ai_tools_menu(data_path)
@@ -3963,9 +3987,7 @@ def main_menu():
             pak_obb_tools_menu(data_path)
         elif choice == '3':
             lua_tools_menu(data_path)
-        elif choice == '4':
-            manage_ai_api_keys()
-        elif choice == '5' or choice.lower() in ['util', 'utils', 'utilities', 'help']:
+        elif choice in ['4', '5'] or choice.lower() in ['util', 'utils', 'utilities', 'help']:
             utilities_menu(data_path)
         elif choice.lower() in ['u', 'update', 'autoupdate', 'auto-update']:
             check_and_auto_update(interactive=True)
